@@ -34,10 +34,61 @@ export function DashboardContent() {
   }
 
   if (stats.error || buildings.error) {
+    const err = stats.error ?? buildings.error;
+    const code = err?.data?.code;
+    const msg = err?.message;
+
+    if (code === "FORBIDDEN" || msg?.includes("No organization")) {
+      return (
+        <div className="py-12 text-center">
+          <p className="text-sm font-medium text-gray-900">No organization selected</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Create or select an organization to view your portfolio.
+          </p>
+          <a
+            href="/onboarding"
+            className="mt-4 inline-block rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            Get started
+          </a>
+        </div>
+      );
+    }
+
+    if (code === "NOT_FOUND" || msg?.includes("Organization not found")) {
+      return (
+        <div className="py-12 text-center">
+          <p className="text-sm font-medium text-gray-900">Organization syncing</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Your organization is being set up. This usually takes a few seconds.
+          </p>
+          <button
+            onClick={() => {
+              stats.refetch();
+              buildings.refetch();
+            }}
+            className="mt-4 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
     return (
-      <p className="py-12 text-center text-sm text-gray-500">
-        Something went wrong. Try refreshing.
-      </p>
+      <div className="py-12 text-center">
+        <p className="text-sm text-gray-500">Something went wrong.</p>
+        <p className="mt-1 text-xs text-gray-400">{msg}</p>
+        <button
+          onClick={() => {
+            stats.refetch();
+            buildings.refetch();
+          }}
+          className="mt-4 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Retry
+        </button>
+      </div>
     );
   }
 
@@ -47,9 +98,9 @@ export function DashboardContent() {
   const scoredCount = s.compliant + s.atRisk + s.nonCompliant;
 
   // Client-side status filter
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filtered = statusFilter
     ? b.buildings.filter(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (bld: any) =>
           bld.latestSnapshot?.complianceStatus === statusFilter ||
           (!bld.latestSnapshot && statusFilter === "PENDING_DATA"),

@@ -232,7 +232,6 @@ export async function runIngestionPipeline(
 ): Promise<IngestionPipelineResult> {
   const startTime = Date.now();
   const errors: string[] = [];
-  let snapshotId: string | null = null;
   let pipelineRunId: string | null = null;
   let espmSyncResult: ESPMSyncResult | null = null;
 
@@ -339,7 +338,6 @@ export async function runIngestionPipeline(
     const snapshot = await input.tenantDb.complianceSnapshot.create({
       data: snapshotData,
     });
-    snapshotId = snapshot.id;
 
     // Step 5: Create PipelineRun audit record
     const durationMs = Date.now() - startTime;

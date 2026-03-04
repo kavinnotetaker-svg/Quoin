@@ -1,3 +1,4 @@
+import "./lib/config"; // Validate env vars before starting workers
 import { startDataIngestionWorker } from "./pipelines/data-ingestion/worker";
 
 console.log("[Worker] Starting Quoin worker process...");
