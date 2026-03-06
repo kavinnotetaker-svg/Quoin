@@ -12,40 +12,47 @@ interface OrgRow {
   tier: string;
 }
 
-/** Find org by Clerk ID using raw SQL (bypasses Prisma model layer issues). */
+/** Find org by Clerk ID using Prisma models. */
 async function findOrgByClerkId(clerkOrgId: string): Promise<OrgRow | null> {
-  const rows = await prisma.$queryRawUnsafe<OrgRow[]>(
-    `SELECT id, name, slug, clerk_org_id, tier
-     FROM organizations
-     WHERE clerk_org_id = $1
-     LIMIT 1`,
-    clerkOrgId,
-  );
-  return rows[0] ?? null;
+  const org = await prisma.organization.findUnique({
+    where: { clerkOrgId },
+    select: { id: true, name: true, slug: true, clerkOrgId: true, tier: true }
+  });
+  if (!org) return null;
+  return {
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    clerk_org_id: org.clerkOrgId,
+    tier: org.tier
+  };
 }
 
-/** Upsert org via raw SQL — bypasses RLS and Prisma model validation. */
+/** Upsert org using Prisma models. */
 async function ensureOrgExists(
   clerkOrgId: string,
   name: string,
   slug: string,
 ): Promise<OrgRow> {
-  const id = createId();
-  const now = new Date();
+  const org = await prisma.organization.upsert({
+    where: { clerkOrgId },
+    update: {},
+    create: {
+      name,
+      slug,
+      clerkOrgId,
+      tier: 'FREE'
+    },
+    select: { id: true, name: true, slug: true, clerkOrgId: true, tier: true }
+  });
 
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO organizations (id, name, slug, clerk_org_id, tier, settings, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, 'FREE', '{}', $5, $5)
-     ON CONFLICT (clerk_org_id) DO NOTHING`,
-    id, name, slug, clerkOrgId, now,
-  );
-
-  // Always re-fetch to get the actual row (either existing or newly inserted)
-  const org = await findOrgByClerkId(clerkOrgId);
-  if (!org) {
-    throw new Error(`Failed to upsert organization for clerk_org_id=${clerkOrgId}`);
-  }
-  return org;
+  return {
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    clerk_org_id: org.clerkOrgId,
+    tier: org.tier
+  };
 }
 
 export async function createContext() {

@@ -35,14 +35,14 @@ export const buildingRouter = router({
     let buildingCount = 0;
 
     if (ctx.clerkOrgId) {
-      const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
-        `SELECT id FROM organizations WHERE clerk_org_id = $1 LIMIT 1`,
-        ctx.clerkOrgId,
-      );
-      if (rows[0]) {
+      const org = await prisma.organization.findUnique({
+        where: { clerkOrgId: ctx.clerkOrgId },
+        select: { id: true }
+      });
+      if (org) {
         orgExists = true;
         buildingCount = await prisma.building.count({
-          where: { organizationId: rows[0].id },
+          where: { organizationId: org.id },
         });
       }
     }
