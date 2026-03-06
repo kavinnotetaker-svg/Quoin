@@ -27,9 +27,10 @@ describe("Snapshot — EUI Calculation", () => {
     expect(eui.totalSiteKBtu).toBe(145_010 * 12);
     // Site EUI = 1,740,120 / 150,000 = 11.6008
     expect(eui.siteEui).toBeCloseTo(11.6008, 2);
-    // Source EUI = 1,740,120 × 2.80 / 150,000 = 32.482
-    expect(eui.sourceEui).toBeCloseTo(eui.siteEui * 2.8, 2);
+    // Source EUI = 1,740,120 × 2.70 / 150,000 (DC 2024-2026 EPA ratio)
+    expect(eui.sourceEui).toBeCloseTo(eui.siteEui * 2.70, 2);
     expect(eui.fuelBreakdown["ELECTRIC"]).toBe(145_010 * 12);
+    expect(eui.sourceFactorsUsed["ELECTRIC"]).toBe(2.70);
   });
 
   it("calculates dual-fuel EUI with correct source-site ratios", () => {
@@ -49,13 +50,15 @@ describe("Snapshot — EUI Calculation", () => {
     const eui = calculateEUI(readings, 100_000);
 
     expect(eui.totalSiteKBtu).toBe(150_000);
-    // Source: electric 100K × 2.80 = 280K, gas 50K × 1.05 = 52.5K → total 332.5K
-    expect(eui.totalSourceKBtu).toBe(100_000 * 2.8 + 50_000 * 1.05);
+    // Source: electric 100K × 2.70 = 270K, gas 50K × 1.05 = 52.5K → total 322.5K
+    expect(eui.totalSourceKBtu).toBe(100_000 * 2.70 + 50_000 * 1.05);
     expect(eui.siteEui).toBe(1.5);
-    expect(eui.sourceEui).toBeCloseTo(3.325, 3);
+    expect(eui.sourceEui).toBeCloseTo(3.225, 3);
     expect(eui.fuelBreakdown["ELECTRIC"]).toBe(100_000);
     expect(eui.fuelBreakdown["GAS"]).toBe(50_000);
     expect(eui.monthsCovered).toBe(1);
+    expect(eui.sourceFactorsUsed["ELECTRIC"]).toBe(2.70);
+    expect(eui.sourceFactorsUsed["GAS"]).toBe(1.05);
   });
 
   it("returns zeros for empty readings", () => {
@@ -104,7 +107,7 @@ describe("Snapshot — EUI Calculation", () => {
     expect(eui.readingCount).toBe(3);
   });
 
-  it("uses 1.45 ratio for STEAM", () => {
+  it("uses 1.20 ratio for STEAM (DC 2024-2026 EPA factor)", () => {
     const readings: EUIReading[] = [
       {
         consumptionKbtu: 100_000,
@@ -113,7 +116,8 @@ describe("Snapshot — EUI Calculation", () => {
       },
     ];
     const eui = calculateEUI(readings, 100_000);
-    expect(eui.sourceEui).toBeCloseTo(1.45, 3);
+    expect(eui.sourceEui).toBeCloseTo(1.20, 3);
+    expect(eui.sourceFactorsUsed["STEAM"]).toBe(1.20);
   });
 });
 
@@ -245,6 +249,8 @@ describe("Snapshot — buildSnapshotData", () => {
       energyStarScore: 45,
       siteEui: 120.5,
       sourceEui: 337.4,
+      totalSiteKbtu: 18_075_000,
+      totalSourceKbtu: 50_610_000,
       weatherNormalizedSiteEui: 115.2,
       dataQualityScore: 85,
     });
@@ -270,6 +276,8 @@ describe("Snapshot — buildSnapshotData", () => {
       energyStarScore: 68,
       siteEui: 82,
       sourceEui: 229.6,
+      totalSiteKbtu: 16_400_000,
+      totalSourceKbtu: 45_920_000,
       weatherNormalizedSiteEui: 79.5,
     });
 
@@ -288,6 +296,8 @@ describe("Snapshot — buildSnapshotData", () => {
       energyStarScore: null,
       siteEui: 95.2,
       sourceEui: 266.56,
+      totalSiteKbtu: 7_616_000,
+      totalSourceKbtu: 21_324_800,
       weatherNormalizedSiteEui: null,
     });
 
@@ -305,6 +315,8 @@ describe("Snapshot — buildSnapshotData", () => {
       energyStarScore: 0,
       siteEui: 200,
       sourceEui: 560,
+      totalSiteKbtu: 200_000_000,
+      totalSourceKbtu: 560_000_000,
       weatherNormalizedSiteEui: 195.0,
     });
 

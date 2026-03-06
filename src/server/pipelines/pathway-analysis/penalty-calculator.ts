@@ -4,7 +4,9 @@ import type {
   PrescriptivePathwayInput,
   PenaltyResult,
   AllPathwaysResult,
+  MetricAwarePenaltyInput,
 } from "./types";
+import { RegulatoryDataError } from "../shared/source-factors";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -230,6 +232,84 @@ export function determineApplicablePathway(
   if (currentScore >= bepsTargetScore) return "COMPLIANT";
   if (currentScore > 55) return "STANDARD_TARGET";
   return "PERFORMANCE";
+}
+
+// ─── Metric-Aware Pathway Switch ─────────────────────────────────────────────
+
+/**
+ * Route penalty calculation to the correct metric based on pathway type.
+ *
+ * DC BEPS Dual-Metric Model:
+ * - StandardTarget: Uses Source EUI to compare against the DC Property Type Median
+ *   (since the median is derived from ENERGY STAR Scores, which are source-based).
+ * - Performance: Uses Site EUI to calculate the 20% reduction target from the
+ *   2019 baseline (site-based measurement).
+ *
+ * Mixing these up produces incorrect penalty projections.
+ *
+ * @throws {RegulatoryDataError} if required metric data is null/undefined for the chosen pathway
+ */
+export function calculateMetricAwarePenalty(
+  input: MetricAwarePenaltyInput,
+): PenaltyResult {
+  if (input.pathway === "STANDARD_TARGET") {
+    if (input.currentScore == null) {
+      throw new RegulatoryDataError(
+        "StandardTarget pathway requires a current ENERGY STAR score (source-based), but it is null. " +
+          "Ensure ESPM sync has completed and returned a valid score.",
+        "currentScore",
+      );
+    }
+    if (input.baselineScore == null) {
+      throw new RegulatoryDataError(
+        "StandardTarget pathway requires a baseline ENERGY STAR score, but it is null. " +
+          "Set the baseline score from the building's 2019 benchmark year.",
+        "baselineScore",
+      );
+    }
+
+    return calculateStandardTargetPenalty({
+      grossSquareFeet: input.grossSquareFeet,
+      propertyType: input.propertyType,
+      bepsTargetScore: input.bepsTargetScore,
+      baselineScore: input.baselineScore,
+      currentScore: input.currentScore,
+      maxGapForPropertyType: input.maxGapForPropertyType,
+    });
+  }
+
+  if (input.pathway === "PERFORMANCE") {
+    if (input.baselineSiteEui == null) {
+      throw new RegulatoryDataError(
+        "Performance pathway requires a baseline Site EUI (2019), but it is null. " +
+          "Upload or sync the building's 2019 baseline energy data.",
+        "baselineSiteEui",
+      );
+    }
+    if (input.currentSiteEui == null) {
+      throw new RegulatoryDataError(
+        "Performance pathway requires a current Site EUI, but it is null. " +
+          "Ensure recent energy readings have been ingested.",
+        "currentSiteEui",
+      );
+    }
+
+    return calculatePerformancePenalty({
+      grossSquareFeet: input.grossSquareFeet,
+      propertyType: input.propertyType,
+      bepsTargetScore: input.bepsTargetScore,
+      baselineAdjustedSiteEui: input.baselineSiteEui,
+      currentAdjustedSiteEui: input.currentSiteEui,
+      targetReductionPct: input.targetReductionPct ?? PERFORMANCE_TARGET_PCT,
+    });
+  }
+
+  // Exhaustive check — should never reach here
+  const _exhaustive: never = input.pathway;
+  throw new RegulatoryDataError(
+    `Unknown pathway: ${_exhaustive}`,
+    "pathway",
+  );
 }
 
 // ─── All Pathways Comparison ─────────────────────────────────────────────────

@@ -12,7 +12,6 @@ import type { BuildingCapitalProfile, EligibilityResult } from "./types";
 
 const CLEER_MIN_PROJECT_COST = 10_000;
 const CLEER_MAX_LOAN = 250_000;
-const CLEER_MIN_TERM = 2;
 const CLEER_MAX_TERM = 12;
 const CLEER_INTEREST_RATE = 3.0; // Low-interest per Doc4 (City First partnership)
 const CLEER_MIN_MULTIFAMILY_UNITS = 5;

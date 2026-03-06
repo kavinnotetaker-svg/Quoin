@@ -1,5 +1,5 @@
 import { espmParser } from "./xml-config";
-import type { PropertyMetrics, ESPMMetric } from "./types";
+import type { PropertyMetrics } from "./types";
 
 /**
  * Parsed ESPM metrics subset needed for BEPS compliance tracking.

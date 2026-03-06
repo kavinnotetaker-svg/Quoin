@@ -1,16 +1,6 @@
 import type { MeterType } from "./types";
 import { calculateMaxPenalty } from "../pathway-analysis/penalty-calculator";
-
-/**
- * Source-to-site energy ratios per ENERGY STAR reference.
- * Used to convert site energy to source energy for EUI calculations.
- */
-const SOURCE_SITE_RATIOS: Record<MeterType, number> = {
-  ELECTRIC: 2.8,
-  GAS: 1.05,
-  STEAM: 1.45,
-  OTHER: 1.0,
-};
+import { getSourceRatio } from "../shared/source-factors";
 
 export interface EUICalculation {
   siteEui: number;
@@ -20,6 +10,8 @@ export interface EUICalculation {
   readingCount: number;
   monthsCovered: number;
   fuelBreakdown: Record<string, number>;
+  /** Per-fuel-type source factors used in this calculation (for audit trail) */
+  sourceFactorsUsed: Record<string, number>;
 }
 
 export interface EUIReading {
@@ -48,20 +40,23 @@ export function calculateEUI(
       readingCount: 0,
       monthsCovered: 0,
       fuelBreakdown: {},
+      sourceFactorsUsed: {},
     };
   }
 
   let totalSiteKBtu = 0;
   let totalSourceKBtu = 0;
   const fuelBreakdown: Record<string, number> = {};
+  const sourceFactorsUsed: Record<string, number> = {};
   const months = new Set<string>();
 
   for (const reading of readings) {
     const kbtu = reading.consumptionKbtu;
     totalSiteKBtu += kbtu;
 
-    const ratio = SOURCE_SITE_RATIOS[reading.meterType] ?? 1.0;
+    const ratio = getSourceRatio(reading.meterType);
     totalSourceKBtu += kbtu * ratio;
+    sourceFactorsUsed[reading.meterType] = ratio;
 
     fuelBreakdown[reading.meterType] =
       (fuelBreakdown[reading.meterType] ?? 0) + kbtu;
@@ -80,6 +75,7 @@ export function calculateEUI(
     readingCount: readings.length,
     monthsCovered: months.size,
     fuelBreakdown,
+    sourceFactorsUsed,
   };
 }
 
@@ -174,6 +170,8 @@ export interface SnapshotInput {
   energyStarScore: number | null;
   siteEui: number;
   sourceEui: number;
+  totalSiteKbtu: number;
+  totalSourceKbtu: number;
   weatherNormalizedSiteEui: number | null;
   dataQualityScore?: number;
 }
@@ -205,6 +203,8 @@ export function buildSnapshotData(input: SnapshotInput) {
     energyStarScore: input.energyStarScore,
     siteEui: input.siteEui,
     sourceEui: input.sourceEui,
+    totalSiteKbtu: input.totalSiteKbtu,
+    totalSourceKbtu: input.totalSourceKbtu,
     complianceStatus: status,
     complianceGap: gap,
     estimatedPenalty: penalty,

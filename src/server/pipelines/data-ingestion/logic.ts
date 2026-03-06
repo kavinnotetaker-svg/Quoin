@@ -9,7 +9,6 @@ import {
 import { syncWithESPM, type ESPMSyncResult } from "./espm-sync";
 import type { ESPM } from "@/server/integrations/espm";
 import type { UploadResult, NormalizedReading, MeterType } from "./types";
-import { prisma } from "@/server/lib/db";
 
 interface ProcessCSVParams {
   csvContent: string;
@@ -54,7 +53,7 @@ export async function processCSVUpload(
     tenantDb,
   } = params;
 
-  const uploadBatchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)} `;
+  const uploadBatchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const allWarnings: string[] = [];
   const allErrors: string[] = [];
 
@@ -280,19 +279,10 @@ export async function runIngestionPipeline(
       building.grossSquareFeet,
     );
 
-    // Step 3: Optional ESPM sync
+    // Step 3: Optional ESPM sync (skip if no espmPropertyId)
     let energyStarScore: number | null = null;
     let weatherNormalizedSiteEui: number | null = null;
-    let effectiveEspmId = building.espmPropertyId;
-
-    if (!effectiveEspmId && input.espmClient) {
-      // Auto-assign a mock property ID for testing the pipeline if none exists
-      effectiveEspmId = Math.floor(Math.random() * 900000 + 100000).toString();
-      await input.tenantDb.building.update({
-        where: { id: building.id },
-        data: { espmPropertyId: effectiveEspmId },
-      });
-    }
+    const effectiveEspmId = building.espmPropertyId;
 
     if (input.espmClient && effectiveEspmId) {
       const newReadings = await input.tenantDb.energyReading.findMany({
@@ -340,7 +330,7 @@ export async function runIngestionPipeline(
 
     // Carry forward previous score if ESPM didn't return one
     if (energyStarScore == null) {
-      const prevSnapshot = await prisma.complianceSnapshot.findFirst({
+      const prevSnapshot = await input.tenantDb.complianceSnapshot.findFirst({
         where: { buildingId: input.buildingId, energyStarScore: { not: null } },
         orderBy: { snapshotDate: "desc" },
       });
@@ -350,7 +340,8 @@ export async function runIngestionPipeline(
       }
     }
 
-    // Step 4: Build and persist ComplianceSnapshot (append-only)
+    // Step 4: Create PipelineRun FIRST so we can link it to the snapshot at create time
+    const durationMs = Date.now() - startTime;
     const snapshotData = buildSnapshotData({
       buildingId: input.buildingId,
       organizationId: input.organizationId,
@@ -359,17 +350,13 @@ export async function runIngestionPipeline(
       energyStarScore,
       siteEui: eui.siteEui,
       sourceEui: eui.sourceEui,
+      totalSiteKbtu: eui.totalSiteKBtu,
+      totalSourceKbtu: eui.totalSourceKBtu,
       weatherNormalizedSiteEui,
       dataQualityScore,
     });
 
-    const snapshot = await prisma.complianceSnapshot.create({
-      data: snapshotData,
-    });
-
-    // Step 5: Create PipelineRun audit record
-    const durationMs = Date.now() - startTime;
-    const pipelineRun = await prisma.pipelineRun.create({
+    const pipelineRun = await input.tenantDb.pipelineRun.create({
       data: {
         organizationId: input.organizationId,
         buildingId: input.buildingId,
@@ -386,7 +373,6 @@ export async function runIngestionPipeline(
           newReadings: uploadReadings.length,
         },
         outputSummary: {
-          snapshotId: snapshot.id,
           energyStarScore,
           siteEui: eui.siteEui,
           sourceEui: eui.sourceEui,
@@ -401,10 +387,12 @@ export async function runIngestionPipeline(
     });
     pipelineRunId = pipelineRun.id;
 
-    // Link snapshot to pipeline run
-    await prisma.complianceSnapshot.update({
-      where: { id: snapshot.id },
-      data: { pipelineRunId: pipelineRun.id },
+    // Step 5: Persist ComplianceSnapshot (append-only — INSERT only, never UPDATE)
+    const snapshot = await input.tenantDb.complianceSnapshot.create({
+      data: {
+        ...snapshotData,
+        pipelineRunId: pipelineRun.id,
+      },
     });
 
     return {
@@ -413,7 +401,7 @@ export async function runIngestionPipeline(
       pipelineRunId: pipelineRun.id,
       espmSync: espmSyncResult,
       errors,
-      summary: `EUI: ${eui.siteEui.toFixed(1)} kBtu / ft² | Score: ${energyStarScore ?? "N/A"} | Status: ${snapshotData.complianceStatus} | Penalty: $${snapshotData.estimatedPenalty.toLocaleString()} `,
+      summary: `EUI: ${eui.siteEui.toFixed(1)} kBtu/ft² | Score: ${energyStarScore ?? "N/A"} | Status: ${snapshotData.complianceStatus} | Penalty: $${snapshotData.estimatedPenalty.toLocaleString()}`,
     };
   } catch (err) {
     const durationMs = Date.now() - startTime;

@@ -62,8 +62,11 @@ describe("RLS Tenant Isolation", () => {
   afterAll(async () => {
     // Disable append-only rules for cleanup (superuser can ALTER TABLE)
     await prisma.$executeRawUnsafe(
-      `ALTER TABLE compliance_snapshots DISABLE RULE compliance_snapshots_no_delete`
-    ).catch(() => { }); // Ignore if rule doesn't exist or permission denied in CI
+      `ALTER TABLE compliance_snapshots DISABLE RULE IF EXISTS compliance_snapshots_no_delete`
+    ).catch(() => { /* Ignore if rule doesn't exist or permission denied in CI */ });
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE energy_readings DISABLE RULE IF EXISTS energy_readings_no_delete`
+    ).catch(() => { /* Ignore if rule doesn't exist */ });
 
     // Delete in FK order: snapshots → users → buildings → orgs
     await prisma.complianceSnapshot.deleteMany({
@@ -81,8 +84,11 @@ describe("RLS Tenant Isolation", () => {
 
     // Re-enable append-only rules
     await prisma.$executeRawUnsafe(
-      `ALTER TABLE compliance_snapshots ENABLE RULE compliance_snapshots_no_delete`
-    );
+      `ALTER TABLE compliance_snapshots ENABLE RULE IF EXISTS compliance_snapshots_no_delete`
+    ).catch(() => { /* Ignore if rule doesn't exist */ });
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE energy_readings ENABLE RULE IF EXISTS energy_readings_no_delete`
+    ).catch(() => { /* Ignore if rule doesn't exist */ });
 
     await prisma.$disconnect();
   });

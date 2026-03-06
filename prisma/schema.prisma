@@ -239,6 +239,8 @@ model EnergyReading {
   consumption     Float
   unit            EnergyUnit
   consumptionKbtu Float        @map("consumption_kbtu")
+  sourceKbtu      Float?       @map("source_kbtu")
+  sourceFactorUsed Float?      @map("source_factor_used")
   cost            Float?
   isVerified      Boolean      @default(false) @map("is_verified")
   uploadBatchId   String?      @map("upload_batch_id")
@@ -265,6 +267,8 @@ model ComplianceSnapshot {
   energyStarScore  Float?           @map("energy_star_score")
   siteEui          Float?           @map("site_eui")
   sourceEui        Float?           @map("source_eui")
+  totalSiteKbtu    Float?           @map("total_site_kbtu")
+  totalSourceKbtu  Float?           @map("total_source_kbtu")
   weatherNormalizedSiteEui Float?   @map("weather_normalized_site_eui")
   complianceStatus ComplianceStatus @map("compliance_status")
   complianceGap    Float?           @map("compliance_gap")
