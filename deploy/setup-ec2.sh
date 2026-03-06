@@ -10,6 +10,17 @@ sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -aG docker "$USER"
 
+# Allocate a 2GB swapfile conditionally
+if [ ! -f /swapfile ]; then
+    sudo dd if=/dev/zero of=/swapfile count=2048 bs=1MiB
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    sudo sh -c 'echo "/swapfile none swap sw 0 0" >> /etc/fstab'
+else
+    echo "Swapfile already exists."
+fi
+
 # Install Docker Compose
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose

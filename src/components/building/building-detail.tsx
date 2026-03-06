@@ -70,7 +70,7 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
         complianceStatus={snap?.complianceStatus ?? "PENDING_DATA"}
         estimatedPenalty={snap?.estimatedPenalty ?? null}
         bepsTargetScore={data.bepsTargetScore}
-        maxPenaltyExposure={data.maxPenaltyExposure}
+        grossSquareFeet={data.grossSquareFeet}
         snapshotDate={snap?.snapshotDate ?? null}
       />
 
@@ -82,13 +82,12 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
           <button
             key={tab.key}
             onClick={() => !tab.disabled && setActiveTab(tab.key)}
-            className={`border-b-2 pb-2 ${
-              tab.disabled
+            className={`border-b-2 pb-2 ${tab.disabled
                 ? "pointer-events-none border-transparent text-gray-300"
                 : activeTab === tab.key
                   ? "border-gray-900 text-gray-900"
                   : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
           >
             {tab.label}
             {tab.disabled && (

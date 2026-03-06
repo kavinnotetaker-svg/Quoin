@@ -11,6 +11,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
 RUN npm run build
+RUN npm run worker:build
 
 # Stage 3: Production image
 FROM node:20-alpine AS production
@@ -20,7 +21,6 @@ ENV NODE_ENV=production
 # Copy standalone Next.js output
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
 
 # Copy Prisma schema + generated client for migrations
 COPY --from=build /app/prisma ./prisma

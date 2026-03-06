@@ -131,13 +131,10 @@ export const buildingRouter = router({
   create: tenantProcedure
     .input(createBuildingInput)
     .mutation(async ({ ctx, input }) => {
-      const maxPenaltyExposure = Math.min(input.grossSquareFeet * 10, 7_500_000);
-
       const building = await ctx.tenantDb.building.create({
         data: {
           ...input,
           organizationId: ctx.organizationId,
-          maxPenaltyExposure,
         },
       });
 
@@ -166,17 +163,9 @@ export const buildingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const updateData: Record<string, unknown> = { ...input.data };
-      if (input.data.grossSquareFeet) {
-        updateData.maxPenaltyExposure = Math.min(
-          input.data.grossSquareFeet * 10,
-          7_500_000
-        );
-      }
-
       const building = await ctx.tenantDb.building.update({
         where: { id: input.id },
-        data: updateData,
+        data: input.data,
       });
 
       return building;

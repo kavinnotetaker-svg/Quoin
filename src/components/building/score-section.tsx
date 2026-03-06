@@ -5,7 +5,7 @@ interface ScoreSectionProps {
   complianceStatus: string;
   estimatedPenalty: number | null;
   bepsTargetScore: number;
-  maxPenaltyExposure: number;
+  grossSquareFeet: number;
   snapshotDate: string | Date | null;
 }
 
@@ -14,9 +14,10 @@ export function ScoreSection({
   complianceStatus,
   estimatedPenalty,
   bepsTargetScore,
-  maxPenaltyExposure,
+  grossSquareFeet,
   snapshotDate,
 }: ScoreSectionProps) {
+  const maxPenaltyExposure = Math.min(grossSquareFeet * 10, 7_500_000);
   const gap =
     energyStarScore != null ? energyStarScore - bepsTargetScore : null;
   const gapText =

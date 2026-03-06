@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
@@ -99,88 +99,8 @@ enum ComplianceStatus {
   PENDING_DATA
 }
 
-enum ECMCategory {
-  HVAC
-  LIGHTING
-  ENVELOPE
-  CONTROLS
-  DHW
-  PLUG_LOAD
-  OTHER
-}
-
-enum ECMStatus {
-  RECOMMENDED
-  APPROVED
-  IN_PROGRESS
-  COMPLETED
-  REJECTED
-}
-
-enum PathwayType {
-  STANDARD
-  PERFORMANCE
-  PRESCRIPTIVE
-}
-
-enum PathwayStatus {
-  DRAFT
-  ACTIVE
-  COMPLETED
-  ABANDONED
-}
-
-enum FundingType {
-  CLEER
-  CPACE
-  AHRA_GRANT
-  IRA_REBATE
-  OWNER_EQUITY
-  OTHER
-}
-
-enum ApplicationStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  SUBMITTED
-  APPROVED
-  DENIED
-}
-
-enum CapitalStackStatus {
-  DRAFT
-  PROPOSED
-  APPROVED
-  FUNDED
-  CLOSED
-}
-
-enum AlertSeverity {
-  INFO
-  WARNING
-  CRITICAL
-}
-
-enum AlertType {
-  EUI_SPIKE
-  SCORE_DROP
-  CONSUMPTION_ANOMALY
-  SEASONAL_DEVIATION
-  SUSTAINED_DRIFT
-}
-
-enum AlertStatus {
-  OPEN
-  ACKNOWLEDGED
-  RESOLVED
-  SUPPRESSED
-}
-
 enum PipelineType {
   DATA_INGESTION
-  PATHWAY_ANALYSIS
-  CAPITAL_STRUCTURING
-  DRIFT_DETECTION
   FULL_CYCLE
 }
 
@@ -197,20 +117,6 @@ enum PipelineStatus {
   COMPLETED
   FAILED
   CANCELLED
-}
-
-enum SubmissionType {
-  BENCHMARKING
-  COMPLETED_ACTIONS_REPORT
-  PATHWAY_SELECTION
-}
-
-enum SubmissionStatus {
-  DRAFT
-  VALIDATED
-  SUBMITTED
-  ACCEPTED
-  REJECTED
 }
 
 // ─── Models ─────────────────────────────────────────────────────────────────
@@ -243,7 +149,6 @@ model User {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   organization   Organization @relation(fields: [organizationId], references: [id])
-  resolvedAlerts DriftAlert[]
 
   @@index([organizationId])
   @@map("users")
@@ -262,32 +167,45 @@ model Building {
   espmPropertyId           BigInt?             @map("espm_property_id")
   espmShareStatus          EspmShareStatus     @default(UNLINKED) @map("espm_share_status")
   greenButtonStatus         GreenButtonStatus   @default(NONE) @map("green_button_status")
-  greenButtonAccessToken    String?             @map("green_button_access_token")
-  greenButtonRefreshToken   String?             @map("green_button_refresh_token")
-  greenButtonResourceUri    String?             @map("green_button_resource_uri")
-  greenButtonSubscriptionId String?             @map("green_button_subscription_id")
-  greenButtonTokenExpiresAt DateTime?           @map("green_button_token_expires_at")
-  greenButtonConnectedAt    DateTime?           @map("green_button_connected_at")
   dataIngestionMethod      DataIngestionMethod @default(CSV_UPLOAD) @map("data_ingestion_method")
   bepsTargetScore          Float               @map("beps_target_score")
   complianceCycle          ComplianceCycle     @default(CYCLE_1) @map("compliance_cycle")
   selectedPathway          SelectedPathway     @default(NONE) @map("selected_pathway")
-  maxPenaltyExposure       Float               @map("max_penalty_exposure")
+  doeeBuildingId           String?             @map("doee_building_id")
+  baselineYear             Int?                @map("baseline_year")
+  targetEui                Float?              @map("target_eui")
+  ward                     Int?
   createdAt                DateTime            @default(now()) @map("created_at")
   updatedAt                DateTime            @updatedAt @map("updated_at")
 
-  organization        Organization              @relation(fields: [organizationId], references: [id])
-  energyReadings      EnergyReading[]
-  complianceSnapshots ComplianceSnapshot[]
-  compliancePathways  CompliancePathway[]
-  capitalStacks       CapitalStack[]
-  driftAlerts         DriftAlert[]
-  pipelineRuns        PipelineRun[]
-  doeeSubmissions     DOEESubmission[]
-  ecms                EnergyConservationMeasure[]
+  organization          Organization              @relation(fields: [organizationId], references: [id])
+  energyReadings        EnergyReading[]
+  complianceSnapshots   ComplianceSnapshot[]
+  pipelineRuns          PipelineRun[]
+  greenButtonConnection GreenButtonConnection?
+  meters                Meter[]
 
   @@index([organizationId])
   @@map("buildings")
+}
+
+model Meter {
+  id             String     @id @default(cuid())
+  buildingId     String     @map("building_id")
+  organizationId String     @map("organization_id")
+  espmMeterId    BigInt?    @map("espm_meter_id")
+  meterType      MeterType  @map("meter_type")
+  name           String
+  unit           EnergyUnit
+  isActive       Boolean    @default(true) @map("is_active")
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  building       Building        @relation(fields: [buildingId], references: [id])
+  energyReadings EnergyReading[]
+
+  @@index([buildingId])
+  @@index([organizationId])
+  @@map("meters")
 }
 
 model EnergyReading {
@@ -306,8 +224,10 @@ model EnergyReading {
   uploadBatchId   String?      @map("upload_batch_id")
   rawPayload      Json?        @map("raw_payload")
   ingestedAt      DateTime     @default(now()) @map("ingested_at")
+  meterId         String?      @map("meter_id")
 
   building Building @relation(fields: [buildingId], references: [id])
+  meter    Meter?   @relation(fields: [meterId], references: [id])
 
   @@index([buildingId, periodStart(sort: Desc)])
   @@index([buildingId, source, ingestedAt(sort: Desc)])
@@ -329,142 +249,37 @@ model ComplianceSnapshot {
   complianceGap    Float?           @map("compliance_gap")
   estimatedPenalty Float?           @map("estimated_penalty")
   dataQualityScore Float?           @map("data_quality_score")
+  activePathway    SelectedPathway?  @map("active_pathway")
+  targetScore      Float?            @map("target_score")
+  targetEui        Float?            @map("target_eui")
+  penaltyInputsJson Json?            @map("penalty_inputs_json")
 
   building    Building     @relation(fields: [buildingId], references: [id])
   pipelineRun PipelineRun? @relation(fields: [pipelineRunId], references: [id])
-  doeeSubmissions DOEESubmission[]
 
   @@index([buildingId, snapshotDate(sort: Desc)])
   @@index([organizationId, buildingId])
   @@map("compliance_snapshots")
 }
 
-model EnergyConservationMeasure {
-  id                  String      @id @default(cuid())
-  buildingId          String      @map("building_id")
-  organizationId      String      @map("organization_id")
-  pathwayId           String      @map("pathway_id")
-  category            ECMCategory
-  name                String
-  estimatedCost       Float       @map("estimated_cost")
-  annualSavingsKbtu   Float       @map("annual_savings_kbtu")
-  annualSavingsDollars Float      @map("annual_savings_dollars")
-  scoreImpact         Float       @map("score_impact")
-  usefulLifeYears     Int         @map("useful_life_years")
-  implementationWeeks Int         @map("implementation_weeks")
-  isSelected          Boolean     @default(false) @map("is_selected")
-  status              ECMStatus   @default(RECOMMENDED)
-  source              String
-  createdAt           DateTime    @default(now()) @map("created_at")
-  updatedAt           DateTime    @updatedAt @map("updated_at")
+model GreenButtonConnection {
+  id             String            @id @default(cuid())
+  buildingId     String            @unique @map("building_id")
+  organizationId String            @map("organization_id")
+  status         GreenButtonStatus @default(PENDING_AUTH)
+  // TODO: Encrypt access and refresh tokens at rest before reaching production
+  accessToken    String            @map("access_token")
+  refreshToken   String            @map("refresh_token")
+  resourceUri    String?           @map("resource_uri")
+  subscriptionId String?           @map("subscription_id")
+  tokenExpiresAt DateTime?         @map("token_expires_at")
+  connectedAt    DateTime          @default(now()) @map("connected_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  building Building          @relation(fields: [buildingId], references: [id])
-  pathway  CompliancePathway @relation(fields: [pathwayId], references: [id])
+  building Building @relation(fields: [buildingId], references: [id])
 
-  @@index([organizationId, category, status])
-  @@index([organizationId, buildingId])
-  @@map("energy_conservation_measures")
-}
-
-model FundingSource {
-  id                String            @id @default(cuid())
-  capitalStackId    String            @map("capital_stack_id")
-  organizationId    String            @map("organization_id")
-  type              FundingType
-  amount            Float
-  interestRate      Float?            @map("interest_rate")
-  termMonths        Int?              @map("term_months")
-  monthlyPayment    Float?            @map("monthly_payment")
-  isEligible        Boolean           @map("is_eligible")
-  eligibilityNotes  String?           @map("eligibility_notes")
-  applicationStatus ApplicationStatus @default(NOT_STARTED) @map("application_status")
-  applicationUrl    String?           @map("application_url")
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
-
-  capitalStack CapitalStack @relation(fields: [capitalStackId], references: [id])
-
-  @@index([organizationId, type, applicationStatus])
   @@index([organizationId])
-  @@map("funding_sources")
-}
-
-model CompliancePathway {
-  id                       String        @id @default(cuid())
-  buildingId               String        @map("building_id")
-  organizationId           String        @map("organization_id")
-  pathwayType              PathwayType   @map("pathway_type")
-  baselineScore            Float         @map("baseline_score")
-  baselineEui              Float         @map("baseline_eui")
-  targetMetric             String        @map("target_metric")
-  projectedFinalScore      Float?        @map("projected_final_score")
-  projectedPenaltyReduction Float?       @map("projected_penalty_reduction")
-  confidenceLevel          Float?        @map("confidence_level")
-  totalEcmCost             Float?        @map("total_ecm_cost")
-  status                   PathwayStatus @default(DRAFT)
-  generatedAt              DateTime      @default(now()) @map("generated_at")
-  aiAnalysis               String?       @db.Text @map("ai_analysis")
-  aiModelUsed              String?       @map("ai_model_used")
-  createdAt                DateTime      @default(now()) @map("created_at")
-  updatedAt                DateTime      @updatedAt @map("updated_at")
-
-  building      Building                   @relation(fields: [buildingId], references: [id])
-  ecms          EnergyConservationMeasure[]
-  capitalStacks CapitalStack[]
-
-  @@index([organizationId, buildingId])
-  @@map("compliance_pathways")
-}
-
-model CapitalStack {
-  id                     String             @id @default(cuid())
-  buildingId             String             @map("building_id")
-  organizationId         String             @map("organization_id")
-  pathwayId              String             @map("pathway_id")
-  totalProjectCost       Float              @map("total_project_cost")
-  estimatedMonthlySavings Float             @map("estimated_monthly_savings")
-  simplePaybackMonths    Float              @map("simple_payback_months")
-  cashFlowPositiveDay1   Boolean            @map("cash_flow_positive_day1")
-  status                 CapitalStackStatus @default(DRAFT)
-  proposalDocUrl         String?            @map("proposal_doc_url")
-  aiAnalysis             String?            @db.Text @map("ai_analysis")
-  aiModelUsed            String?            @map("ai_model_used")
-  createdAt              DateTime           @default(now()) @map("created_at")
-  updatedAt              DateTime           @updatedAt @map("updated_at")
-
-  building       Building          @relation(fields: [buildingId], references: [id])
-  pathway        CompliancePathway @relation(fields: [pathwayId], references: [id])
-  fundingSources FundingSource[]
-
-  @@index([organizationId, buildingId])
-  @@map("capital_stacks")
-}
-
-model DriftAlert {
-  id                   String        @id @default(cuid())
-  buildingId           String        @map("building_id")
-  organizationId       String        @map("organization_id")
-  severity             AlertSeverity
-  alertType            AlertType     @map("alert_type")
-  title                String
-  description          String        @db.Text
-  aiAnalysis           String?       @db.Text @map("ai_analysis")
-  baselineValue        Float         @map("baseline_value")
-  actualValue          Float         @map("actual_value")
-  deviationPercent     Float         @map("deviation_percent")
-  estimatedAnnualImpact Float?       @map("estimated_annual_impact")
-  status               AlertStatus   @default(OPEN)
-  resolvedAt           DateTime?     @map("resolved_at")
-  resolvedByUserId     String?       @map("resolved_by_user_id")
-  createdAt            DateTime      @default(now()) @map("created_at")
-  updatedAt            DateTime      @updatedAt @map("updated_at")
-
-  building   Building @relation(fields: [buildingId], references: [id])
-  resolvedBy User?    @relation(fields: [resolvedByUserId], references: [id])
-
-  @@index([buildingId, status, severity])
-  @@index([organizationId, buildingId])
-  @@map("drift_alerts")
+  @@map("green_button_connections")
 }
 
 model PipelineRun {
@@ -492,26 +307,4 @@ model PipelineRun {
   @@index([pipelineType, status, createdAt(sort: Desc)])
   @@index([organizationId, buildingId])
   @@map("pipeline_runs")
-}
-
-model DOEESubmission {
-  id             String           @id @default(cuid())
-  buildingId     String           @map("building_id")
-  organizationId String           @map("organization_id")
-  submissionType SubmissionType   @map("submission_type")
-  reportingYear  Int              @map("reporting_year")
-  snapshotId     String           @map("snapshot_id")
-  status         SubmissionStatus @default(DRAFT)
-  dueDate        DateTime         @map("due_date")
-  submittedAt    DateTime?        @map("submitted_at")
-  documentUrl    String?          @map("document_url")
-  submittedData  Json             @map("submitted_data")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-
-  building Building           @relation(fields: [buildingId], references: [id])
-  snapshot ComplianceSnapshot @relation(fields: [snapshotId], references: [id])
-
-  @@index([organizationId, buildingId])
-  @@map("doee_submissions")
 }
