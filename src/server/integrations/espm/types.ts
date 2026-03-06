@@ -24,6 +24,7 @@ export interface PropertyMetrics {
   sourceTotal: number | null;
   siteIntensity: number | null;
   sourceIntensity: number | null;
+  weatherNormalizedSiteIntensity: number | null;
   directGHGEmissions: number | null;
   medianScore: number | null;
 }

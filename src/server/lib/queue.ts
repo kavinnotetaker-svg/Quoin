@@ -43,4 +43,10 @@ export function createWorker(
 export const QUEUES = {
   DATA_INGESTION: "data-ingestion",
   ESPM_SYNC: "espm-sync",
+  PATHWAY_ANALYSIS: "pathway-analysis",
+  CAPITAL_STRUCTURING: "capital-structuring",
+  DRIFT_DETECTION: "drift-detection",
+  AI_ANALYSIS: "ai-analysis",
+  NOTIFICATIONS: "notifications",
+  REPORT_GENERATOR: "report-generator",
 } as const;

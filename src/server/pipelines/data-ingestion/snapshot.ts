@@ -174,6 +174,7 @@ export interface SnapshotInput {
   energyStarScore: number | null;
   siteEui: number;
   sourceEui: number;
+  weatherNormalizedSiteEui: number | null;
   dataQualityScore?: number;
 }
 
@@ -207,6 +208,7 @@ export function buildSnapshotData(input: SnapshotInput) {
     complianceStatus: status,
     complianceGap: gap,
     estimatedPenalty: penalty,
+    weatherNormalizedSiteEui: input.weatherNormalizedSiteEui,
     dataQualityScore: input.dataQualityScore ?? null,
   };
 }

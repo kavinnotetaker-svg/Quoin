@@ -15,6 +15,9 @@
   <metric name="sourceIntensity" uom="kBtu/ft²" dataType="numeric">
     <value>280.8</value>
   </metric>
+  <metric name="weatherNormalizedSiteIntensity" uom="kBtu/ft²" dataType="numeric">
+    <value>115.2</value>
+  </metric>
   <metric name="directGHGEmissions" dataType="numeric">
     <value>512.7</value>
   </metric>

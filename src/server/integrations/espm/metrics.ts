@@ -7,7 +7,7 @@ import type {
 } from "./types";
 
 export class MetricsService {
-  constructor(private readonly client: ESPMClient) {}
+  constructor(private readonly client: ESPMClient) { }
 
   /**
    * Get property metrics (score, EUI, etc.).
@@ -71,6 +71,7 @@ export class MetricsService {
       sourceTotal: getNumericValue("sourceTotal"),
       siteIntensity: getNumericValue("siteIntensity"),
       sourceIntensity: getNumericValue("sourceIntensity"),
+      weatherNormalizedSiteIntensity: getNumericValue("weatherNormalizedSiteIntensity"),
       directGHGEmissions: getNumericValue("directGHGEmissions"),
       medianScore: getNumericValue("medianScore"),
     };

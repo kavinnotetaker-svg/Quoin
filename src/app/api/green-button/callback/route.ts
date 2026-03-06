@@ -103,22 +103,32 @@ export async function GET(req: NextRequest) {
   try {
     const tokens = await exchangeCodeForTokens(config, code);
 
+    await tenantDb.greenButtonConnection.upsert({
+      where: { buildingId },
+      update: {
+        status: "ACTIVE",
+        accessToken: encryptToken(tokens.accessToken, encryptionKey),
+        refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
+        tokenExpiresAt: tokens.expiresAt,
+        subscriptionId: tokens.subscriptionId,
+        resourceUri: tokens.resourceUri,
+      },
+      create: {
+        buildingId,
+        organizationId: org.id,
+        status: "ACTIVE",
+        accessToken: encryptToken(tokens.accessToken, encryptionKey),
+        refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
+        tokenExpiresAt: tokens.expiresAt,
+        subscriptionId: tokens.subscriptionId,
+        resourceUri: tokens.resourceUri,
+      }
+    });
+
     await tenantDb.building.update({
       where: { id: buildingId },
       data: {
         greenButtonStatus: "ACTIVE",
-        greenButtonAccessToken: encryptToken(
-          tokens.accessToken,
-          encryptionKey,
-        ),
-        greenButtonRefreshToken: encryptToken(
-          tokens.refreshToken,
-          encryptionKey,
-        ),
-        greenButtonTokenExpiresAt: tokens.expiresAt,
-        greenButtonSubscriptionId: tokens.subscriptionId,
-        greenButtonResourceUri: tokens.resourceUri,
-        greenButtonConnectedAt: new Date(),
         dataIngestionMethod: "GREEN_BUTTON",
       },
     });

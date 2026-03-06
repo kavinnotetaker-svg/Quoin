@@ -6,6 +6,8 @@ import { BuildingHeader } from "./building-header";
 import { ScoreSection } from "./score-section";
 import { EnergyTab } from "./energy-tab";
 import { ComplianceTab } from "./compliance-tab";
+import { CapitalTab } from "./capital-tab";
+import { AlertsTab } from "./alerts-tab";
 import { UploadModal } from "./upload-modal";
 
 interface Tab {
@@ -17,8 +19,8 @@ interface Tab {
 const TABS: Tab[] = [
   { key: "energy", label: "Energy" },
   { key: "compliance", label: "Compliance" },
-  { key: "capital", label: "Capital", disabled: true },
-  { key: "alerts", label: "Alerts", disabled: true },
+  { key: "capital", label: "Capital" },
+  { key: "alerts", label: "Alerts" },
 ];
 
 export function BuildingDetail({ buildingId }: { buildingId: string }) {
@@ -55,11 +57,13 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
   return (
     <div className="space-y-6">
       <BuildingHeader
+        buildingId={buildingId}
         name={data.name}
         address={data.address}
         propertyType={data.propertyType}
         grossSquareFeet={data.grossSquareFeet}
         yearBuilt={data.yearBuilt}
+        espmPropertyId={data.espmPropertyId?.toString() ?? null}
         onUpload={() => setShowUpload(true)}
       />
 
@@ -83,10 +87,10 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
             key={tab.key}
             onClick={() => !tab.disabled && setActiveTab(tab.key)}
             className={`border-b-2 pb-2 ${tab.disabled
-                ? "pointer-events-none border-transparent text-gray-300"
-                : activeTab === tab.key
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+              ? "pointer-events-none border-transparent text-gray-300"
+              : activeTab === tab.key
+                ? "border-gray-900 text-gray-900"
+                : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
           >
             {tab.label}
@@ -104,6 +108,8 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
       {activeTab === "compliance" && (
         <ComplianceTab buildingId={buildingId} />
       )}
+      {activeTab === "capital" && <CapitalTab buildingId={buildingId} />}
+      {activeTab === "alerts" && <AlertsTab buildingId={buildingId} />}
 
       {/* Upload modal */}
       {showUpload && (

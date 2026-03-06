@@ -28,6 +28,7 @@ export function StepBuilding({ onNext, onSkip }: StepBuildingProps) {
       propertyType: data.propertyType as "OFFICE" | "MULTIFAMILY" | "MIXED_USE" | "OTHER",
       yearBuilt: data.yearBuilt ?? undefined,
       bepsTargetScore: data.bepsTargetScore,
+      espmPropertyId: data.espmPropertyId,
     });
   }
 

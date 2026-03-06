@@ -12,6 +12,7 @@ export interface BuildingFormData {
   propertyType: string;
   yearBuilt: number | null;
   bepsTargetScore: number;
+  espmPropertyId?: string;
 }
 
 interface BuildingFormProps {
@@ -29,6 +30,7 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
   const [sqft, setSqft] = useState("");
   const [propertyType, setPropertyType] = useState("OFFICE");
   const [yearBuilt, setYearBuilt] = useState("");
+  const [espmPropertyId, setEspmPropertyId] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const targetScore = BEPS_TARGET_SCORES[propertyType] ?? 50;
@@ -77,6 +79,7 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
       propertyType,
       yearBuilt: yearBuilt ? parseInt(yearBuilt, 10) : null,
       bepsTargetScore: targetScore,
+      espmPropertyId: espmPropertyId.trim() || undefined,
     });
   }
 
@@ -199,6 +202,25 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
         />
         {errors.yearBuilt && <p className="mt-1 text-xs text-red-600">{errors.yearBuilt}</p>}
+      </div>
+
+      {/* ESPM Property ID (optional) */}
+      <div>
+        <label htmlFor="bld-espm" className="block text-sm font-medium text-gray-700">
+          ESPM Property ID <span className="text-gray-400">(optional)</span>
+        </label>
+        <input
+          id="bld-espm"
+          type="text"
+          inputMode="numeric"
+          value={espmPropertyId}
+          onChange={(e) => setEspmPropertyId(e.target.value.replace(/[^0-9]/g, ""))}
+          placeholder="e.g., 88762425"
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Find this in your ENERGY STAR Portfolio Manager account under property details.
+        </p>
       </div>
 
       {/* Target score (auto-populated, read-only) */}

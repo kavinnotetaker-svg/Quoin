@@ -245,6 +245,7 @@ describe("Snapshot — buildSnapshotData", () => {
       energyStarScore: 45,
       siteEui: 120.5,
       sourceEui: 337.4,
+      weatherNormalizedSiteEui: 115.2,
       dataQualityScore: 85,
     });
 
@@ -269,6 +270,7 @@ describe("Snapshot — buildSnapshotData", () => {
       energyStarScore: 68,
       siteEui: 82,
       sourceEui: 229.6,
+      weatherNormalizedSiteEui: 79.5,
     });
 
     expect(snap.complianceStatus).toBe("COMPLIANT");
@@ -286,6 +288,7 @@ describe("Snapshot — buildSnapshotData", () => {
       energyStarScore: null,
       siteEui: 95.2,
       sourceEui: 266.56,
+      weatherNormalizedSiteEui: null,
     });
 
     expect(snap.complianceStatus).toBe("PENDING_DATA");
@@ -297,11 +300,12 @@ describe("Snapshot — buildSnapshotData", () => {
     const snap = buildSnapshotData({
       buildingId: "b4",
       organizationId: "org1",
-      grossSquareFeet: 1_000_000, // 10M penalty uncapped, capped at 7.5M
+      grossSquareFeet: 1_000_000,
       bepsTargetScore: 71,
       energyStarScore: 0,
       siteEui: 200,
       sourceEui: 560,
+      weatherNormalizedSiteEui: 195.0,
     });
 
     // maxPenalty = min(1M × 10, 7.5M) = 7.5M, fraction = 1.0

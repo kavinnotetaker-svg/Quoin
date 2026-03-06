@@ -3,7 +3,7 @@ import { espmBuilder } from "./xml-config";
 import type { ConsumptionDataEntry } from "./types";
 
 export class ConsumptionService {
-  constructor(private readonly client: ESPMClient) {}
+  constructor(private readonly client: ESPMClient) { }
 
   /**
    * Push consumption data to a meter.
@@ -22,15 +22,17 @@ export class ConsumptionService {
     }
 
     const xml = espmBuilder.build({
-      meterConsumption: entries.map((entry) => ({
-        startDate: entry.startDate,
-        endDate: entry.endDate,
-        usage: entry.usage,
-        ...(entry.cost !== undefined ? { cost: entry.cost } : {}),
-        ...(entry.estimatedValue !== undefined
-          ? { estimatedValue: entry.estimatedValue }
-          : {}),
-      })),
+      meterData: {
+        meterConsumption: entries.map((entry) => ({
+          startDate: entry.startDate,
+          endDate: entry.endDate,
+          usage: entry.usage,
+          ...(entry.cost !== undefined ? { cost: entry.cost } : {}),
+          ...(entry.estimatedValue !== undefined
+            ? { estimatedValue: entry.estimatedValue }
+            : {}),
+        })),
+      },
     }) as string;
 
     return this.client.post(`/meter/${meterId}/consumptionData`, xml);

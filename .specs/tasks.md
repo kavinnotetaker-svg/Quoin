@@ -334,3 +334,33 @@
 - [DONE] Update middleware.ts (add /api/health to public routes)
 - [DONE] Create .github/workflows/ci.yml (Postgres + Redis services, tsc, test, eval)
 - [DONE] All 126 unit tests pass, TypeScript compiles clean, ESLint clean
+
+---
+
+# Phase 2: Engineering Tasks
+
+## Section 1: Robust Data Ingestion & Metric Generation
+
+- [DONE] csv-parser.ts outputs valid EnergyReading records (kWh, Therms, CCF)
+- [DONE] xml-parser.ts: ESPM XML mock service via fast-xml-parser (score, siteEui, weatherNormalizedSiteEui)
+- [DONE] Added weatherNormalizedSiteEui to ComplianceSnapshot schema + types
+- [DONE] Worker pipeline wires CSV → normalize → validate → persist → ESPM sync → ComplianceSnapshot
+- [DONE] Migration: 20260306100000_add_weather_normalized_eui
+
+## Section 2: Pathway-Specific Compliance Math & Exemptions
+
+- [DONE] determineApplicablePathway(): score-based routing (>55 Standard, ≤55 Performance)
+- [DONE] exemption-screener.ts: Low Occupancy, Financial Distress, Recent Construction checks
+
+## Section 3: ECM Generation & Capital Structuring
+
+- [DONE] ecm-scorer.ts: 10 ECMs, Quick Win/Deep Retrofit prioritization by pathway
+- [DONE] eligibility/cleer.ts, cpace.ts, ahra.ts: Boolean funding screeners
+- [DONE] logic.ts: Capital stack assembly (Grants → Debt → CPACE → Equity)
+
+## Section 4: Active Monitoring & DOEE Reporting
+
+- [DONE] rules-engine.ts: 5 drift detection rules (EUI Spike, Score Drop, Anomaly, Seasonal, Sustained)
+- [DONE] worker.ts: BullMQ drift detection worker
+- [DONE] report.ts: tRPC router (getComplianceReport, getExemptionReport)
+- [DONE] 211 unit tests pass. 1 integration test pending DB migration.

@@ -5,8 +5,8 @@ export interface PenaltyInput {
 }
 
 export interface PerformancePathwayInput extends PenaltyInput {
-  baselineSiteEui: number;
-  currentSiteEui: number;
+  baselineAdjustedSiteEui: number;
+  currentAdjustedSiteEui: number;
   targetReductionPct: number;
 }
 

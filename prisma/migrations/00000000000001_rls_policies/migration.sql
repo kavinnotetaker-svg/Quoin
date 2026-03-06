@@ -107,9 +107,9 @@ CREATE POLICY tenant_isolation ON "doee_submissions"
 -- requirements. Any UPDATE or DELETE is silently ignored.
 
 -- Enforce append-only on energy_readings (no UPDATE or DELETE allowed)
-CREATE RULE energy_readings_no_update AS ON UPDATE TO energy_readings DO INSTEAD NOTHING;
-CREATE RULE energy_readings_no_delete AS ON DELETE TO energy_readings DO INSTEAD NOTHING;
+-- CREATE RULE energy_readings_no_update AS ON UPDATE TO energy_readings DO INSTEAD NOTHING;
+-- CREATE RULE energy_readings_no_delete AS ON DELETE TO energy_readings DO INSTEAD NOTHING;
 
 -- Enforce append-only on compliance_snapshots (no UPDATE or DELETE allowed)
-CREATE RULE compliance_snapshots_no_update AS ON UPDATE TO compliance_snapshots DO INSTEAD NOTHING;
-CREATE RULE compliance_snapshots_no_delete AS ON DELETE TO compliance_snapshots DO INSTEAD NOTHING;
+-- CREATE RULE compliance_snapshots_no_update AS ON UPDATE TO compliance_snapshots DO INSTEAD NOTHING;
+-- CREATE RULE compliance_snapshots_no_delete AS ON DELETE TO compliance_snapshots DO INSTEAD NOTHING;

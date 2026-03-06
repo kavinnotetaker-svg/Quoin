@@ -1,7 +1,6 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { createId } from "@paralleldrive/cuid2";
 import { prisma, getTenantClient } from "@/server/lib/db";
 
 interface OrgRow {

@@ -12,6 +12,8 @@ const createBuildingInput = z.object({
   propertyType: z.enum(["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"]),
   yearBuilt: z.number().int().min(1800).max(2030).optional(),
   bepsTargetScore: z.number().min(0).max(100),
+  maxPenaltyExposure: z.number().min(0).default(0),
+  espmPropertyId: z.string().max(50).optional(),
 });
 
 const listBuildingsInput = z.object({
@@ -88,8 +90,7 @@ export const buildingRouter = router({
       ]);
 
       return {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        buildings: (buildings as any[]).map((b) => ({
+        buildings: buildings.map((b) => ({
           ...b,
           latestSnapshot: b.complianceSnapshots?.[0] ?? null,
         })),
@@ -131,10 +132,12 @@ export const buildingRouter = router({
   create: tenantProcedure
     .input(createBuildingInput)
     .mutation(async ({ ctx, input }) => {
+      const { espmPropertyId, ...rest } = input;
       const building = await ctx.tenantDb.building.create({
         data: {
-          ...input,
+          ...rest,
           organizationId: ctx.organizationId,
+          espmPropertyId: espmPropertyId ? BigInt(espmPropertyId) : null,
         },
       });
 
@@ -156,6 +159,8 @@ export const buildingRouter = router({
             .optional(),
           yearBuilt: z.number().int().min(1800).max(2030).nullable().optional(),
           bepsTargetScore: z.number().min(0).max(100).optional(),
+          maxPenaltyExposure: z.number().min(0).optional(),
+          espmPropertyId: z.string().max(50).nullable().optional(),
           selectedPathway: z
             .enum(["STANDARD", "PERFORMANCE", "PRESCRIPTIVE", "NONE"])
             .optional(),
@@ -163,12 +168,36 @@ export const buildingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const { espmPropertyId, ...rest } = input.data;
       const building = await ctx.tenantDb.building.update({
         where: { id: input.id },
-        data: input.data,
+        data: {
+          ...rest,
+          ...(espmPropertyId !== undefined
+            ? { espmPropertyId: espmPropertyId ? BigInt(espmPropertyId) : null }
+            : {}),
+        },
       });
 
       return building;
+    }),
+
+  delete: tenantProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      // Use admin client to bypass RLS for cascade operations
+      await prisma.driftAlert.deleteMany({ where: { buildingId: input.id } });
+      await prisma.energyReading.deleteMany({ where: { buildingId: input.id } });
+      await prisma.complianceSnapshot.deleteMany({ where: { buildingId: input.id } });
+      await prisma.pipelineRun.deleteMany({ where: { buildingId: input.id } });
+      await prisma.meter.deleteMany({ where: { buildingId: input.id } });
+      await prisma.greenButtonConnection.deleteMany({ where: { buildingId: input.id } });
+
+      await prisma.building.delete({
+        where: { id: input.id },
+      });
+
+      return { success: true };
     }),
 
   pipelineRuns: tenantProcedure

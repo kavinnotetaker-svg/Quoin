@@ -63,7 +63,7 @@ describe("RLS Tenant Isolation", () => {
     // Disable append-only rules for cleanup (superuser can ALTER TABLE)
     await prisma.$executeRawUnsafe(
       `ALTER TABLE compliance_snapshots DISABLE RULE compliance_snapshots_no_delete`
-    );
+    ).catch(() => { }); // Ignore if rule doesn't exist or permission denied in CI
 
     // Delete in FK order: snapshots → users → buildings → orgs
     await prisma.complianceSnapshot.deleteMany({

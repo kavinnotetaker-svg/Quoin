@@ -49,7 +49,7 @@ export function calculatePerformancePenalty(
 ): PenaltyResult {
   const maxPenalty = calculateMaxPenalty(input.grossSquareFeet);
 
-  if (input.baselineSiteEui <= 0) {
+  if (input.baselineAdjustedSiteEui <= 0) {
     return {
       maxPenalty,
       adjustedPenalty: maxPenalty,
@@ -57,12 +57,12 @@ export function calculatePerformancePenalty(
       pathway: "PERFORMANCE",
       compliant: false,
       details:
-        "No baseline EUI available — cannot calculate Performance Pathway.",
+        "No baseline Adjusted Site EUI available — cannot calculate Performance Pathway.",
     };
   }
 
   const reductionPct =
-    ((input.baselineSiteEui - input.currentSiteEui) / input.baselineSiteEui) *
+    ((input.baselineAdjustedSiteEui - input.currentAdjustedSiteEui) / input.baselineAdjustedSiteEui) *
     100;
   const targetPct = input.targetReductionPct || PERFORMANCE_TARGET_PCT;
 
@@ -210,6 +210,28 @@ export function calculatePrescriptivePenalty(
   };
 }
 
+// ─── Pathway Routing ────────────────────────────────────────────────────────
+
+/**
+ * Determine applicable compliance pathway based on ENERGY STAR score.
+ *
+ * DC BEPS rules:
+ * - Score >= target: COMPLIANT (no pathway needed)
+ * - Score > 55 and < target: Standard Target Pathway (score-based gap closure)
+ * - Score <= 55: Performance Pathway (20% Site EUI reduction target, ignores score)
+ *
+ * Buildings can always opt for Prescriptive as an alternative.
+ */
+export function determineApplicablePathway(
+  currentScore: number | null,
+  bepsTargetScore: number,
+): "COMPLIANT" | "STANDARD_TARGET" | "PERFORMANCE" | "PENDING_DATA" {
+  if (currentScore === null) return "PENDING_DATA";
+  if (currentScore >= bepsTargetScore) return "COMPLIANT";
+  if (currentScore > 55) return "STANDARD_TARGET";
+  return "PERFORMANCE";
+}
+
 // ─── All Pathways Comparison ─────────────────────────────────────────────────
 
 /**
@@ -219,8 +241,8 @@ export function calculateAllPathways(input: {
   grossSquareFeet: number;
   propertyType: string;
   bepsTargetScore: number;
-  baselineSiteEui?: number;
-  currentSiteEui?: number;
+  baselineAdjustedSiteEui?: number;
+  currentAdjustedSiteEui?: number;
   baselineScore?: number;
   currentScore?: number;
   maxGapForPropertyType?: number;
@@ -231,13 +253,13 @@ export function calculateAllPathways(input: {
   let standardTarget: PenaltyResult | null = null;
   let prescriptive: PenaltyResult | null = null;
 
-  if (input.baselineSiteEui != null && input.currentSiteEui != null) {
+  if (input.baselineAdjustedSiteEui != null && input.currentAdjustedSiteEui != null) {
     performance = calculatePerformancePenalty({
       grossSquareFeet: input.grossSquareFeet,
       propertyType: input.propertyType,
       bepsTargetScore: input.bepsTargetScore,
-      baselineSiteEui: input.baselineSiteEui,
-      currentSiteEui: input.currentSiteEui,
+      baselineAdjustedSiteEui: input.baselineAdjustedSiteEui,
+      currentAdjustedSiteEui: input.currentAdjustedSiteEui,
       targetReductionPct: PERFORMANCE_TARGET_PCT,
     });
   }

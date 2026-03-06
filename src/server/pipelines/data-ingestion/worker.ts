@@ -1,6 +1,7 @@
 import { createWorker, QUEUES } from "@/server/lib/queue";
 import { getTenantClient } from "@/server/lib/db";
 import { runIngestionPipeline } from "./logic";
+import { createESPMClient } from "@/server/integrations/espm";
 
 export interface DataIngestionJobData {
   buildingId: string;
@@ -26,6 +27,7 @@ export function startDataIngestionWorker() {
         uploadBatchId: data.uploadBatchId,
         triggerType: data.triggerType,
         tenantDb,
+        espmClient: createESPMClient(),
       });
 
       if (!result.success) {

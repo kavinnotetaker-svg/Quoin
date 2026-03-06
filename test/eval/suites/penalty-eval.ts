@@ -55,8 +55,8 @@ registerSuite({
           grossSquareFeet: BUILDING_A.grossSquareFeet,
           propertyType: BUILDING_A.propertyType,
           bepsTargetScore: BUILDING_A.targetScore,
-          baselineSiteEui: BUILDING_A.baselineEui,
-          currentSiteEui: BUILDING_A.currentEui,
+          baselineAdjustedSiteEui: BUILDING_A.baselineEui,
+          currentAdjustedSiteEui: BUILDING_A.currentEui,
           targetReductionPct: 20,
         });
         const ref = referencePenaltyCalc({
@@ -159,8 +159,8 @@ registerSuite({
           grossSquareFeet: BUILDING_B.grossSquareFeet,
           propertyType: BUILDING_B.propertyType,
           bepsTargetScore: BUILDING_B.targetScore,
-          baselineSiteEui: BUILDING_B.baselineEui,
-          currentSiteEui: BUILDING_B.currentEui,
+          baselineAdjustedSiteEui: BUILDING_B.baselineEui,
+          currentAdjustedSiteEui: BUILDING_B.currentEui,
           targetReductionPct: 20,
         });
         return {

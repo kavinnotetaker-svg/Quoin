@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma, getTenantClient } from "@/server/lib/db";
-import { createQueue, QUEUES } from "@/server/lib/queue";
 import { processCSVUpload } from "@/server/pipelines/data-ingestion/logic";
 import type { MeterType } from "@/server/pipelines/data-ingestion/types";
 
@@ -83,23 +82,33 @@ export async function POST(req: NextRequest) {
       tenantDb,
     });
 
-    // Enqueue pipeline job if readings were created
-    if (result.success && result.readingsCreated > 0) {
+    // Run pipeline inline to create ComplianceSnapshot
+    try {
+      const { runIngestionPipeline } = await import("@/server/pipelines/data-ingestion/logic");
+      let espmClient;
       try {
-        const queue = createQueue(QUEUES.DATA_INGESTION);
-        await queue.add("ingest", {
-          buildingId,
-          organizationId: org.id,
-          uploadBatchId: result.uploadBatchId,
-          triggerType: "CSV_UPLOAD",
-        });
-      } catch (queueErr) {
-        console.error("[Upload] Failed to enqueue pipeline job:", queueErr);
-        // Don't fail the upload — readings are persisted, pipeline can be retried
-        result.warnings.push(
-          "Data saved but pipeline job could not be enqueued. It will be retried.",
-        );
+        const { createESPMClient } = await import("@/server/integrations/espm");
+        espmClient = createESPMClient();
+      } catch {
+        console.warn("[Upload] ESPM client not available, skipping sync");
       }
+      const pipelineResult = await runIngestionPipeline({
+        buildingId,
+        organizationId: org.id,
+        uploadBatchId: result.uploadBatchId,
+        triggerType: "CSV_UPLOAD",
+        tenantDb,
+        espmClient,
+      });
+      console.log("[Upload] Pipeline result:", pipelineResult.summary);
+      if (pipelineResult.errors.length > 0) {
+        result.warnings.push(...pipelineResult.errors.map(e => `Pipeline: ${e}`));
+      }
+    } catch (pipelineErr) {
+      console.error("[Upload] Pipeline failed:", pipelineErr);
+      result.warnings.push(
+        "Data saved but compliance snapshot could not be generated. Try refreshing.",
+      );
     }
 
     return NextResponse.json(result, { status: result.success ? 200 : 422 });

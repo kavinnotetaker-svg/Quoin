@@ -101,7 +101,23 @@ enum ComplianceStatus {
 
 enum PipelineType {
   DATA_INGESTION
+  PATHWAY_ANALYSIS
+  CAPITAL_STRUCTURING
+  DRIFT_DETECTION
   FULL_CYCLE
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
 }
 
 enum TriggerType {
@@ -169,12 +185,15 @@ model Building {
   greenButtonStatus         GreenButtonStatus   @default(NONE) @map("green_button_status")
   dataIngestionMethod      DataIngestionMethod @default(CSV_UPLOAD) @map("data_ingestion_method")
   bepsTargetScore          Float               @map("beps_target_score")
+  maxPenaltyExposure       Float               @default(0) @map("max_penalty_exposure")
   complianceCycle          ComplianceCycle     @default(CYCLE_1) @map("compliance_cycle")
   selectedPathway          SelectedPathway     @default(NONE) @map("selected_pathway")
   doeeBuildingId           String?             @map("doee_building_id")
   baselineYear             Int?                @map("baseline_year")
   targetEui                Float?              @map("target_eui")
   ward                     Int?
+  hasFinancialDistress     Boolean             @default(false) @map("has_financial_distress")
+  occupancyRate            Float?              @map("occupancy_rate")
   createdAt                DateTime            @default(now()) @map("created_at")
   updatedAt                DateTime            @updatedAt @map("updated_at")
 
@@ -184,6 +203,7 @@ model Building {
   pipelineRuns          PipelineRun[]
   greenButtonConnection GreenButtonConnection?
   meters                Meter[]
+  driftAlerts           DriftAlert[]
 
   @@index([organizationId])
   @@map("buildings")
@@ -245,6 +265,7 @@ model ComplianceSnapshot {
   energyStarScore  Float?           @map("energy_star_score")
   siteEui          Float?           @map("site_eui")
   sourceEui        Float?           @map("source_eui")
+  weatherNormalizedSiteEui Float?   @map("weather_normalized_site_eui")
   complianceStatus ComplianceStatus @map("compliance_status")
   complianceGap    Float?           @map("compliance_gap")
   estimatedPenalty Float?           @map("estimated_penalty")
@@ -303,8 +324,34 @@ model PipelineRun {
 
   building            Building?            @relation(fields: [buildingId], references: [id])
   complianceSnapshots ComplianceSnapshot[]
+  driftAlerts         DriftAlert[]
 
   @@index([pipelineType, status, createdAt(sort: Desc)])
   @@index([organizationId, buildingId])
   @@map("pipeline_runs")
+}
+
+model DriftAlert {
+  id              String        @id @default(cuid())
+  organizationId  String        @map("organization_id")
+  buildingId      String        @map("building_id")
+  pipelineRunId   String?       @map("pipeline_run_id")
+  ruleId          String        @map("rule_id")
+  severity        AlertSeverity
+  status          AlertStatus   @default(ACTIVE)
+  title           String
+  description     String        @db.Text
+  currentValue    Float         @map("current_value")
+  threshold       Float
+  aiRootCause     String?       @db.Text @map("ai_root_cause")
+  detectedAt      DateTime      @default(now()) @map("detected_at")
+  acknowledgedAt  DateTime?     @map("acknowledged_at")
+  resolvedAt      DateTime?     @map("resolved_at")
+
+  building    Building     @relation(fields: [buildingId], references: [id])
+  pipelineRun PipelineRun? @relation(fields: [pipelineRunId], references: [id])
+
+  @@index([buildingId, status, detectedAt(sort: Desc)])
+  @@index([organizationId, buildingId])
+  @@map("drift_alerts")
 }

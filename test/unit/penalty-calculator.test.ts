@@ -5,6 +5,7 @@ import {
   calculateStandardTargetPenalty,
   calculatePrescriptivePenalty,
   calculateAllPathways,
+  determineApplicablePathway,
 } from "@/server/pipelines/pathway-analysis/penalty-calculator";
 import {
   BUILDING_A,
@@ -57,8 +58,8 @@ describe("calculatePerformancePenalty", () => {
   it("20% reduction achieved → $0 (compliant)", () => {
     const result = calculatePerformancePenalty({
       ...base,
-      baselineSiteEui: 100,
-      currentSiteEui: 80, // 20% reduction
+      baselineAdjustedSiteEui: 100,
+      currentAdjustedSiteEui: 80, // 20% reduction
     });
     expect(result.adjustedPenalty).toBe(0);
     expect(result.compliant).toBe(true);
@@ -67,8 +68,8 @@ describe("calculatePerformancePenalty", () => {
   it("25% reduction → $0 (exceeds target)", () => {
     const result = calculatePerformancePenalty({
       ...base,
-      baselineSiteEui: 100,
-      currentSiteEui: 75, // 25% reduction
+      baselineAdjustedSiteEui: 100,
+      currentAdjustedSiteEui: 75, // 25% reduction
     });
     expect(result.adjustedPenalty).toBe(0);
     expect(result.compliant).toBe(true);
@@ -77,8 +78,8 @@ describe("calculatePerformancePenalty", () => {
   it("10% of 20% target → 50% penalty reduction", () => {
     const result = calculatePerformancePenalty({
       ...base,
-      baselineSiteEui: 120,
-      currentSiteEui: 108, // 10% reduction
+      baselineAdjustedSiteEui: 120,
+      currentAdjustedSiteEui: 108, // 10% reduction
     });
     expect(result.adjustedPenalty).toBe(750_000);
     expect(result.reductionPct).toBeCloseTo(50, 0);
@@ -87,8 +88,8 @@ describe("calculatePerformancePenalty", () => {
   it("0% reduction → full penalty", () => {
     const result = calculatePerformancePenalty({
       ...base,
-      baselineSiteEui: 100,
-      currentSiteEui: 100, // 0% reduction
+      baselineAdjustedSiteEui: 100,
+      currentAdjustedSiteEui: 100, // 0% reduction
     });
     expect(result.adjustedPenalty).toBe(1_500_000);
     expect(result.reductionPct).toBe(0);
@@ -97,8 +98,8 @@ describe("calculatePerformancePenalty", () => {
   it("negative reduction (EUI increased) → full penalty", () => {
     const result = calculatePerformancePenalty({
       ...base,
-      baselineSiteEui: 100,
-      currentSiteEui: 110, // EUI went up
+      baselineAdjustedSiteEui: 100,
+      currentAdjustedSiteEui: 110, // EUI went up
     });
     expect(result.adjustedPenalty).toBe(1_500_000);
     expect(result.reductionPct).toBe(0);
@@ -107,8 +108,8 @@ describe("calculatePerformancePenalty", () => {
   it("5% reduction → 25% penalty reduction", () => {
     const result = calculatePerformancePenalty({
       ...base,
-      baselineSiteEui: 100,
-      currentSiteEui: 95, // 5% reduction → 5/20 = 25%
+      baselineAdjustedSiteEui: 100,
+      currentAdjustedSiteEui: 95, // 5% reduction → 5/20 = 25%
     });
     expect(result.adjustedPenalty).toBe(1_125_000);
     expect(result.reductionPct).toBeCloseTo(25, 0);
@@ -117,8 +118,8 @@ describe("calculatePerformancePenalty", () => {
   it("zero baseline EUI → full penalty with no-data message", () => {
     const result = calculatePerformancePenalty({
       ...base,
-      baselineSiteEui: 0,
-      currentSiteEui: 80,
+      baselineAdjustedSiteEui: 0,
+      currentAdjustedSiteEui: 80,
     });
     expect(result.adjustedPenalty).toBe(1_500_000);
     expect(result.compliant).toBe(false);
@@ -290,8 +291,8 @@ describe("calculateAllPathways", () => {
       grossSquareFeet: 150_000,
       propertyType: "OFFICE",
       bepsTargetScore: 71,
-      baselineSiteEui: 120,
-      currentSiteEui: 108,
+      baselineAdjustedSiteEui: 120,
+      currentAdjustedSiteEui: 108,
       baselineScore: 42,
       currentScore: 45,
       prescriptivePointsEarned: 10,
@@ -312,8 +313,8 @@ describe("calculateAllPathways", () => {
       grossSquareFeet: BUILDING_C.grossSquareFeet,
       propertyType: BUILDING_C.propertyType,
       bepsTargetScore: BUILDING_C.targetScore,
-      baselineSiteEui: BUILDING_C.baselineEui,
-      currentSiteEui: BUILDING_C.currentEui,
+      baselineAdjustedSiteEui: BUILDING_C.baselineEui,
+      currentAdjustedSiteEui: BUILDING_C.currentEui,
       baselineScore: BUILDING_C.baselineScore,
       currentScore: BUILDING_C.currentScore,
       prescriptivePointsEarned: BUILDING_C.prescriptivePointsEarned,
@@ -350,8 +351,8 @@ describe("Golden dataset validation", () => {
       grossSquareFeet: BUILDING_A.grossSquareFeet,
       propertyType: BUILDING_A.propertyType,
       bepsTargetScore: BUILDING_A.targetScore,
-      baselineSiteEui: BUILDING_A.baselineEui,
-      currentSiteEui: BUILDING_A.currentEui,
+      baselineAdjustedSiteEui: BUILDING_A.baselineEui,
+      currentAdjustedSiteEui: BUILDING_A.currentEui,
       targetReductionPct: 20,
     });
     expect(result.adjustedPenalty).toBe(BUILDING_A.penalties.performance);
@@ -395,8 +396,8 @@ describe("Golden dataset validation", () => {
       grossSquareFeet: BUILDING_B.grossSquareFeet,
       propertyType: BUILDING_B.propertyType,
       bepsTargetScore: BUILDING_B.targetScore,
-      baselineSiteEui: BUILDING_B.baselineEui,
-      currentSiteEui: BUILDING_B.currentEui,
+      baselineAdjustedSiteEui: BUILDING_B.baselineEui,
+      currentAdjustedSiteEui: BUILDING_B.currentEui,
       targetReductionPct: 20,
     });
     // Allow $1 rounding tolerance
@@ -422,13 +423,46 @@ describe("Golden dataset validation", () => {
       grossSquareFeet: BUILDING_C.grossSquareFeet,
       propertyType: BUILDING_C.propertyType,
       bepsTargetScore: BUILDING_C.targetScore,
-      baselineSiteEui: BUILDING_C.baselineEui,
-      currentSiteEui: BUILDING_C.currentEui,
+      baselineAdjustedSiteEui: BUILDING_C.baselineEui,
+      currentAdjustedSiteEui: BUILDING_C.currentEui,
       targetReductionPct: 20,
     });
     // Performance pathway independently calculates based on EUI, not score
     expect(perf.adjustedPenalty).toBeGreaterThan(0);
     expect(perf.compliant).toBe(false);
+  });
+});
+
+// ── Pathway Routing ─────────────────────────────────────────────────────────
+
+describe("determineApplicablePathway", () => {
+  it("returns COMPLIANT when score >= target", () => {
+    expect(determineApplicablePathway(78, 71)).toBe("COMPLIANT");
+    expect(determineApplicablePathway(71, 71)).toBe("COMPLIANT");
+  });
+
+  it("returns STANDARD_TARGET when score > 55 and < target", () => {
+    expect(determineApplicablePathway(60, 71)).toBe("STANDARD_TARGET");
+    expect(determineApplicablePathway(56, 71)).toBe("STANDARD_TARGET");
+    expect(determineApplicablePathway(70, 71)).toBe("STANDARD_TARGET");
+  });
+
+  it("returns PERFORMANCE when score <= 55", () => {
+    expect(determineApplicablePathway(55, 71)).toBe("PERFORMANCE");
+    expect(determineApplicablePathway(45, 71)).toBe("PERFORMANCE");
+    expect(determineApplicablePathway(0, 71)).toBe("PERFORMANCE");
+  });
+
+  it("returns PENDING_DATA when score is null", () => {
+    expect(determineApplicablePathway(null, 71)).toBe("PENDING_DATA");
+  });
+
+  it("boundary: score=55 → PERFORMANCE (not STANDARD_TARGET)", () => {
+    expect(determineApplicablePathway(55, 71)).toBe("PERFORMANCE");
+  });
+
+  it("boundary: score=56 → STANDARD_TARGET", () => {
+    expect(determineApplicablePathway(56, 71)).toBe("STANDARD_TARGET");
   });
 });
 
@@ -440,8 +474,8 @@ describe("Edge cases", () => {
       grossSquareFeet: 0,
       propertyType: "OFFICE",
       bepsTargetScore: 71,
-      baselineSiteEui: 100,
-      currentSiteEui: 90,
+      baselineAdjustedSiteEui: 100,
+      currentAdjustedSiteEui: 90,
       baselineScore: 50,
       currentScore: 55,
     });
@@ -454,8 +488,8 @@ describe("Edge cases", () => {
       grossSquareFeet: 100_000,
       propertyType: "OFFICE",
       bepsTargetScore: 71,
-      baselineSiteEui: 100,
-      currentSiteEui: 80, // exactly 20%
+      baselineAdjustedSiteEui: 100,
+      currentAdjustedSiteEui: 80, // exactly 20%
       targetReductionPct: 20,
     });
     expect(result.compliant).toBe(true);
