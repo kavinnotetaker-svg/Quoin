@@ -1,57 +1,50 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { prisma, getTenantClient } from "@/server/lib/db";
+import { getTenantClient, prisma } from "@/server/lib/db";
+import {
+  hasRequiredRole,
+  mapClerkOrgRole,
+  type AppRole,
+} from "@/server/lib/access";
 
 interface OrgRow {
   id: string;
   name: string;
   slug: string;
-  clerk_org_id: string;
+  clerkOrgId: string;
   tier: string;
 }
 
-/** Find org by Clerk ID using Prisma models. */
 async function findOrgByClerkId(clerkOrgId: string): Promise<OrgRow | null> {
   const org = await prisma.organization.findUnique({
     where: { clerkOrgId },
-    select: { id: true, name: true, slug: true, clerkOrgId: true, tier: true }
+    select: { id: true, name: true, slug: true, clerkOrgId: true, tier: true },
   });
-  if (!org) return null;
-  return {
-    id: org.id,
-    name: org.name,
-    slug: org.slug,
-    clerk_org_id: org.clerkOrgId,
-    tier: org.tier
-  };
+
+  if (!org) {
+    return null;
+  }
+
+  return org;
 }
 
-/** Upsert org using Prisma models. */
 async function ensureOrgExists(
   clerkOrgId: string,
   name: string,
   slug: string,
 ): Promise<OrgRow> {
-  const org = await prisma.organization.upsert({
+  return prisma.organization.upsert({
     where: { clerkOrgId },
     update: {},
     create: {
       name,
       slug,
       clerkOrgId,
-      tier: 'FREE'
+      tier: "FREE",
     },
-    select: { id: true, name: true, slug: true, clerkOrgId: true, tier: true }
+    select: { id: true, name: true, slug: true, clerkOrgId: true, tier: true },
   });
-
-  return {
-    id: org.id,
-    name: org.name,
-    slug: org.slug,
-    clerk_org_id: org.clerkOrgId,
-    tier: org.tier
-  };
 }
 
 export async function createContext() {
@@ -61,6 +54,7 @@ export async function createContext() {
     clerkUserId: userId,
     clerkOrgId: orgId,
     clerkOrgRole: orgRole,
+    appRole: mapClerkOrgRole(orgRole),
     prisma,
   };
 }
@@ -78,62 +72,76 @@ const enforceAuth = t.middleware(async ({ ctx, next }) => {
   if (!ctx.clerkUserId) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
+
   return next({ ctx: { ...ctx, clerkUserId: ctx.clerkUserId } });
 });
 
 export const protectedProcedure = t.procedure.use(enforceAuth);
 
-const enforceTenant = t.middleware(async ({ ctx, next }) => {
-  if (!ctx.clerkUserId) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-  if (!ctx.clerkOrgId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message:
-        "No organization selected. Please select or create an organization.",
-    });
-  }
+function tenantAccessMiddleware(minimumRole: AppRole) {
+  return t.middleware(async ({ ctx, next }) => {
+    if (!ctx.clerkUserId) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
 
-  // Raw SQL lookup — bypasses Prisma model layer / PrismaPg adapter issues
-  let org = await findOrgByClerkId(ctx.clerkOrgId);
-
-  if (!org) {
-    // Auto-sync: Clerk webhook doesn't fire in local dev.
-    // Fetch org from Clerk API and insert via raw SQL.
-    try {
-      const client = await clerkClient();
-      const clerkOrg = await client.organizations.getOrganization({
-        organizationId: ctx.clerkOrgId,
-      });
-      const slug =
-        clerkOrg.slug ||
-        clerkOrg.name
-          .toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, "")
-          .replace(/\s+/g, "-");
-
-      org = await ensureOrgExists(ctx.clerkOrgId, clerkOrg.name, slug);
-    } catch (syncErr) {
-      console.error("[enforceTenant] Auto-sync org failed:", syncErr);
+    if (!ctx.clerkOrgId) {
       throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Organization not found. It may not have synced yet.",
+        code: "FORBIDDEN",
+        message:
+          "No organization selected. Please select or create an organization.",
       });
     }
-  }
 
-  const tenantDb = getTenantClient(org.id);
+    let org = await findOrgByClerkId(ctx.clerkOrgId);
 
-  return next({
-    ctx: {
-      ...ctx,
-      clerkUserId: ctx.clerkUserId,
-      clerkOrgId: ctx.clerkOrgId,
-      organizationId: org.id,
-      tenantDb,
-    },
+    if (!org) {
+      try {
+        const client = await clerkClient();
+        const clerkOrg = await client.organizations.getOrganization({
+          organizationId: ctx.clerkOrgId,
+        });
+        const slug =
+          clerkOrg.slug ||
+          clerkOrg.name
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, "")
+            .replace(/\s+/g, "-");
+
+        org = await ensureOrgExists(ctx.clerkOrgId, clerkOrg.name, slug);
+      } catch (syncErr) {
+        console.error("[tenantAccessMiddleware] Auto-sync org failed:", syncErr);
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found. It may not have synced yet.",
+        });
+      }
+    }
+
+    const appRole = mapClerkOrgRole(ctx.clerkOrgRole);
+    if (!hasRequiredRole(appRole, minimumRole)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Forbidden" });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        clerkUserId: ctx.clerkUserId,
+        clerkOrgId: ctx.clerkOrgId,
+        appRole,
+        organizationId: org.id,
+        tenantDb: getTenantClient(org.id),
+      },
+    });
   });
-});
+}
 
-export const tenantProcedure = t.procedure.use(enforceTenant);
+export const tenantProcedure = t.procedure.use(tenantAccessMiddleware("VIEWER"));
+export const tenantWriteProcedure = t.procedure.use(
+  tenantAccessMiddleware("ENGINEER"),
+);
+export const tenantManagerProcedure = t.procedure.use(
+  tenantAccessMiddleware("MANAGER"),
+);
+export const tenantAdminProcedure = t.procedure.use(
+  tenantAccessMiddleware("ADMIN"),
+);

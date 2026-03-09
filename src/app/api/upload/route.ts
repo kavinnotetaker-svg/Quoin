@@ -1,28 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma, getTenantClient } from "@/server/lib/db";
 import { processCSVUpload } from "@/server/pipelines/data-ingestion/logic";
 import type { MeterType } from "@/server/pipelines/data-ingestion/types";
+import { getServerAuth } from "@/server/lib/auth";
+import { inngest } from "@/server/inngest/client";
+import { dataIngestEvent } from "@/server/inngest/events";
 
 export async function POST(req: NextRequest) {
-  const { userId, orgId } = await auth();
-  if (!userId || !orgId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const org = await prisma.organization.findUnique({
-    where: { clerkOrgId: orgId },
-  });
-  if (!org) {
-    return NextResponse.json(
-      { error: "Organization not found" },
-      { status: 404 },
-    );
-  }
-
-  const tenantDb = getTenantClient(org.id);
-
   try {
+    const auth = await getServerAuth("ENGINEER");
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const buildingId = formData.get("buildingId") as string | null;
@@ -30,11 +15,9 @@ export async function POST(req: NextRequest) {
     const unitHint = formData.get("unit") as string | null;
 
     if (!file) {
-      return NextResponse.json(
-        { error: "No file provided" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
+
     if (!buildingId) {
       return NextResponse.json(
         { error: "buildingId is required" },
@@ -60,63 +43,64 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const building = await tenantDb.building.findUnique({
-      where: { id: buildingId },
+    const building = await auth.tenantDb.building.findFirst({
+      where: {
+        id: buildingId,
+        archivedAt: null,
+      },
     });
+
     if (!building) {
-      return NextResponse.json(
-        { error: "Building not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Building not found" }, { status: 404 });
     }
 
     const csvContent = await file.text();
-
     const result = await processCSVUpload({
       csvContent,
       buildingId,
-      organizationId: org.id,
+      organizationId: auth.organizationId,
       buildingGSF: building.grossSquareFeet,
       meterTypeHint: (meterTypeHint as MeterType) || undefined,
       unitHint: unitHint || undefined,
-      tenantDb,
+      tenantDb: auth.tenantDb,
     });
 
-    // Run pipeline inline to create ComplianceSnapshot
-    try {
-      const { runIngestionPipeline } = await import("@/server/pipelines/data-ingestion/logic");
-      let espmClient;
+    if (result.success) {
       try {
-        const { createESPMClient } = await import("@/server/integrations/espm");
-        espmClient = createESPMClient();
-      } catch {
-        console.warn("[Upload] ESPM client not available, skipping sync");
+        await inngest.send(
+          dataIngestEvent({
+            buildingId,
+            organizationId: auth.organizationId,
+            uploadBatchId: result.uploadBatchId,
+            triggerType: "CSV_UPLOAD",
+          }),
+        );
+        result.warnings.push(
+          "Compliance recalculation queued asynchronously.",
+        );
+      } catch (queueError) {
+        console.error("[Upload] Failed to queue ingestion job:", queueError);
+        result.warnings.push(
+          "Data saved, but compliance recalculation could not be queued.",
+        );
       }
-      const pipelineResult = await runIngestionPipeline({
-        buildingId,
-        organizationId: org.id,
-        uploadBatchId: result.uploadBatchId,
-        triggerType: "CSV_UPLOAD",
-        tenantDb,
-        espmClient,
-      });
-      console.log("[Upload] Pipeline result:", pipelineResult.summary);
-      if (pipelineResult.errors.length > 0) {
-        result.warnings.push(...pipelineResult.errors.map(e => `Pipeline: ${e}`));
-      }
-    } catch (pipelineErr) {
-      console.error("[Upload] Pipeline failed:", pipelineErr);
-      result.warnings.push(
-        "Data saved but compliance snapshot could not be generated. Try refreshing.",
-      );
     }
 
     return NextResponse.json(result, { status: result.success ? 200 : 422 });
   } catch (error) {
-    console.error("[Upload] Error:", error);
-    return NextResponse.json(
-      { error: "Upload processing failed" },
-      { status: 500 },
-    );
+    const message = error instanceof Error ? error.message : "Upload processing failed";
+    const status =
+      typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      typeof error.status === "number"
+        ? error.status
+        : 500;
+
+    if (status === 500) {
+      console.error("[Upload] Error:", error);
+    }
+
+    return NextResponse.json({ error: message }, { status });
   }
 }

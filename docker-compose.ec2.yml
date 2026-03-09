@@ -7,18 +7,6 @@ services:
       - "3000:3000"
     env_file: .env.production
     depends_on:
-      - redis
-      - postgres
-    restart: unless-stopped
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["node", "server/worker-entrypoint.js"]
-    env_file: .env.production
-    depends_on:
-      - redis
       - postgres
     restart: unless-stopped
 
@@ -32,13 +20,5 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-
 volumes:
   pgdata:
-  redis-data:

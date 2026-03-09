@@ -1,54 +1,74 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-function createPrismaClient(): PrismaClient {
-  const adapter = new PrismaPg({
-    connectionString: process.env["DATABASE_URL"]!,
-  });
+const BASE_DATABASE_URL = process.env["DATABASE_URL"]!;
+const MAX_TENANT_CLIENTS = 64;
+const CUID_REGEX = /^c[a-z0-9]{7,}$/;
+
+function createPrismaClient(connectionString: string): PrismaClient {
+  const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({ adapter });
 }
 
+function buildTenantConnectionString(organizationId: string): string {
+  const url = new URL(BASE_DATABASE_URL);
+  const existingOptions = url.searchParams.get("options");
+  const tenantOptions = [`-c app.organization_id=${organizationId}`, "-c role=quoin_app"];
+  const options = [existingOptions, ...tenantOptions]
+    .filter((value): value is string => Boolean(value))
+    .join(" ");
+
+  url.searchParams.set("options", options);
+  return url.toString();
+}
+
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma?: PrismaClient;
+  tenantPrismaClients?: Map<string, PrismaClient>;
+  tenantPrismaOrder?: string[];
 };
 
-// Base (admin) client — superuser, bypasses RLS.
-// Used ONLY by: webhook handlers, seed scripts, migrations, tests.
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+export const prisma = globalForPrisma.prisma ?? createPrismaClient(BASE_DATABASE_URL);
+
+const tenantPrismaClients =
+  globalForPrisma.tenantPrismaClients ?? new Map<string, PrismaClient>();
+const tenantPrismaOrder = globalForPrisma.tenantPrismaOrder ?? [];
 
 if (process.env["NODE_ENV"] !== "production") {
   globalForPrisma.prisma = prisma;
+  globalForPrisma.tenantPrismaClients = tenantPrismaClients;
+  globalForPrisma.tenantPrismaOrder = tenantPrismaOrder;
 }
 
-const CUID_REGEX = /^c[a-z0-9]{7,}$/;
+function rememberTenantClient(organizationId: string, client: PrismaClient) {
+  tenantPrismaClients.set(organizationId, client);
+  tenantPrismaOrder.push(organizationId);
 
-/**
- * Returns a Prisma client scoped to a single tenant via RLS.
- * Every query runs inside a transaction that:
- *   1. Sets app.organization_id for RLS policy evaluation
- *   2. Downgrades from superuser to quoin_app role so RLS is enforced
- */
+  while (tenantPrismaOrder.length > MAX_TENANT_CLIENTS) {
+    const oldest = tenantPrismaOrder.shift();
+    if (!oldest) {
+      continue;
+    }
+
+    const staleClient = tenantPrismaClients.get(oldest);
+    tenantPrismaClients.delete(oldest);
+    void staleClient?.$disconnect().catch(() => undefined);
+  }
+}
+
 export function getTenantClient(organizationId: string) {
   if (!organizationId || !CUID_REGEX.test(organizationId)) {
     throw new Error(`Invalid organizationId format: ${organizationId}`);
   }
 
-  return prisma.$extends({
-    query: {
-      $allModels: {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        async $allOperations({ args, query }: { args: any; query: (args: any) => any }) {
-          const [, , result] = await prisma.$transaction([
-            prisma.$executeRawUnsafe(
-              `SELECT set_config('app.organization_id', $1, true)`,
-              organizationId
-            ),
-            prisma.$executeRawUnsafe(`SET LOCAL ROLE quoin_app`),
-            query(args),
-          ]);
-          return result;
-        },
-      },
-    },
-  });
+  const existingClient = tenantPrismaClients.get(organizationId);
+  if (existingClient) {
+    return existingClient;
+  }
+
+  const tenantClient = createPrismaClient(
+    buildTenantConnectionString(organizationId),
+  );
+  rememberTenantClient(organizationId, tenantClient);
+  return tenantClient;
 }

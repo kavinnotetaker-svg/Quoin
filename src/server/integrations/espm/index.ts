@@ -4,8 +4,10 @@ import { PropertyService } from "./property";
 import { MeterService } from "./meter";
 import { MetricsService } from "./metrics";
 import { ConsumptionService } from "./consumption";
+import { AccountService } from "./account";
 
 export class ESPM {
+  public readonly account: AccountService;
   public readonly property: PropertyService;
   public readonly meter: MeterService;
   public readonly metrics: MetricsService;
@@ -13,6 +15,7 @@ export class ESPM {
 
   constructor(config: ESPMClientConfig) {
     const client = new ESPMClient(config);
+    this.account = new AccountService(client);
     this.property = new PropertyService(client);
     this.meter = new MeterService(client);
     this.metrics = new MetricsService(client);

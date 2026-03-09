@@ -1,15 +1,69 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { prisma, getTenantClient } from "@/server/lib/db";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getTenantClient, prisma } from "@/server/lib/db";
 
-describe("RLS Tenant Isolation", () => {
+async function dropAppendOnlyRulesForCleanup() {
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_rules
+        WHERE schemaname = 'public'
+          AND tablename = 'compliance_snapshots'
+          AND rulename = 'compliance_snapshots_no_delete'
+      ) THEN
+        EXECUTE 'DROP RULE compliance_snapshots_no_delete ON compliance_snapshots';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM pg_rules
+        WHERE schemaname = 'public'
+          AND tablename = 'energy_readings'
+          AND rulename = 'energy_readings_no_delete'
+      ) THEN
+        EXECUTE 'DROP RULE energy_readings_no_delete ON energy_readings';
+      END IF;
+    END
+    $$;
+  `);
+}
+
+async function restoreAppendOnlyRules() {
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_rules
+        WHERE schemaname = 'public'
+          AND tablename = 'energy_readings'
+          AND rulename = 'energy_readings_no_delete'
+      ) THEN
+        EXECUTE 'CREATE RULE energy_readings_no_delete AS ON DELETE TO energy_readings DO INSTEAD NOTHING';
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_rules
+        WHERE schemaname = 'public'
+          AND tablename = 'compliance_snapshots'
+          AND rulename = 'compliance_snapshots_no_delete'
+      ) THEN
+        EXECUTE 'CREATE RULE compliance_snapshots_no_delete AS ON DELETE TO compliance_snapshots DO INSTEAD NOTHING';
+      END IF;
+    END
+    $$;
+  `);
+}
+
+describe("RLS tenant isolation", () => {
   let orgA: { id: string };
   let orgB: { id: string };
   let buildingA: { id: string };
   let buildingB: { id: string };
 
   beforeAll(async () => {
-    // quoin_app role is created by migration 00000000000002_app_role.
-    // Create test orgs with unique slugs to avoid collisions with seed data
     const ts = Date.now();
 
     orgA = await prisma.organization.create({
@@ -42,6 +96,7 @@ describe("RLS Tenant Isolation", () => {
         bepsTargetScore: 71,
         maxPenaltyExposure: 1000000,
       },
+      select: { id: true },
     });
 
     buildingB = await prisma.building.create({
@@ -56,20 +111,17 @@ describe("RLS Tenant Isolation", () => {
         bepsTargetScore: 66,
         maxPenaltyExposure: 800000,
       },
+      select: { id: true },
     });
   });
 
   afterAll(async () => {
-    // Disable append-only rules for cleanup (superuser can ALTER TABLE)
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE compliance_snapshots DISABLE RULE IF EXISTS compliance_snapshots_no_delete`
-    ).catch(() => { /* Ignore if rule doesn't exist or permission denied in CI */ });
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE energy_readings DISABLE RULE IF EXISTS energy_readings_no_delete`
-    ).catch(() => { /* Ignore if rule doesn't exist */ });
+    await dropAppendOnlyRulesForCleanup().catch(() => undefined);
 
-    // Delete in FK order: snapshots → users → buildings → orgs
     await prisma.complianceSnapshot.deleteMany({
+      where: { buildingId: { in: [buildingA.id, buildingB.id] } },
+    });
+    await prisma.energyReading.deleteMany({
       where: { buildingId: { in: [buildingA.id, buildingB.id] } },
     });
     await prisma.user.deleteMany({
@@ -82,54 +134,23 @@ describe("RLS Tenant Isolation", () => {
       where: { id: { in: [orgA.id, orgB.id] } },
     });
 
-    // Re-enable append-only rules
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE compliance_snapshots ENABLE RULE IF EXISTS compliance_snapshots_no_delete`
-    ).catch(() => { /* Ignore if rule doesn't exist */ });
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE energy_readings ENABLE RULE IF EXISTS energy_readings_no_delete`
-    ).catch(() => { /* Ignore if rule doesn't exist */ });
-
+    await restoreAppendOnlyRules().catch(() => undefined);
     await prisma.$disconnect();
   });
 
-  // ─── Building Isolation ────────────────────────────────────────────────
-
-  it("Org A can see its own buildings", async () => {
-    const clientA = getTenantClient(orgA.id);
-    const buildings = await clientA.building.findMany({
-      where: { organizationId: orgA.id },
-    });
-    expect(buildings).toHaveLength(1);
-    expect(buildings[0].name).toBe("Building Alpha");
-  });
-
-  it("Org A CANNOT see Org B buildings", async () => {
+  it("org A sees only its own buildings", async () => {
     const clientA = getTenantClient(orgA.id);
     const buildings = await clientA.building.findMany();
-    const names = buildings.map((b) => b.name);
-    expect(names).not.toContain("Building Beta");
+    expect(buildings.map((building) => building.name)).toEqual(["Building Alpha"]);
   });
 
-  it("Org B can see its own buildings", async () => {
-    const clientB = getTenantClient(orgB.id);
-    const buildings = await clientB.building.findMany({
-      where: { organizationId: orgB.id },
-    });
-    expect(buildings).toHaveLength(1);
-    expect(buildings[0].name).toBe("Building Beta");
-  });
-
-  it("Org B CANNOT see Org A buildings", async () => {
+  it("org B sees only its own buildings", async () => {
     const clientB = getTenantClient(orgB.id);
     const buildings = await clientB.building.findMany();
-    const names = buildings.map((b) => b.name);
-    expect(names).not.toContain("Building Alpha");
+    expect(buildings.map((building) => building.name)).toEqual(["Building Beta"]);
   });
 
-  // ─── Direct ID Lookup Isolation ────────────────────────────────────────
-
-  it("Org A cannot access Org B building by direct ID lookup", async () => {
+  it("direct ID lookup across tenants returns null", async () => {
     const clientA = getTenantClient(orgA.id);
     const building = await clientA.building.findUnique({
       where: { id: buildingB.id },
@@ -137,33 +158,46 @@ describe("RLS Tenant Isolation", () => {
     expect(building).toBeNull();
   });
 
-  it("Org B cannot access Org A building by direct ID lookup", async () => {
-    const clientB = getTenantClient(orgB.id);
-    const building = await clientB.building.findUnique({
-      where: { id: buildingA.id },
+  it("cross-tenant update is blocked by RLS", async () => {
+    const clientA = getTenantClient(orgA.id);
+    const result = await clientA.building.updateMany({
+      where: { id: buildingB.id },
+      data: { name: "Compromised" },
     });
-    expect(building).toBeNull();
+
+    expect(result.count).toBe(0);
+
+    const unchanged = await prisma.building.findUnique({
+      where: { id: buildingB.id },
+      select: { name: true },
+    });
+    expect(unchanged?.name).toBe("Building Beta");
   });
 
-  // ─── Input Validation ─────────────────────────────────────────────────
+  it("cross-tenant delete is blocked by RLS", async () => {
+    const clientA = getTenantClient(orgA.id);
+    const result = await clientA.building.deleteMany({
+      where: { id: buildingB.id },
+    });
 
-  it("empty organization ID throws", () => {
+    expect(result.count).toBe(0);
+
+    const stillThere = await prisma.building.findUnique({
+      where: { id: buildingB.id },
+      select: { id: true },
+    });
+    expect(stillThere?.id).toBe(buildingB.id);
+  });
+
+  it("empty or invalid organization IDs are rejected", () => {
     expect(() => getTenantClient("")).toThrow("Invalid organizationId format");
-  });
-
-  it("non-CUID organization ID throws", () => {
     expect(() => getTenantClient("not-a-valid-cuid")).toThrow(
-      "Invalid organizationId format"
+      "Invalid organizationId format",
     );
-  });
-
-  it("SQL injection attempt throws", () => {
     expect(() => getTenantClient("'; DROP TABLE organizations; --")).toThrow(
-      "Invalid organizationId format"
+      "Invalid organizationId format",
     );
   });
-
-  // ─── ComplianceSnapshot Isolation ──────────────────────────────────────
 
   it("RLS isolates compliance snapshots", async () => {
     await prisma.complianceSnapshot.create({
@@ -177,57 +211,41 @@ describe("RLS Tenant Isolation", () => {
       },
     });
 
-    // Org B should not see Org A's snapshot
     const clientB = getTenantClient(orgB.id);
     const snapshots = await clientB.complianceSnapshot.findMany();
-    const buildingIds = snapshots.map((s) => s.buildingId);
-    expect(buildingIds).not.toContain(buildingA.id);
+    expect(snapshots.map((snapshot) => snapshot.buildingId)).not.toContain(buildingA.id);
   });
-
-  // ─── User Isolation ────────────────────────────────────────────────────
 
   it("RLS isolates users", async () => {
     const ts = Date.now();
 
-    await prisma.user.create({
-      data: {
-        organizationId: orgA.id,
-        clerkUserId: `clerk_test_user_a_${ts}`,
-        email: `testa_${ts}@test.com`,
-        name: "Test User A",
-        role: "ADMIN",
-      },
-    });
-
-    await prisma.user.create({
-      data: {
-        organizationId: orgB.id,
-        clerkUserId: `clerk_test_user_b_${ts}`,
-        email: `testb_${ts}@test.com`,
-        name: "Test User B",
-        role: "ADMIN",
-      },
+    await prisma.user.createMany({
+      data: [
+        {
+          organizationId: orgA.id,
+          clerkUserId: `clerk_test_user_a_${ts}`,
+          email: `testa_${ts}@test.com`,
+          name: "Test User A",
+          role: "ADMIN",
+        },
+        {
+          organizationId: orgB.id,
+          clerkUserId: `clerk_test_user_b_${ts}`,
+          email: `testb_${ts}@test.com`,
+          name: "Test User B",
+          role: "ADMIN",
+        },
+      ],
     });
 
     const clientA = getTenantClient(orgA.id);
-    const users = await clientA.user.findMany();
-    const names = users.map((u) => u.name);
-    expect(names).toContain("Test User A");
-    expect(names).not.toContain("Test User B");
+    const usersA = await clientA.user.findMany();
+    expect(usersA.map((user) => user.name)).toContain("Test User A");
+    expect(usersA.map((user) => user.name)).not.toContain("Test User B");
 
     const clientB = getTenantClient(orgB.id);
     const usersB = await clientB.user.findMany();
-    const namesB = usersB.map((u) => u.name);
-    expect(namesB).toContain("Test User B");
-    expect(namesB).not.toContain("Test User A");
-  });
-
-  // ─── Admin Client Bypasses RLS ─────────────────────────────────────────
-
-  it("admin client (superuser) sees all data across tenants", async () => {
-    const allBuildings = await prisma.building.findMany();
-    const names = allBuildings.map((b) => b.name);
-    expect(names).toContain("Building Alpha");
-    expect(names).toContain("Building Beta");
+    expect(usersB.map((user) => user.name)).toContain("Test User B");
+    expect(usersB.map((user) => user.name)).not.toContain("Test User A");
   });
 });

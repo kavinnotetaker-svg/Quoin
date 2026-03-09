@@ -194,6 +194,8 @@ model Building {
   ward                     Int?
   hasFinancialDistress     Boolean             @default(false) @map("has_financial_distress")
   occupancyRate            Float?              @map("occupancy_rate")
+  archivedAt               DateTime?           @map("archived_at")
+  archivedByClerkUserId    String?             @map("archived_by_clerk_user_id")
   createdAt                DateTime            @default(now()) @map("created_at")
   updatedAt                DateTime            @updatedAt @map("updated_at")
 
@@ -206,6 +208,7 @@ model Building {
   driftAlerts           DriftAlert[]
 
   @@index([organizationId])
+  @@index([organizationId, archivedAt])
   @@map("buildings")
 }
 
@@ -244,6 +247,7 @@ model EnergyReading {
   cost            Float?
   isVerified      Boolean      @default(false) @map("is_verified")
   uploadBatchId   String?      @map("upload_batch_id")
+  idempotencyKey  String?      @unique @map("idempotency_key")
   rawPayload      Json?        @map("raw_payload")
   ingestedAt      DateTime     @default(now()) @map("ingested_at")
   meterId         String?      @map("meter_id")
@@ -296,7 +300,7 @@ model GreenButtonConnection {
   accessToken    String            @map("access_token")
   refreshToken   String            @map("refresh_token")
   resourceUri    String?           @map("resource_uri")
-  subscriptionId String?           @map("subscription_id")
+  subscriptionId String?           @unique @map("subscription_id")
   tokenExpiresAt DateTime?         @map("token_expires_at")
   connectedAt    DateTime          @default(now()) @map("connected_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
@@ -311,6 +315,7 @@ model PipelineRun {
   id             String         @id @default(cuid())
   organizationId String         @map("organization_id")
   buildingId     String?        @map("building_id")
+  idempotencyKey String?        @unique @map("idempotency_key")
   pipelineType   PipelineType   @map("pipeline_type")
   triggerType    TriggerType    @map("trigger_type")
   status         PipelineStatus @default(QUEUED)
@@ -343,11 +348,13 @@ model DriftAlert {
   ruleId          String        @map("rule_id")
   severity        AlertSeverity
   status          AlertStatus   @default(ACTIVE)
+  active          Boolean       @default(true)
   title           String
   description     String        @db.Text
   currentValue    Float         @map("current_value")
   threshold       Float
   aiRootCause     String?       @db.Text @map("ai_root_cause")
+  idempotencyKey  String?       @unique @map("idempotency_key")
   detectedAt      DateTime      @default(now()) @map("detected_at")
   acknowledgedAt  DateTime?     @map("acknowledged_at")
   resolvedAt      DateTime?     @map("resolved_at")

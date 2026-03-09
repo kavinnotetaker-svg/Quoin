@@ -10,10 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "tsx test/eval/runner.ts",
-    "eval:verbose": "tsx test/eval/runner.ts --verbose",
-    "worker": "tsx src/server/worker-entrypoint.ts",
-    "worker:build": "tsc --project tsconfig.worker.json",
-    "worker:prod": "node dist/server/worker-entrypoint.js"
+    "eval:verbose": "tsx test/eval/runner.ts --verbose"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -28,9 +25,8 @@
     "@trpc/next": "^11.11.0",
     "@trpc/react-query": "^11.11.0",
     "@trpc/server": "^11.11.0",
-    "bullmq": "^5.70.1",
     "fast-xml-parser": "^5.4.2",
-    "ioredis": "^5.10.0",
+    "inngest": "^3.52.6",
     "lucide-react": "^0.576.0",
     "mapbox-gl": "^3.19.0",
     "next": "14.2.35",

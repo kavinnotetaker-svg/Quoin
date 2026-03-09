@@ -30,7 +30,9 @@ export default function OnboardingPage() {
       {step === 3 && (
         <StepData buildingId={buildingId} onNext={next} onSkip={next} />
       )}
-      {step === 4 && <StepConnect onNext={next} onSkip={next} />}
+      {step === 4 && (
+        <StepConnect buildingId={buildingId} onNext={next} onSkip={next} />
+      )}
       {step === 5 && <StepDone />}
     </WizardShell>
   );

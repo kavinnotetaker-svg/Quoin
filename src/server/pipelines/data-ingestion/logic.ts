@@ -9,6 +9,12 @@ import {
 import { syncWithESPM, type ESPMSyncResult } from "./espm-sync";
 import type { ESPM } from "@/server/integrations/espm";
 import type { UploadResult, NormalizedReading, MeterType } from "./types";
+import {
+  buildIngestionRunIdempotencyKey,
+  buildUploadBatchId,
+  persistEnergyReadings,
+} from "./idempotency";
+import { Prisma } from "@/generated/prisma/client";
 
 interface ProcessCSVParams {
   csvContent: string;
@@ -53,7 +59,15 @@ export async function processCSVUpload(
     tenantDb,
   } = params;
 
-  const uploadBatchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const uploadBatchId = buildUploadBatchId(
+    [
+      buildingId,
+      organizationId,
+      meterTypeHint ?? "",
+      unitHint ?? "",
+      csvContent,
+    ].join("|"),
+  );
   const allWarnings: string[] = [];
   const allErrors: string[] = [];
 
@@ -162,22 +176,28 @@ export async function processCSVUpload(
     };
   }
 
-  // Step 6: Persist EnergyReadings (append-only)
-  const created = await tenantDb.energyReading.createMany({
-    data: normalized.map((r) => ({
-      buildingId,
-      organizationId,
+  const created = await persistEnergyReadings({
+    buildingId,
+    organizationId,
+    uploadBatchId,
+    tenantDb,
+    readings: normalized.map((reading) => ({
       source: "CSV_UPLOAD",
-      meterType: r.meterType,
-      periodStart: r.periodStart,
-      periodEnd: r.periodEnd,
-      consumption: r.consumption,
-      unit: r.unit,
-      consumptionKbtu: r.consumptionKbtu,
-      cost: r.cost,
-      uploadBatchId,
+      meterType: reading.meterType,
+      periodStart: reading.periodStart,
+      periodEnd: reading.periodEnd,
+      consumption: reading.consumption,
+      unit: reading.unit,
+      consumptionKbtu: reading.consumptionKbtu,
+      cost: reading.cost,
     })),
   });
+
+  if (created.duplicateCount > 0) {
+    allWarnings.push(
+      `${created.duplicateCount} duplicate readings were ignored during persistence.`,
+    );
+  }
 
   const dates = normalized.map((r) => r.periodStart);
   const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
@@ -187,7 +207,7 @@ export async function processCSVUpload(
     success: true,
     buildingId,
     uploadBatchId,
-    readingsCreated: created.count,
+    readingsCreated: created.createdCount,
     readingsRejected: rejected,
     warnings: allWarnings,
     errors: allErrors,
@@ -201,7 +221,7 @@ export async function processCSVUpload(
 export interface IngestionPipelineInput {
   buildingId: string;
   organizationId: string;
-  uploadBatchId: string;
+  uploadBatchId?: string;
   triggerType: "CSV_UPLOAD" | "MANUAL" | "WEBHOOK" | "SCHEDULED";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tenantDb: any;
@@ -234,11 +254,44 @@ export async function runIngestionPipeline(
   const errors: string[] = [];
   let pipelineRunId: string | null = null;
   let espmSyncResult: ESPMSyncResult | null = null;
+  const ingestionRunIdempotencyKey = buildIngestionRunIdempotencyKey({
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    triggerType: input.triggerType,
+    uploadBatchId: input.uploadBatchId,
+  });
 
   try {
+    const existingRun = await input.tenantDb.pipelineRun.findFirst({
+      where: {
+        idempotencyKey: ingestionRunIdempotencyKey,
+        status: "COMPLETED",
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (existingRun) {
+      const existingSnapshot = await input.tenantDb.complianceSnapshot.findFirst({
+        where: { pipelineRunId: existingRun.id },
+        orderBy: { snapshotDate: "desc" },
+      });
+
+      return {
+        success: true,
+        snapshotId: existingSnapshot?.id ?? null,
+        pipelineRunId: existingRun.id,
+        espmSync: null,
+        errors: [],
+        summary: "Pipeline skipped: idempotent replay",
+      };
+    }
+
     // Step 1: Load building
-    const building = await input.tenantDb.building.findUnique({
-      where: { id: input.buildingId },
+    const building = await input.tenantDb.building.findFirst({
+      where: {
+        id: input.buildingId,
+        archivedAt: null,
+      },
     });
     if (!building) {
       throw new Error(`Building ${input.buildingId} not found`);
@@ -286,10 +339,14 @@ export async function runIngestionPipeline(
 
     if (input.espmClient && effectiveEspmId) {
       const newReadings = await input.tenantDb.energyReading.findMany({
-        where: {
-          buildingId: input.buildingId,
-          uploadBatchId: input.uploadBatchId,
-        },
+        where: input.uploadBatchId
+          ? {
+              buildingId: input.buildingId,
+              uploadBatchId: input.uploadBatchId,
+            }
+          : {
+              buildingId: input.buildingId,
+            },
       });
 
       espmSyncResult = await syncWithESPM(input.espmClient, {
@@ -319,7 +376,9 @@ export async function runIngestionPipeline(
 
     // Compute data quality
     const uploadReadings = await input.tenantDb.energyReading.findMany({
-      where: { uploadBatchId: input.uploadBatchId },
+      where: input.uploadBatchId
+        ? { uploadBatchId: input.uploadBatchId }
+        : { buildingId: input.buildingId },
     });
     const dataQualityScore = computeDataQualityScore(
       uploadReadings.length,
@@ -356,54 +415,91 @@ export async function runIngestionPipeline(
       dataQualityScore,
     });
 
-    const pipelineRun = await input.tenantDb.pipelineRun.create({
-      data: {
-        organizationId: input.organizationId,
-        buildingId: input.buildingId,
-        pipelineType: "DATA_INGESTION",
-        triggerType: input.triggerType,
-        status: "COMPLETED",
-        durationMs,
-        startedAt: new Date(startTime),
-        completedAt: new Date(),
-        inputSummary: {
-          uploadBatchId: input.uploadBatchId,
-          triggerType: input.triggerType,
-          readingsLoaded: readings.length,
-          newReadings: uploadReadings.length,
-        },
-        outputSummary: {
-          energyStarScore,
-          siteEui: eui.siteEui,
-          sourceEui: eui.sourceEui,
-          weatherNormalizedSiteEui,
-          complianceStatus: snapshotData.complianceStatus,
-          estimatedPenalty: snapshotData.estimatedPenalty,
-          monthsCovered: eui.monthsCovered,
-          espmSynced: espmSyncResult?.pushed ?? false,
-        },
-        errorMessage: errors.length > 0 ? errors.join("; ") : null,
+    const persisted = await input.tenantDb.$transaction(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      async (tx: any) => {
+        const pipelineRun = await tx.pipelineRun.create({
+          data: {
+            organizationId: input.organizationId,
+            buildingId: input.buildingId,
+            idempotencyKey: ingestionRunIdempotencyKey,
+            pipelineType: "DATA_INGESTION",
+            triggerType: input.triggerType,
+            status: "COMPLETED",
+            durationMs,
+            startedAt: new Date(startTime),
+            completedAt: new Date(),
+            inputSummary: {
+              uploadBatchId: input.uploadBatchId ?? null,
+              triggerType: input.triggerType,
+              readingsLoaded: readings.length,
+              newReadings: uploadReadings.length,
+            },
+            outputSummary: {
+              energyStarScore,
+              siteEui: eui.siteEui,
+              sourceEui: eui.sourceEui,
+              weatherNormalizedSiteEui,
+              complianceStatus: snapshotData.complianceStatus,
+              estimatedPenalty: snapshotData.estimatedPenalty,
+              monthsCovered: eui.monthsCovered,
+              espmSynced: espmSyncResult?.pushed ?? false,
+            },
+            errorMessage: errors.length > 0 ? errors.join("; ") : null,
+          },
+        });
+
+        const snapshot = await tx.complianceSnapshot.create({
+          data: {
+            ...snapshotData,
+            pipelineRunId: pipelineRun.id,
+          },
+        });
+
+        return { pipelineRun, snapshot };
       },
-    });
-    pipelineRunId = pipelineRun.id;
+    );
+    pipelineRunId = persisted.pipelineRun.id;
 
     // Step 5: Persist ComplianceSnapshot (append-only — INSERT only, never UPDATE)
-    const snapshot = await input.tenantDb.complianceSnapshot.create({
-      data: {
-        ...snapshotData,
-        pipelineRunId: pipelineRun.id,
-      },
-    });
-
     return {
       success: true,
-      snapshotId: snapshot.id,
-      pipelineRunId: pipelineRun.id,
+      snapshotId: persisted.snapshot.id,
+      pipelineRunId: persisted.pipelineRun.id,
       espmSync: espmSyncResult,
       errors,
       summary: `EUI: ${eui.siteEui.toFixed(1)} kBtu/ft² | Score: ${energyStarScore ?? "N/A"} | Status: ${snapshotData.complianceStatus} | Penalty: $${snapshotData.estimatedPenalty.toLocaleString()}`,
     };
   } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      const existingRun = await input.tenantDb.pipelineRun.findFirst({
+        where: {
+          idempotencyKey: ingestionRunIdempotencyKey,
+          status: "COMPLETED",
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (existingRun) {
+        const existingSnapshot = await input.tenantDb.complianceSnapshot.findFirst({
+          where: { pipelineRunId: existingRun.id },
+          orderBy: { snapshotDate: "desc" },
+        });
+
+        return {
+          success: true,
+          snapshotId: existingSnapshot?.id ?? null,
+          pipelineRunId: existingRun.id,
+          espmSync: null,
+          errors: [],
+          summary: "Pipeline skipped: concurrent idempotent replay",
+        };
+      }
+    }
+
     const durationMs = Date.now() - startTime;
     const message = err instanceof Error ? err.message : String(err);
 

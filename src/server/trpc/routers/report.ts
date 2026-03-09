@@ -126,8 +126,11 @@ export const reportRouter = router({
     .input(z.object({ buildingId: z.string() }))
     .output(reportOutputSchema)
     .query(async ({ ctx, input }) => {
-      const building = await ctx.tenantDb.building.findUnique({
-        where: { id: input.buildingId },
+      const building = await ctx.tenantDb.building.findFirst({
+        where: {
+          id: input.buildingId,
+          archivedAt: null,
+        },
       });
       if (!building) {
         throw new TRPCError({
@@ -245,8 +248,11 @@ export const reportRouter = router({
     )
     .output(exemptionReportSchema)
     .query(async ({ ctx, input }) => {
-      const building = await ctx.tenantDb.building.findUnique({
-        where: { id: input.buildingId },
+      const building = await ctx.tenantDb.building.findFirst({
+        where: {
+          id: input.buildingId,
+          archivedAt: null,
+        },
       });
       if (!building) {
         throw new TRPCError({

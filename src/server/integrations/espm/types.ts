@@ -84,3 +84,8 @@ export interface ESPMReasonsForNoScore {
     reason: string[];
   };
 }
+
+export interface DataExchangeSettings {
+  termsOfUse: string;
+  supportedMeterTypes: string[];
+}

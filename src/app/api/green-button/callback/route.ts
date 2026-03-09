@@ -1,110 +1,86 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma, getTenantClient } from "@/server/lib/db";
+import { getServerAuth } from "@/server/lib/auth";
 import {
+  decodeGreenButtonStateCookie,
   exchangeCodeForTokens,
   encryptToken,
+  getGreenButtonConfig,
+  getGreenButtonStateCookieName,
 } from "@/server/integrations/green-button";
 
-function getGreenButtonConfig() {
-  const clientId = process.env["GREEN_BUTTON_CLIENT_ID"];
-  const clientSecret = process.env["GREEN_BUTTON_CLIENT_SECRET"];
-  const authEndpoint = process.env["GREEN_BUTTON_AUTH_ENDPOINT"];
-  const tokenEndpoint = process.env["GREEN_BUTTON_TOKEN_ENDPOINT"];
-  const redirectUri = process.env["GREEN_BUTTON_REDIRECT_URI"];
-
-  if (
-    !clientId ||
-    !clientSecret ||
-    !authEndpoint ||
-    !tokenEndpoint ||
-    !redirectUri
-  ) {
-    return null;
-  }
-
-  return {
-    clientId,
-    clientSecret,
-    authorizationEndpoint: authEndpoint,
-    tokenEndpoint,
-    redirectUri,
-    scope: "",
-  };
+function redirectWithCookieCleanup(
+  req: NextRequest,
+  path: string,
+) {
+  const response = NextResponse.redirect(new URL(path, req.nextUrl.origin));
+  response.cookies.delete(getGreenButtonStateCookieName());
+  return response;
 }
 
-/**
- * GET /api/green-button/callback?code=xxx&state=xxx
- * Handles the OAuth callback from Pepco after user authorization.
- * Exchanges the code for tokens and stores them encrypted on the building.
- */
 export async function GET(req: NextRequest) {
-  const { userId, orgId } = await auth();
-  if (!userId || !orgId) {
-    return NextResponse.redirect(
-      new URL("/sign-in", req.nextUrl.origin),
-    );
+  const auth = await getServerAuth("ENGINEER").catch(() => null);
+  if (!auth) {
+    return NextResponse.redirect(new URL("/sign-in", req.nextUrl.origin));
   }
 
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
   const error = req.nextUrl.searchParams.get("error");
+  const stateCookie = decodeGreenButtonStateCookie(
+    req.cookies.get(getGreenButtonStateCookieName())?.value,
+  );
 
-  // User denied authorization
+  if (!stateCookie || stateCookie.organizationId !== auth.organizationId) {
+    return redirectWithCookieCleanup(req, "/dashboard?gb=invalid-state");
+  }
+
   if (error) {
-    const buildingId = state?.split(":")?.[1];
-    const redirectUrl = buildingId
-      ? `/buildings/${buildingId}?gb=denied`
-      : "/dashboard?gb=denied";
-    return NextResponse.redirect(new URL(redirectUrl, req.nextUrl.origin));
-  }
-
-  if (!code || !state) {
-    return NextResponse.redirect(
-      new URL("/dashboard?gb=error", req.nextUrl.origin),
+    return redirectWithCookieCleanup(
+      req,
+      `/buildings/${stateCookie.buildingId}?gb=denied`,
     );
   }
 
-  // Extract buildingId from state (format: csrfToken:buildingId)
-  const stateParts = state.split(":");
-  if (stateParts.length < 2) {
-    return NextResponse.redirect(
-      new URL("/dashboard?gb=error", req.nextUrl.origin),
+  if (!code || !state || state !== stateCookie.nonce) {
+    return redirectWithCookieCleanup(
+      req,
+      `/buildings/${stateCookie.buildingId}?gb=invalid-state`,
     );
   }
-  const buildingId = stateParts[1]!;
 
   const config = getGreenButtonConfig();
   if (!config) {
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
+    return redirectWithCookieCleanup(
+      req,
+      `/buildings/${stateCookie.buildingId}?gb=error`,
     );
   }
 
   const encryptionKey = process.env["GREEN_BUTTON_ENCRYPTION_KEY"];
   if (!encryptionKey) {
     console.error("[Green Button] GREEN_BUTTON_ENCRYPTION_KEY not set");
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
+    return redirectWithCookieCleanup(
+      req,
+      `/buildings/${stateCookie.buildingId}?gb=error`,
     );
   }
 
-  const org = await prisma.organization.findUnique({
-    where: { clerkOrgId: orgId },
+  const building = await auth.tenantDb.building.findFirst({
+    where: {
+      id: stateCookie.buildingId,
+      archivedAt: null,
+    },
   });
-  if (!org) {
-    return NextResponse.redirect(
-      new URL("/dashboard?gb=error", req.nextUrl.origin),
-    );
-  }
 
-  const tenantDb = getTenantClient(org.id);
+  if (!building) {
+    return redirectWithCookieCleanup(req, "/dashboard?gb=error");
+  }
 
   try {
     const tokens = await exchangeCodeForTokens(config, code);
 
-    await tenantDb.greenButtonConnection.upsert({
-      where: { buildingId },
+    await auth.tenantDb.greenButtonConnection.upsert({
+      where: { buildingId: stateCookie.buildingId },
       update: {
         status: "ACTIVE",
         accessToken: encryptToken(tokens.accessToken, encryptionKey),
@@ -114,38 +90,40 @@ export async function GET(req: NextRequest) {
         resourceUri: tokens.resourceUri,
       },
       create: {
-        buildingId,
-        organizationId: org.id,
+        buildingId: stateCookie.buildingId,
+        organizationId: auth.organizationId,
         status: "ACTIVE",
         accessToken: encryptToken(tokens.accessToken, encryptionKey),
         refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
         tokenExpiresAt: tokens.expiresAt,
         subscriptionId: tokens.subscriptionId,
         resourceUri: tokens.resourceUri,
-      }
+      },
     });
 
-    await tenantDb.building.update({
-      where: { id: buildingId },
+    await auth.tenantDb.building.update({
+      where: { id: stateCookie.buildingId },
       data: {
         greenButtonStatus: "ACTIVE",
         dataIngestionMethod: "GREEN_BUTTON",
       },
     });
 
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=success`, req.nextUrl.origin),
+    return redirectWithCookieCleanup(
+      req,
+      `/buildings/${stateCookie.buildingId}?gb=success`,
     );
   } catch (err) {
     console.error("[Green Button] Token exchange failed:", err);
 
-    await tenantDb.building.update({
-      where: { id: buildingId },
+    await auth.tenantDb.building.update({
+      where: { id: stateCookie.buildingId },
       data: { greenButtonStatus: "FAILED" },
     });
 
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
+    return redirectWithCookieCleanup(
+      req,
+      `/buildings/${stateCookie.buildingId}?gb=error`,
     );
   }
 }

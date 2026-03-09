@@ -23,16 +23,13 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      redis:
-        image: redis:7
-        ports: ["6379:6379"]
 
     env:
       DATABASE_URL: postgresql://quoin:quoin@localhost:5432/quoin_test
-      REDIS_URL: redis://localhost:6379
       CLERK_SECRET_KEY: sk_test_placeholder
       CLERK_WEBHOOK_SECRET: whsec_test_placeholder
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_test_placeholder
 
     steps:
       - uses: actions/checkout@v4
@@ -46,14 +43,23 @@ jobs:
 
       - run: npx prisma generate
 
-      - name: TypeScript check
-        run: npx tsc --noEmit
-
       - name: Run migrations
         run: npx prisma migrate deploy
 
-      - name: Run unit tests
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and integration tests
         run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Docker build
+        run: docker build -t quoin:test .
 
       - name: Run evals
         run: npm run eval

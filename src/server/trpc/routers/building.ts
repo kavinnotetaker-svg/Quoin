@@ -1,7 +1,15 @@
 import { z } from "zod";
-import { router, tenantProcedure, protectedProcedure } from "../init";
+import {
+  router,
+  tenantAdminProcedure,
+  tenantManagerProcedure,
+  tenantProcedure,
+  protectedProcedure,
+} from "../init";
 import { TRPCError } from "@trpc/server";
-import { prisma } from "@/server/lib/db";
+import { prisma, getTenantClient } from "@/server/lib/db";
+import { inngest } from "@/server/inngest/client";
+import { dataIngestEvent } from "@/server/inngest/events";
 
 const createBuildingInput = z.object({
   name: z.string().min(1).max(200),
@@ -29,6 +37,27 @@ const listBuildingsInput = z.object({
   search: z.string().max(200).optional(),
 });
 
+async function requireActiveBuilding(
+  tenantDb: ReturnType<typeof getTenantClient>,
+  buildingId: string,
+) {
+  const building = await tenantDb.building.findFirst({
+    where: {
+      id: buildingId,
+      archivedAt: null,
+    },
+  });
+
+  if (!building) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Building not found",
+    });
+  }
+
+  return building;
+}
+
 export const buildingRouter = router({
   onboardingStatus: protectedProcedure.query(async ({ ctx }) => {
     const hasOrg = !!ctx.clerkOrgId;
@@ -39,12 +68,14 @@ export const buildingRouter = router({
     if (ctx.clerkOrgId) {
       const org = await prisma.organization.findUnique({
         where: { clerkOrgId: ctx.clerkOrgId },
-        select: { id: true }
+        select: { id: true },
       });
+
       if (org) {
         orgExists = true;
-        buildingCount = await prisma.building.count({
-          where: { organizationId: org.id },
+        const tenantDb = getTenantClient(org.id);
+        buildingCount = await tenantDb.building.count({
+          where: { archivedAt: null },
         });
       }
     }
@@ -58,56 +89,63 @@ export const buildingRouter = router({
     };
   }),
 
-  list: tenantProcedure
-    .input(listBuildingsInput)
-    .query(async ({ ctx, input }) => {
-      const { page, pageSize, sortBy, sortOrder, propertyType, search } = input;
-      const skip = (page - 1) * pageSize;
+  list: tenantProcedure.input(listBuildingsInput).query(async ({ ctx, input }) => {
+    const { page, pageSize, sortBy, sortOrder, propertyType, search } = input;
+    const skip = (page - 1) * pageSize;
 
-      const where: Record<string, unknown> = {};
-      if (propertyType) where.propertyType = propertyType;
-      if (search) {
-        where.OR = [
-          { name: { contains: search, mode: "insensitive" } },
-          { address: { contains: search, mode: "insensitive" } },
-        ];
-      }
+    const where: Record<string, unknown> = {
+      archivedAt: null,
+    };
 
-      const [buildings, total] = await Promise.all([
-        ctx.tenantDb.building.findMany({
-          where,
-          skip,
-          take: pageSize,
-          orderBy: { [sortBy]: sortOrder },
-          include: {
-            complianceSnapshots: {
-              orderBy: { snapshotDate: "desc" },
-              take: 1,
-            },
+    if (propertyType) {
+      where.propertyType = propertyType;
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { address: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const [buildings, total] = await Promise.all([
+      ctx.tenantDb.building.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { [sortBy]: sortOrder },
+        include: {
+          complianceSnapshots: {
+            orderBy: { snapshotDate: "desc" },
+            take: 1,
           },
-        }),
-        ctx.tenantDb.building.count({ where }),
-      ]);
-
-      return {
-        buildings: buildings.map((b) => ({
-          ...b,
-          latestSnapshot: b.complianceSnapshots?.[0] ?? null,
-        })),
-        pagination: {
-          page,
-          pageSize,
-          total,
-          totalPages: Math.ceil(total / pageSize),
         },
-      };
-    }),
+      }),
+      ctx.tenantDb.building.count({ where }),
+    ]);
+
+    return {
+      buildings: buildings.map((building) => ({
+        ...building,
+        latestSnapshot: building.complianceSnapshots[0] ?? null,
+      })),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
+  }),
 
   get: tenantProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const building = await ctx.tenantDb.building.findUnique({
-        where: { id: input.id },
+      const building = await ctx.tenantDb.building.findFirst({
+        where: {
+          id: input.id,
+          archivedAt: null,
+        },
         include: {
           complianceSnapshots: {
             orderBy: { snapshotDate: "desc" },
@@ -129,22 +167,21 @@ export const buildingRouter = router({
       };
     }),
 
-  create: tenantProcedure
+  create: tenantManagerProcedure
     .input(createBuildingInput)
     .mutation(async ({ ctx, input }) => {
       const { espmPropertyId, ...rest } = input;
-      const building = await ctx.tenantDb.building.create({
+
+      return ctx.tenantDb.building.create({
         data: {
           ...rest,
           organizationId: ctx.organizationId,
           espmPropertyId: espmPropertyId ? BigInt(espmPropertyId) : null,
         },
       });
-
-      return building;
     }),
 
-  update: tenantProcedure
+  update: tenantManagerProcedure
     .input(
       z.object({
         id: z.string(),
@@ -165,12 +202,17 @@ export const buildingRouter = router({
             .enum(["STANDARD", "PERFORMANCE", "PRESCRIPTIVE", "NONE"])
             .optional(),
         }),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
+      const previousBuilding = await requireActiveBuilding(ctx.tenantDb, input.id);
       const { espmPropertyId, ...rest } = input.data;
-      const building = await ctx.tenantDb.building.update({
-        where: { id: input.id },
+
+      const updated = await ctx.tenantDb.building.updateMany({
+        where: {
+          id: input.id,
+          archivedAt: null,
+        },
         data: {
           ...rest,
           ...(espmPropertyId !== undefined
@@ -179,25 +221,63 @@ export const buildingRouter = router({
         },
       });
 
+      if (updated.count !== 1) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Building update could not be applied",
+        });
+      }
+
+      const building = await requireActiveBuilding(ctx.tenantDb, input.id);
+
+      if (
+        espmPropertyId &&
+        previousBuilding.espmPropertyId?.toString() !== espmPropertyId
+      ) {
+        try {
+          await inngest.send(
+            dataIngestEvent({
+              buildingId: building.id,
+              organizationId: building.organizationId,
+              triggerType: "MANUAL",
+            }),
+          );
+        } catch (queueError) {
+          console.error("[building.update] Failed to queue ingestion job:", queueError);
+        }
+      }
+
       return building;
     }),
 
-  delete: tenantProcedure
+  delete: tenantAdminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      // Use admin client to bypass RLS for cascade operations
-      await prisma.driftAlert.deleteMany({ where: { buildingId: input.id } });
-      await prisma.energyReading.deleteMany({ where: { buildingId: input.id } });
-      await prisma.complianceSnapshot.deleteMany({ where: { buildingId: input.id } });
-      await prisma.pipelineRun.deleteMany({ where: { buildingId: input.id } });
-      await prisma.meter.deleteMany({ where: { buildingId: input.id } });
-      await prisma.greenButtonConnection.deleteMany({ where: { buildingId: input.id } });
+    .mutation(async ({ ctx, input }) => {
+      await requireActiveBuilding(ctx.tenantDb, input.id);
 
-      await prisma.building.delete({
-        where: { id: input.id },
+      const archivedAt = new Date();
+      const archived = await ctx.tenantDb.building.updateMany({
+        where: {
+          id: input.id,
+          archivedAt: null,
+        },
+        data: {
+          archivedAt,
+          archivedByClerkUserId: ctx.clerkUserId,
+        },
       });
 
-      return { success: true };
+      if (archived.count !== 1) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Building archive could not be applied",
+        });
+      }
+
+      return {
+        success: true,
+        archivedAt: archivedAt.toISOString(),
+      };
     }),
 
   pipelineRuns: tenantProcedure
@@ -208,6 +288,8 @@ export const buildingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await requireActiveBuilding(ctx.tenantDb, input.buildingId);
+
       return ctx.tenantDb.pipelineRun.findMany({
         where: { buildingId: input.buildingId },
         orderBy: { createdAt: "desc" },
@@ -218,6 +300,8 @@ export const buildingRouter = router({
   latestSnapshot: tenantProcedure
     .input(z.object({ buildingId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await requireActiveBuilding(ctx.tenantDb, input.buildingId);
+
       return ctx.tenantDb.complianceSnapshot.findFirst({
         where: { buildingId: input.buildingId },
         orderBy: { snapshotDate: "desc" },
@@ -232,6 +316,8 @@ export const buildingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await requireActiveBuilding(ctx.tenantDb, input.buildingId);
+
       const since = new Date();
       since.setMonth(since.getMonth() - input.months);
 
@@ -252,6 +338,8 @@ export const buildingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await requireActiveBuilding(ctx.tenantDb, input.buildingId);
+
       return ctx.tenantDb.complianceSnapshot.findMany({
         where: { buildingId: input.buildingId },
         orderBy: { snapshotDate: "desc" },
@@ -261,6 +349,7 @@ export const buildingRouter = router({
 
   portfolioStats: tenantProcedure.query(async ({ ctx }) => {
     const buildings = await ctx.tenantDb.building.findMany({
+      where: { archivedAt: null },
       include: {
         complianceSnapshots: {
           orderBy: { snapshotDate: "desc" },
@@ -285,31 +374,35 @@ export const buildingRouter = router({
 
     for (const building of buildings) {
       const snapshot = building.complianceSnapshots[0];
-      if (snapshot) {
-        switch (snapshot.complianceStatus) {
-          case "NON_COMPLIANT":
-            stats.nonCompliant++;
-            break;
-          case "AT_RISK":
-            stats.atRisk++;
-            break;
-          case "COMPLIANT":
-            stats.compliant++;
-            break;
-          case "EXEMPT":
-            stats.exempt++;
-            break;
-          case "PENDING_DATA":
-            stats.pendingData++;
-            break;
-        }
-        if (snapshot.estimatedPenalty) {
-          stats.totalPenaltyExposure += snapshot.estimatedPenalty;
-        }
-        if (snapshot.energyStarScore != null) {
-          scoreSum += snapshot.energyStarScore;
-          scoreCount++;
-        }
+      if (!snapshot) {
+        continue;
+      }
+
+      switch (snapshot.complianceStatus) {
+        case "NON_COMPLIANT":
+          stats.nonCompliant++;
+          break;
+        case "AT_RISK":
+          stats.atRisk++;
+          break;
+        case "COMPLIANT":
+          stats.compliant++;
+          break;
+        case "EXEMPT":
+          stats.exempt++;
+          break;
+        case "PENDING_DATA":
+          stats.pendingData++;
+          break;
+      }
+
+      if (snapshot.estimatedPenalty) {
+        stats.totalPenaltyExposure += snapshot.estimatedPenalty;
+      }
+
+      if (snapshot.energyStarScore != null) {
+        scoreSum += snapshot.energyStarScore;
+        scoreCount++;
       }
     }
 

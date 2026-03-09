@@ -1,21 +1,13 @@
-import { auth } from "@clerk/nextjs/server";
+import {
+  requireRouteTenantAccess,
+  type AppRole,
+  type TenantAccessContext,
+} from "@/server/lib/access";
 
-export interface ServerAuth {
-  clerkUserId: string;
-  clerkOrgId: string | null | undefined;
-  clerkOrgRole: string | null | undefined;
-}
+export type ServerAuth = TenantAccessContext;
 
-export async function getServerAuth(): Promise<ServerAuth> {
-  const { userId, orgId, orgRole } = await auth();
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
-  return {
-    clerkUserId: userId,
-    clerkOrgId: orgId,
-    clerkOrgRole: orgRole,
-  };
+export async function getServerAuth(
+  minimumRole: AppRole = "VIEWER",
+): Promise<ServerAuth> {
+  return requireRouteTenantAccess(minimumRole);
 }

@@ -1,11 +1,26 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { PageHeader } from "@/components/layout/page-header";
 import { KPIRow } from "./kpi-row";
 import { BuildingTable } from "./building-table";
-import { BuildingMap } from "./building-map";
+
+const BuildingMap = dynamic(
+  () => import("./building-map").then((mod) => mod.BuildingMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="flex items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500"
+        style={{ height: "calc(100vh - 280px)", minHeight: "400px" }}
+      >
+        Loading map...
+      </div>
+    ),
+  },
+);
 
 const STATUS_FILTERS = [
   { label: "All", value: undefined },

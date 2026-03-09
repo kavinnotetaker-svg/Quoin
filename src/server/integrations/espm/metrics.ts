@@ -29,12 +29,20 @@ export class MetricsService {
       "medianScore",
     ].join(", ");
 
-    const raw = await this.client.get<ESPMPropertyMetrics>(
+    const raw = await this.client.get<unknown>(
       `/property/${propertyId}/metrics?year=${year}&month=${month}&measurementSystem=EPA`,
       { "PM-Metrics": metricsHeader },
     );
 
-    return this.parseMetrics(raw);
+    // ZOD VALIDATION (Issue 10)
+    const { ESPMPropertyMetricsSchema } = await import("./schema");
+    const parsed = ESPMPropertyMetricsSchema.safeParse(raw);
+
+    if (!parsed.success) {
+      throw new Error(`ESPM Metrics Schema Validation Failed: ${parsed.error.message}`);
+    }
+
+    return this.parseMetrics(parsed.data as unknown as ESPMPropertyMetrics);
   }
 
   /**

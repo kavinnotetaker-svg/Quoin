@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenantProcedure, router } from "../init";
+import { tenantProcedure, tenantWriteProcedure, router } from "../init";
 import { TRPCError } from "@trpc/server";
 
 /**
@@ -120,7 +120,7 @@ export const driftRouter = router({
   /**
    * Acknowledge an alert (mark as seen but not resolved).
    */
-  acknowledge: tenantProcedure
+  acknowledge: tenantWriteProcedure
     .input(z.object({ alertId: z.string() }))
     .output(z.object({ id: z.string(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -145,7 +145,7 @@ export const driftRouter = router({
   /**
    * Resolve an alert (mark as fixed/no longer relevant).
    */
-  resolve: tenantProcedure
+  resolve: tenantWriteProcedure
     .input(z.object({ alertId: z.string() }))
     .output(z.object({ id: z.string(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
