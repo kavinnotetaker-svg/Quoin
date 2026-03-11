@@ -1,0 +1,213 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e3]
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - link "Quoin" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e8]:
+        - link "Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e10]
+          - text: Dashboard
+        - link "Buildings" [ref=e15] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e16]
+          - text: Buildings
+        - link "Reports" [ref=e20] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e21]
+          - text: Reports
+        - link "Settings" [ref=e24] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e25]
+          - text: Settings
+    - generic [ref=e28]:
+      - banner [ref=e29]:
+        - button "Open organization switcher" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]:
+            - img "JBG's logo" [ref=e35]
+            - generic "JBG" [ref=e38]
+          - img [ref=e39]
+        - button "Open user menu" [ref=e42] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e45]
+      - main [ref=e47]:
+        - generic [ref=e48]:
+          - heading "Portfolio Overview" [level=1] [ref=e50]
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - paragraph [ref=e53]: Buildings
+              - paragraph [ref=e54]: "2"
+              - paragraph [ref=e55]: 1 non-compliant
+            - generic [ref=e56]:
+              - paragraph [ref=e57]: Penalty Exposure
+              - paragraph [ref=e58]: $3,097,352
+            - generic [ref=e59]:
+              - paragraph [ref=e60]: Avg Score
+              - paragraph [ref=e61]: "49"
+              - paragraph [ref=e62]: across 1 scored
+            - generic [ref=e63]:
+              - paragraph [ref=e64]: Pending Data
+              - paragraph [ref=e65]: "1"
+              - paragraph [ref=e66]: need fresh data
+          - separator [ref=e67]
+          - generic [ref=e68]:
+            - generic [ref=e69]:
+              - button "All" [ref=e70] [cursor=pointer]
+              - button "Compliant" [ref=e71] [cursor=pointer]
+              - button "At Risk" [ref=e72] [cursor=pointer]
+              - button "Non-Compliant" [ref=e73] [cursor=pointer]
+              - button "Pending" [ref=e74] [cursor=pointer]
+            - generic [ref=e75]:
+              - generic [ref=e76]:
+                - button "Table" [ref=e77] [cursor=pointer]
+                - button "Map" [ref=e78] [cursor=pointer]
+              - textbox "Search buildings..." [ref=e79]
+          - table [ref=e81]:
+            - rowgroup [ref=e82]:
+              - row "Name Type Score Status Penalty Updated" [ref=e83]:
+                - columnheader "Name" [ref=e84]
+                - columnheader "Type" [ref=e85]
+                - columnheader "Score" [ref=e86]
+                - columnheader "Status" [ref=e87]
+                - columnheader "Penalty" [ref=e88]
+                - columnheader "Updated" [ref=e89]
+            - rowgroup [ref=e90]:
+              - row "ICC Office 45 Pending $2,712,000 Today" [ref=e91]:
+                - cell "ICC" [ref=e92]:
+                  - link "ICC" [ref=e93] [cursor=pointer]:
+                    - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                - cell "Office" [ref=e94]
+                - cell "45" [ref=e95]
+                - cell "Pending" [ref=e96]:
+                  - generic [ref=e97]: Pending
+                - cell "$2,712,000" [ref=e99]
+                - cell "Today" [ref=e100]
+              - row "John R. Thompson Jr. Intercollegiate Athletic Center Office 52 Non-Compliant $385,352 4d ago" [ref=e101]:
+                - cell "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e102]:
+                  - link "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e103] [cursor=pointer]:
+                    - /url: /buildings/cmmfast4n001fa4hsoq8btz8x
+                - cell "Office" [ref=e104]
+                - cell "52" [ref=e105]
+                - cell "Non-Compliant" [ref=e106]:
+                  - generic [ref=e107]: Non-Compliant
+                - cell "$385,352" [ref=e109]
+                - cell "4d ago" [ref=e110]
+          - separator [ref=e111]
+          - generic [ref=e112]:
+            - generic [ref=e113]:
+              - generic [ref=e114]:
+                - paragraph [ref=e115]: Buildings Ready
+                - paragraph [ref=e116]: "0"
+              - generic [ref=e117]:
+                - paragraph [ref=e118]: Buildings Blocked
+                - paragraph [ref=e119]: "2"
+              - generic [ref=e120]:
+                - paragraph [ref=e121]: High Risk Buildings
+                - paragraph [ref=e122]: "1"
+              - generic [ref=e123]:
+                - paragraph [ref=e124]: Estimated Exposure
+                - paragraph [ref=e125]: $2,260,000
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - generic [ref=e129]:
+                  - heading "Priority Actions" [level=3] [ref=e130]
+                  - paragraph [ref=e131]: Deterministic portfolio risk actions derived from governed records.
+                - generic [ref=e132]:
+                  - generic [ref=e133]:
+                    - generic [ref=e134]:
+                      - link "ICC" [ref=e135] [cursor=pointer]:
+                        - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                      - generic [ref=e136]: HIGH
+                    - paragraph [ref=e137]: Benchmarking readiness is currently blocked.
+                    - paragraph [ref=e138]: Resolve the blocking readiness findings and rerun the benchmarking workflow.
+                  - generic [ref=e139]:
+                    - generic [ref=e140]:
+                      - link "ICC" [ref=e141] [cursor=pointer]:
+                        - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                      - generic [ref=e142]: HIGH
+                    - paragraph [ref=e143]: The latest governed BEPS evaluation is still pending required data.
+                    - paragraph [ref=e144]: Complete the missing canonical BEPS inputs and rerun the evaluation.
+                  - generic [ref=e145]:
+                    - generic [ref=e146]:
+                      - link "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e147] [cursor=pointer]:
+                        - /url: /buildings/cmmfast4n001fa4hsoq8btz8x
+                      - generic [ref=e148]: HIGH
+                    - paragraph [ref=e149]: No governed benchmarking submission record exists for the current reporting year.
+                    - paragraph [ref=e150]: Run benchmarking readiness evaluation and create the canonical annual submission record.
+                  - generic [ref=e151]:
+                    - generic [ref=e152]:
+                      - link "ICC" [ref=e153] [cursor=pointer]:
+                        - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                      - generic [ref=e154]: HIGH
+                    - paragraph [ref=e155]: Benchmarking evidence requirements are not satisfied for verification or GFA correction.
+                    - paragraph [ref=e156]: Attach the missing verification or GFA evidence to the annual benchmarking record.
+                  - generic [ref=e157]:
+                    - generic [ref=e158]:
+                      - link "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e159] [cursor=pointer]:
+                        - /url: /buildings/cmmfast4n001fa4hsoq8btz8x
+                      - generic [ref=e160]: HIGH
+                    - paragraph [ref=e161]: No Portfolio Manager sync state exists for this building.
+                    - paragraph [ref=e162]: Run a Portfolio Manager sync and inspect linkage/QA results.
+                  - generic [ref=e163]:
+                    - generic [ref=e164]:
+                      - link "ICC" [ref=e165] [cursor=pointer]:
+                        - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                      - generic [ref=e166]: HIGH
+                    - paragraph [ref=e167]: The BEPS filing has missing evidence or packet warnings that still need operator attention.
+                    - paragraph [ref=e168]: Attach the missing support evidence and regenerate the packet to clear warnings.
+                  - generic [ref=e169]:
+                    - generic [ref=e170]:
+                      - link "ICC" [ref=e171] [cursor=pointer]:
+                        - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                      - generic [ref=e172]: HIGH
+                    - paragraph [ref=e173]: Benchmarking work remains open for a reporting year that is already due.
+                    - paragraph [ref=e174]: Submit or advance the benchmarking filing for the current reporting year.
+                  - generic [ref=e175]:
+                    - generic [ref=e176]:
+                      - link "ICC" [ref=e177] [cursor=pointer]:
+                        - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                      - generic [ref=e178]: HIGH
+                    - paragraph [ref=e179]: Portfolio Manager QA found meter, coverage, or overlap issues.
+                    - paragraph [ref=e180]: Resolve missing meters or consumption-period issues before relying on readiness automation.
+              - generic [ref=e181]:
+                - generic [ref=e183]:
+                  - heading "Benchmarking Readiness" [level=3] [ref=e184]
+                  - paragraph [ref=e185]: Portfolio Manager sync and benchmarking autopilot status by building.
+                - generic [ref=e186]:
+                  - generic [ref=e187]:
+                    - generic [ref=e188]:
+                      - link "ICC" [ref=e189] [cursor=pointer]:
+                        - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                      - generic [ref=e190]: BLOCKED
+                    - paragraph [ref=e191]: Reporting year 2025 • PM sync SUCCEEDED
+                  - generic [ref=e192]:
+                    - generic [ref=e193]:
+                      - link "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e194] [cursor=pointer]:
+                        - /url: /buildings/cmmfast4n001fa4hsoq8btz8x
+                      - generic [ref=e195]: PENDING
+                    - paragraph [ref=e196]: Reporting year 2025 • PM sync NOT_STARTED
+              - generic [ref=e197]:
+                - generic [ref=e199]:
+                  - heading "Operational Anomalies" [level=3] [ref=e200]
+                  - paragraph [ref=e201]: Deterministic operations anomalies affecting compliance and energy use.
+                - generic [ref=e203]:
+                  - generic [ref=e204]:
+                    - link "ICC" [ref=e205] [cursor=pointer]:
+                      - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                    - generic [ref=e206]: HIGH
+                  - paragraph [ref=e207]: No active meters are linked to the building
+                  - paragraph [ref=e208]: MISSING_OR_SUSPECT_METER_DATA
+              - generic [ref=e209]:
+                - generic [ref=e211]:
+                  - heading "Retrofit Priorities" [level=3] [ref=e212]
+                  - paragraph [ref=e213]: Ranked retrofit candidates using avoided penalty, savings, timing, and confidence.
+                - generic [ref=e215]:
+                  - generic [ref=e216]:
+                    - link "Manual" [ref=e217] [cursor=pointer]:
+                      - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                    - generic [ref=e218]: MEDIUM
+                  - paragraph [ref=e219]: ICC
+                  - generic [ref=e220]:
+                    - generic [ref=e221]: Priority 39.21
+                    - generic [ref=e222]: Avoided penalty $180,800
+                    - generic [ref=e223]: Net cost $120,000

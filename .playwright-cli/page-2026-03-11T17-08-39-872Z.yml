@@ -1,0 +1,121 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e52]
+  - generic [ref=e53]:
+    - complementary [ref=e54]:
+      - link "Quoin" [ref=e56] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e57]:
+        - link "Dashboard" [ref=e58] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e59]
+          - text: Dashboard
+        - link "Buildings" [ref=e64] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e65]
+          - text: Buildings
+        - link "Reports" [ref=e69] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e70]
+          - text: Reports
+        - link "Settings" [ref=e73] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e74]
+          - text: Settings
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - button "Open organization switcher" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "JBG's logo" [ref=e84]
+            - generic "JBG" [ref=e87]
+          - img [ref=e88]
+        - button "Open user menu" [ref=e91] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e94]
+      - main [ref=e96]:
+        - generic [ref=e248]:
+          - generic [ref=e249]:
+            - generic [ref=e250]:
+              - generic [ref=e251]:
+                - heading "ICC" [level=1] [ref=e252]
+                - paragraph [ref=e253]: 1472-1498 37th St NW, Washington, DC 20057
+                - paragraph [ref=e254]: Office | 226,000 SF | Built 1982
+              - generic [ref=e255]:
+                - button "Upload Data" [ref=e256] [cursor=pointer]
+                - button "Delete" [ref=e257] [cursor=pointer]
+            - generic [ref=e258]:
+              - generic [ref=e259]: "ESPM Property ID:"
+              - generic [ref=e260]: "88762425"
+              - button "Edit" [ref=e261] [cursor=pointer]
+          - separator [ref=e262]
+          - generic [ref=e263]:
+            - generic [ref=e264]:
+              - paragraph [ref=e265]: ENERGY STAR Score
+              - paragraph [ref=e266]: "45"
+              - paragraph [ref=e267]: "Target: 71 (-26 below)"
+            - generic [ref=e268]:
+              - paragraph [ref=e269]: Status
+              - paragraph [ref=e270]:
+                - generic [ref=e271]: Non-Compliant
+              - paragraph [ref=e273]: Since Mar 6, 2026
+            - generic [ref=e274]:
+              - paragraph [ref=e275]: Penalty Exposure
+              - paragraph [ref=e276]: $827,606
+              - paragraph [ref=e277]: "Max: $2,260,000"
+          - separator [ref=e278]
+          - generic [ref=e279]:
+            - button "Energy" [ref=e280] [cursor=pointer]
+            - button "Benchmarking" [ref=e281] [cursor=pointer]
+            - button "BEPS" [ref=e282] [cursor=pointer]
+            - button "Retrofit" [ref=e283] [cursor=pointer]
+            - button "Financing" [ref=e284] [cursor=pointer]
+            - button "Operations" [ref=e285] [cursor=pointer]
+            - button "Provenance" [ref=e286] [cursor=pointer]
+            - button "Compliance" [ref=e287] [cursor=pointer]
+            - button "Capital" [ref=e288] [cursor=pointer]
+            - button "Alerts" [ref=e289] [cursor=pointer]
+          - generic [ref=e1115]:
+            - generic [ref=e1116]:
+              - generic [ref=e1118]:
+                - heading "Create Financing Case" [level=3] [ref=e1119]
+                - paragraph [ref=e1120]: Select one or more retrofit candidates to create a governed financing case.
+              - generic [ref=e1121]:
+                - generic [ref=e1122]: Case name
+                - textbox "Case name" [ref=e1123]
+              - generic [ref=e1125]:
+                - checkbox "Manual LED_LIGHTING_RETROFIT Capex $120,000 • Savings $15,000" [ref=e1126]
+                - generic [ref=e1127]:
+                  - generic [ref=e1128]: Manual
+                  - generic [ref=e1129]: LED_LIGHTING_RETROFIT
+                  - generic [ref=e1130]: Capex $120,000 • Savings $15,000
+              - button "Create Financing Case" [disabled] [ref=e1132]
+            - generic [ref=e1133]:
+              - generic [ref=e1134]:
+                - generic [ref=e1136]:
+                  - heading "Financing Cases" [level=3] [ref=e1137]
+                  - paragraph [ref=e1138]: Canonical financing cases and linked retrofit bundles for this building.
+                - button "Manual SINGLE_CANDIDATE Capex $120,000 Savings $15,000 Avoided penalty $180,800 Compliance uplift 8.00%" [ref=e1149] [cursor=pointer]:
+                  - generic [ref=e1150]:
+                    - generic [ref=e1151]: Manual
+                    - generic [ref=e1152]: SINGLE_CANDIDATE
+                  - generic [ref=e1153]:
+                    - generic [ref=e1154]: Capex $120,000
+                    - generic [ref=e1155]: Savings $15,000
+                    - generic [ref=e1156]: Avoided penalty $180,800
+                    - generic [ref=e1157]: Compliance uplift 8.00%
+              - generic [ref=e1141]:
+                - generic [ref=e1142]:
+                  - generic [ref=e1143]:
+                    - heading "Financing Packet" [level=3] [ref=e1144]
+                    - paragraph [ref=e1145]: Generate, finalize, inspect, and export the deterministic financing packet for the selected case.
+                  - generic [ref=e1158]:
+                    - button "Generate" [ref=e1159] [cursor=pointer]
+                    - button "Finalize" [ref=e1160] [cursor=pointer]
+                    - button "Export JSON" [ref=e1161] [cursor=pointer]
+                - generic [ref=e1162]:
+                  - generic [ref=e1163]:
+                    - generic [ref=e1164]: Packet v1 • FINALIZED
+                    - generic [ref=e1165]: 0ec30dd3c202d6608bf71b86d1da79d94302a84efe49a8d004c38b0820132c39
+                  - generic [ref=e1166]:
+                    - generic [ref=e1167]: Warnings
+                    - list [ref=e1168]:
+                      - listitem [ref=e1169]: One or more retrofit candidates do not have a linked support source artifact.
+  - generic [ref=e686]: "0"

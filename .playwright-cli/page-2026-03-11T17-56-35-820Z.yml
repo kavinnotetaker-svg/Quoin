@@ -1,0 +1,130 @@
+- generic [ref=e1]:
+  - alert [ref=e3]
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - link "Quoin" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e8]:
+        - link "Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e10]
+          - text: Dashboard
+        - link "Buildings" [ref=e15] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e16]
+          - text: Buildings
+        - link "Reports" [ref=e20] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e21]
+          - text: Reports
+        - link "Settings" [active] [ref=e24] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e25]
+          - text: Settings
+    - generic [ref=e28]:
+      - banner [ref=e29]:
+        - button "Open organization switcher" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]:
+            - img "JBG's logo" [ref=e35]
+            - generic "JBG" [ref=e38]
+          - img [ref=e39]
+        - button "Open user menu" [ref=e42] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e45]
+      - main [ref=e47]:
+        - generic [ref=e224]:
+          - heading "Settings" [level=1] [ref=e226]
+          - generic [ref=e227]:
+            - generic [ref=e228]:
+              - paragraph [ref=e229]: Organization Selected
+              - paragraph [ref=e230]: "Yes"
+            - generic [ref=e231]:
+              - paragraph [ref=e232]: Organization Synced
+              - paragraph [ref=e233]: "Yes"
+            - generic [ref=e234]:
+              - paragraph [ref=e235]: Buildings
+              - paragraph [ref=e236]: "2"
+            - generic [ref=e237]:
+              - paragraph [ref=e238]: Onboarding Complete
+              - paragraph [ref=e239]: "Yes"
+          - generic [ref=e240]:
+            - generic [ref=e241]:
+              - generic [ref=e243]:
+                - heading "Active Rule Packages" [level=3] [ref=e244]
+                - paragraph [ref=e245]: Governed rule packages and active versions currently loaded into the platform.
+              - generic [ref=e246]:
+                - generic [ref=e247]:
+                  - generic [ref=e248]: DC_BENCHMARKING_2025
+                  - generic [ref=e249]: DC Benchmarking Annual Submission Workflow
+                  - generic [ref=e251]:
+                    - generic [ref=e252]: bootstrap-2026-03-09 • ACTIVE
+                    - generic [ref=e253]: Effective Dec 31, 2024, 07:00 PM
+                    - generic [ref=e254]: Source DC benchmarking binding authority bootstrap metadata
+                - generic [ref=e255]:
+                  - generic [ref=e256]: DC_BEPS_CYCLE_1
+                  - generic [ref=e257]: DC BEPS Cycle 1
+                  - generic [ref=e259]:
+                    - generic [ref=e260]: dc-cycle-1-2021-v1 • ACTIVE
+                    - generic [ref=e261]: Effective Dec 31, 2020, 07:00 PM
+                    - generic [ref=e262]: Source DC BEPS Cycle 1 binding authority metadata
+                - generic [ref=e263]:
+                  - generic [ref=e264]: DC_BEPS_CYCLE_2
+                  - generic [ref=e265]: DC BEPS Cycle 2
+                  - generic [ref=e266]:
+                    - generic [ref=e267]:
+                      - generic [ref=e268]: test-cycle-2-v1 • ACTIVE
+                      - generic [ref=e269]: Effective Dec 31, 2026, 07:00 PM
+                      - generic [ref=e270]: Source BEPS multi-cycle source 1773250163213
+                    - generic [ref=e271]:
+                      - generic [ref=e272]: dc-cycle-2-bootstrap-v1 • ACTIVE
+                      - generic [ref=e273]: Effective Dec 31, 2026, 07:00 PM
+                      - generic [ref=e274]: Source DOEE BEPS Monthly Update May 27 2021
+            - generic [ref=e275]:
+              - generic [ref=e277]:
+                - heading "Active Factor Sets" [level=3] [ref=e278]
+                - paragraph [ref=e279]: Governed factor sets and standards tables available to the compliance engines.
+              - generic [ref=e280]:
+                - generic [ref=e281]:
+                  - generic [ref=e282]: DC_BEPS_CYCLE_1_FACTORS_V1
+                  - generic [ref=e283]: dc-cycle-1-factors-v1 • ACTIVE
+                  - generic [ref=e284]: Effective Dec 31, 2020, 07:00 PM
+                  - generic [ref=e285]: Source Guide to the 2021 Building Energy Performance Standards
+                - generic [ref=e286]:
+                  - generic [ref=e287]: DC_BEPS_CYCLE_2_FACTORS_V1
+                  - generic [ref=e288]: dc-cycle-2-factors-v1 • ACTIVE
+                  - generic [ref=e289]: Effective Dec 31, 2026, 07:00 PM
+                  - generic [ref=e290]: Source DOEE BEPS Monthly Update May 27 2021
+                - generic [ref=e291]:
+                  - generic [ref=e292]: DC_BEPS_CYCLE_2_FACTORS_V1
+                  - generic [ref=e293]: test-cycle-2-v1 • ACTIVE
+                  - generic [ref=e294]: Effective Dec 31, 2026, 07:00 PM
+                  - generic [ref=e295]: Source BEPS multi-cycle source 1773250163213
+                - generic [ref=e296]:
+                  - generic [ref=e297]: DC_CURRENT_STANDARDS
+                  - generic [ref=e298]: bootstrap-2026-03-09 • ACTIVE
+                  - generic [ref=e299]: Effective Dec 31, 2023, 07:00 PM
+                  - generic [ref=e300]: Source DC benchmarking guidance bootstrap metadata
+          - generic [ref=e301]:
+            - generic [ref=e303]:
+              - heading "Portfolio Manager Autopilot Status" [level=3] [ref=e304]
+              - paragraph [ref=e305]: Current PM sync and readiness state across the portfolio.
+            - table [ref=e307]:
+              - rowgroup [ref=e308]:
+                - row "Building Reporting Year Sync Readiness Submission" [ref=e309]:
+                  - columnheader "Building" [ref=e310]
+                  - columnheader "Reporting Year" [ref=e311]
+                  - columnheader "Sync" [ref=e312]
+                  - columnheader "Readiness" [ref=e313]
+                  - columnheader "Submission" [ref=e314]
+              - rowgroup [ref=e315]:
+                - row "ICC 2025 SUCCEEDED BLOCKED BLOCKED" [ref=e316]:
+                  - cell "ICC" [ref=e317]
+                  - cell "2025" [ref=e318]
+                  - cell "SUCCEEDED" [ref=e319]
+                  - cell "BLOCKED" [ref=e320]
+                  - cell "BLOCKED" [ref=e321]
+                - row "John R. Thompson Jr. Intercollegiate Athletic Center 2025 NOT_STARTED PENDING NONE" [ref=e322]:
+                  - cell "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e323]
+                  - cell "2025" [ref=e324]
+                  - cell "NOT_STARTED" [ref=e325]
+                  - cell "PENDING" [ref=e326]
+                  - cell "NONE" [ref=e327]

@@ -1,0 +1,146 @@
+
+> quoin@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 2.6s
+ ○ Compiling /src/middleware ...
+ ✓ Compiled /src/middleware in 1810ms (189 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 4.9s (1192 modules)
+ GET / 307 in 5397ms
+ ✓ Compiled in 496ms (492 modules)
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 5.1s (1384 modules)
+ GET /dashboard 200 in 5615ms
+ ✓ Compiled /api/trpc/[trpc] in 262ms (835 modules)
+ ✓ Compiled (1063 modules)
+ GET /favicon.ico 200 in 2336ms
+ POST /dashboard 200 in 2295ms
+ POST /dashboard 200 in 26ms
+ GET /api/trpc/building.portfolioStats,building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%2C%22v%22%3A1%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 500 in 3211ms
+ GET /api/trpc/building.portfolioStats,building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%2C%22v%22%3A1%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 500 in 73ms
+ GET /?_rsc=3py13 200 in 19ms
+ POST /dashboard 200 in 316ms
+ GET /?_rsc=1p60s 200 in 13ms
+ GET / 200 in 94ms
+ GET /favicon.ico 200 in 17ms
+ POST / 200 in 34ms
+ POST / 200 in 11ms
+ ✓ Compiled /sign-in/[[...sign-in]] in 360ms (1633 modules)
+ GET /sign-in/SignIn_clerk_catchall_check_1773161944347 200 in 121ms
+ GET /dashboard 200 in 292ms
+ POST /dashboard 200 in 55ms
+ POST /dashboard 200 in 27ms
+ GET /api/trpc/building.portfolioStats,building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%2C%22v%22%3A1%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 500 in 1289ms
+ GET /api/trpc/building.portfolioStats,building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%2C%22v%22%3A1%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 500 in 71ms
+ ✓ Compiled in 389ms (807 modules)
+ GET /dashboard 200 in 526ms
+ ✓ Compiled /api/trpc/[trpc] in 260ms (838 modules)
+ ✓ Compiled (1066 modules)
+ GET /favicon.ico 200 in 884ms
+ POST /dashboard 200 in 1140ms
+ POST /dashboard 200 in 44ms
+ GET /api/trpc/building.portfolioStats,building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%2C%22v%22%3A1%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 200 in 1221ms
+ ○ Compiling /buildings ...
+ ✓ Compiled /buildings in 1102ms (1643 modules)
+ GET /api/trpc/building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%2C%22page%22%3A1%2C%22pageSize%22%3A25%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 200 in 139ms
+ ○ Compiling /buildings/[id] ...
+ ✓ Compiled /buildings/[id] in 3.1s (2617 modules)
+ GET /api/trpc/building.get?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22id%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%7D%7D%7D 200 in 179ms
+ GET /api/trpc/building.energyReadings?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%2C%22months%22%3A24%7D%7D%7D 200 in 48ms
+ GET /api/trpc/building.complianceHistory?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%2C%22limit%22%3A20%7D%7D%7D 200 in 39ms
+ GET /api/trpc/capital.getAnalysis?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%7D%7D%7D 200 in 138ms
+ GET /api/trpc/drift.listAlerts,drift.alertSummary?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%2C%22status%22%3Anull%2C%22limit%22%3A50%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22status%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%7D%7D%7D 200 in 63ms
+ GET /api/trpc/drift.listAlerts?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%2C%22status%22%3A%22ACTIVE%22%2C%22limit%22%3A50%7D%7D%7D 200 in 36ms
+ GET /api/trpc/drift.listAlerts?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%2C%22status%22%3A%22ACKNOWLEDGED%22%2C%22limit%22%3A50%7D%7D%7D 200 in 36ms
+ GET /api/trpc/drift.listAlerts?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmfast4n001fa4hsoq8btz8x%22%2C%22status%22%3A%22RESOLVED%22%2C%22limit%22%3A50%7D%7D%7D 200 in 38ms
+ ✓ Compiled in 773ms (1071 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 309ms
+ ✓ Compiled in 304ms (1071 modules)
+ ✓ Compiled in 275ms (1071 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 174ms
+ GET /dashboard?_rsc=p0ba9 200 in 535ms
+ ○ Compiling /api/trpc/[trpc] ...
+ ✓ Compiled /api/trpc/[trpc] in 2.1s (2370 modules)
+ ✓ Compiled in 0ms (1527 modules)
+ GET /api/trpc/portfolioRisk.list,portfolioRisk.priorityActions,benchmarking.listPortfolioReadiness,operations.listPortfolioAnomalies,retrofit.rankPortfolio,building.portfolioStats,building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22limit%22%3A25%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%222%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%223%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%224%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%225%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%2C%22v%22%3A1%7D%7D%2C%226%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 200 in 3107ms
+ GET /dashboard?_rsc=p0ba9 200 in 1676ms
+ ✓ Compiled in 733ms (2600 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 314ms
+ ✓ Compiled in 323ms (1073 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 356ms
+ ✓ Compiled in 244ms (1073 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 300ms
+ ✓ Compiled in 3.1s (2545 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 3175ms
+ GET /dashboard?_rsc=p0ba9 200 in 238ms
+ ✓ Compiled in 1095ms (2545 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 1072ms
+ GET /dashboard?_rsc=p0ba9 200 in 210ms
+ ✓ Compiled in 467ms (1073 modules)
+ ✓ Compiled in 250ms (1073 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 581ms
+ GET /dashboard?_rsc=p0ba9 200 in 303ms
+ ✓ Compiled in 210ms (1073 modules)
+ ✓ Compiled in 279ms (1073 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 434ms
+ GET /dashboard?_rsc=p0ba9 200 in 214ms
+ ✓ Compiled in 196ms (1073 modules)
+ ✓ Compiled in 296ms (1073 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 240ms
+ GET /dashboard?_rsc=p0ba9 200 in 243ms
+ ✓ Compiled in 199ms (1073 modules)
+ ✓ Compiled in 210ms (1073 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 325ms
+ GET /dashboard?_rsc=p0ba9 200 in 209ms
+ ✓ Compiled in 181ms (1073 modules)
+ ✓ Compiled in 228ms (1073 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 302ms
+ GET /dashboard?_rsc=p0ba9 200 in 1065ms
+ ✓ Compiled in 397ms (1073 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 479ms
+ ○ Compiling /api/trpc/[trpc] ...
+ ✓ Compiled /api/trpc/[trpc] in 1659ms (2382 modules)
+ ✓ Compiled in 1ms (1533 modules)
+ GET /api/trpc/portfolioRisk.list,portfolioRisk.priorityActions,benchmarking.listPortfolioReadiness,operations.listPortfolioAnomalies,retrofit.rankPortfolio?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22limit%22%3A25%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%222%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%223%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%224%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%7D 200 in 4293ms
+ GET /dashboard?_rsc=p0ba9 200 in 3313ms
+ ✓ Compiled in 466ms (2612 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 284ms
+ ✓ Compiled in 917ms (2612 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 272ms
+ ✓ Compiled in 866ms (2382 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 371ms
+ ✓ Compiled in 187ms (1079 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 459ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1391ms (2385 modules)
+ GET /dashboard 404 in 1607ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1526ms (2596 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 255ms
+ GET /dashboard?_rsc=p0ba9 200 in 210ms
+ GET /dashboard 200 in 322ms
+ GET /_next/static/css/app/layout.css?v=1773166013011 404 in 37ms
+ GET /_next/static/css/app/(dashboard)/dashboard/page.css?v=1773166013011 404 in 38ms
+ GET /_next/static/chunks/main-app.js?v=1773166013011 404 in 45ms
+ GET /_next/static/chunks/app/(dashboard)/dashboard/page.js 404 in 33ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 32ms
+ GET /_next/static/chunks/app/(dashboard)/layout.js 404 in 17ms
+ GET / 500 in 57ms
+ GET /_next/static/chunks/webpack.js 404 in 201ms
+ GET /_next/static/chunks/main.js 404 in 200ms
+ GET /_next/static/chunks/react-refresh.js 404 in 199ms
+ GET /_next/static/chunks/pages/_app.js 404 in 196ms
+ GET /_next/static/development/_buildManifest.js 404 in 192ms
+ GET /_next/static/chunks/pages/_error.js 404 in 144ms
+ GET /_next/static/development/_ssgManifest.js 404 in 43ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 1224ms (1375 modules)
+ GET /favicon.ico 200 in 1321ms
+ GET / 500 in 1080ms
+ GET /favicon.ico 200 in 13ms

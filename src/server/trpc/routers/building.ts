@@ -201,50 +201,45 @@ export const buildingRouter = router({
         });
       }
 
-      await prisma.$transaction([
-        prisma.driftAlert.deleteMany({
-          where: {
-            buildingId: input.id,
-            organizationId: ctx.organizationId,
-          },
-        }),
-        prisma.energyReading.deleteMany({
-          where: {
-            buildingId: input.id,
-            organizationId: ctx.organizationId,
-          },
-        }),
-        prisma.complianceSnapshot.deleteMany({
-          where: {
-            buildingId: input.id,
-            organizationId: ctx.organizationId,
-          },
-        }),
-        prisma.pipelineRun.deleteMany({
-          where: {
-            buildingId: input.id,
-            organizationId: ctx.organizationId,
-          },
-        }),
-        prisma.meter.deleteMany({
-          where: {
-            buildingId: input.id,
-            organizationId: ctx.organizationId,
-          },
-        }),
-        prisma.greenButtonConnection.deleteMany({
-          where: {
-            buildingId: input.id,
-            organizationId: ctx.organizationId,
-          },
-        }),
-        prisma.building.deleteMany({
-          where: {
-            id: input.id,
-            organizationId: ctx.organizationId,
-          },
-        }),
-      ]);
+      const childScope = { buildingId: input.id };
+
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(
+          `SELECT set_config('app.organization_id', $1, true)`,
+          ctx.organizationId,
+        );
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE quoin_app`);
+
+        await tx.filingPacket.deleteMany({ where: childScope });
+        await tx.filingRecordEvent.deleteMany({ where: childScope });
+        await tx.financingPacket.deleteMany({ where: childScope });
+        await tx.financingCaseCandidate.deleteMany({ where: childScope });
+        await tx.evidenceArtifact.deleteMany({ where: childScope });
+        await tx.filingRecord.deleteMany({ where: childScope });
+        await tx.benchmarkSubmission.deleteMany({ where: childScope });
+        await tx.bepsAlternativeComplianceAgreement.deleteMany({
+          where: childScope,
+        });
+        await tx.bepsPrescriptiveItem.deleteMany({ where: childScope });
+        await tx.bepsMetricInput.deleteMany({ where: childScope });
+        await tx.portfolioManagerSyncState.deleteMany({ where: childScope });
+        await tx.operationalAnomaly.deleteMany({ where: childScope });
+        await tx.financingCase.deleteMany({ where: childScope });
+        await tx.retrofitCandidate.deleteMany({ where: childScope });
+        await tx.driftAlert.deleteMany({ where: childScope });
+        await tx.energyReading.deleteMany({ where: childScope });
+        await tx.complianceSnapshot.deleteMany({ where: childScope });
+        await tx.complianceRun.deleteMany({ where: childScope });
+        await tx.pipelineRun.deleteMany({ where: childScope });
+        await tx.meter.deleteMany({ where: childScope });
+        await tx.greenButtonConnection.deleteMany({ where: childScope });
+        await tx.sourceArtifact.deleteMany({ where: childScope });
+        await tx.$executeRaw`
+          DELETE FROM "buildings"
+          WHERE "id" = ${input.id}
+            AND "organization_id" = ${ctx.organizationId}
+        `;
+      });
 
       return { success: true };
     }),

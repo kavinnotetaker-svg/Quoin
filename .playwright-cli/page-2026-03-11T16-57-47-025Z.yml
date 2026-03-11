@@ -1,0 +1,45 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e26]
+  - generic [ref=e29]:
+    - generic [ref=e30]:
+      - generic [ref=e32]:
+        - heading "Sign in to Quoin" [level=1] [ref=e33]
+        - paragraph [ref=e34]: Welcome back! Please sign in to continue
+      - generic [ref=e35]:
+        - button "Sign in with Google Continue with Google" [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]:
+            - img "Sign in with Google" [ref=e41]
+            - generic [ref=e42]: Continue with Google
+        - paragraph [ref=e45]: or
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - generic [ref=e51]:
+              - generic [ref=e53]: Email address
+              - textbox "Email address" [ref=e54]:
+                - /placeholder: Enter your email address
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Password
+                  - generic:
+                    - textbox "Password":
+                      - /placeholder: Enter your password
+                    - button "Show password":
+                      - img
+          - button "Continue" [ref=e57] [cursor=pointer]:
+            - generic [ref=e58]:
+              - text: Continue
+              - img [ref=e59]
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - generic [ref=e63]: Don’t have an account?
+        - link "Sign up" [ref=e64] [cursor=pointer]:
+          - /url: http://localhost:3000/sign-up
+      - generic [ref=e66]:
+        - generic [ref=e68]:
+          - paragraph [ref=e69]: Secured by
+          - link "Clerk logo" [ref=e70] [cursor=pointer]:
+            - /url: https://go.clerk.com/components
+            - img [ref=e71]
+        - paragraph [ref=e76]: Development mode

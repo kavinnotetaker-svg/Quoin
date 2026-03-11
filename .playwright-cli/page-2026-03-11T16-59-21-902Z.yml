@@ -1,0 +1,64 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - heading "Create your account" [level=1] [ref=e9]
+        - paragraph [ref=e10]: Welcome! Please fill in the details to get started.
+      - generic [ref=e11]:
+        - generic [ref=e13]:
+          - button "Sign in with Google Continue with Google" [disabled]:
+            - generic:
+              - generic:
+                - img "Sign in with Google"
+              - generic: Continue with Google
+        - paragraph [ref=e21]: or
+        - generic [ref=e23]:
+          - generic [ref=e24]:
+            - generic [ref=e25]:
+              - generic [ref=e27]:
+                - generic [ref=e28]:
+                  - generic: First name
+                  - generic: Optional
+                - textbox "First name" [disabled]: Codex
+              - generic [ref=e34]:
+                - generic [ref=e35]:
+                  - generic: Last name
+                  - generic: Optional
+                - textbox "Last name" [disabled]: Tester
+            - generic [ref=e42]:
+              - generic [ref=e43]:
+                - generic: Email address
+              - textbox "Email address" [disabled]:
+                - /placeholder: Enter your email address
+                - text: codex.manual.qa+1@example.com
+            - generic [ref=e48]:
+              - generic [ref=e49]:
+                - generic [ref=e50]:
+                  - generic: Password
+                - generic [ref=e52]:
+                  - textbox "Password" [disabled]:
+                    - /placeholder: Enter your password
+                    - text: QuoinTest123!
+                  - button "Show password" [ref=e54] [cursor=pointer]:
+                    - img [ref=e55]
+              - generic [ref=e58]: Your password meets all the necessary requirements.
+              - paragraph [ref=e82]:
+                - img [ref=e83]
+                - text: Your password meets all the necessary requirements.
+          - generic [ref=e60]:
+            - button "Loading" [disabled]:
+              - generic:
+                - generic "Loading"
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - generic [ref=e67]: Already have an account?
+        - link "Sign in" [ref=e68] [cursor=pointer]:
+          - /url: http://localhost:3000/sign-in
+      - generic [ref=e70]:
+        - generic [ref=e72]:
+          - paragraph [ref=e73]: Secured by
+          - link "Clerk logo" [ref=e74] [cursor=pointer]:
+            - /url: https://go.clerk.com/components
+            - img [ref=e75]
+        - paragraph [ref=e80]: Development mode
+  - alert [ref=e3]

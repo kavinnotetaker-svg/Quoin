@@ -1,0 +1,202 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e3]
+  - generic [ref=e4]:
+    - button [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - complementary [ref=e7]:
+      - generic [ref=e8]:
+        - link "Quoin" [ref=e9] [cursor=pointer]:
+          - /url: /dashboard
+        - button [ref=e10] [cursor=pointer]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e16]
+          - text: Dashboard
+        - link "Buildings" [ref=e21] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e22]
+          - text: Buildings
+        - link "Reports" [ref=e26] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e27]
+          - text: Reports
+        - link "Settings" [ref=e30] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e31]
+          - text: Settings
+    - generic [ref=e34]:
+      - banner [ref=e35]:
+        - button "Open organization switcher" [ref=e37] [cursor=pointer]:
+          - generic [ref=e38]:
+            - img "JBG's logo" [ref=e41]
+            - generic "JBG" [ref=e44]
+          - img [ref=e45]
+        - button "Open user menu" [ref=e48] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e51]
+      - main [ref=e53]:
+        - generic [ref=e230]:
+          - generic [ref=e231]:
+            - generic [ref=e232]:
+              - generic [ref=e233]:
+                - heading "ICC" [level=1] [ref=e234]
+                - paragraph [ref=e235]: 1472-1498 37th St NW, Washington, DC 20057
+                - paragraph [ref=e236]: Office | 226,000 SF | Built 1982
+              - generic [ref=e237]:
+                - button "Upload Data" [ref=e238] [cursor=pointer]
+                - button "Delete" [ref=e239] [cursor=pointer]
+            - generic [ref=e240]:
+              - generic [ref=e241]: "ESPM Property ID:"
+              - generic [ref=e242]: "88762425"
+              - button "Edit" [ref=e243] [cursor=pointer]
+          - separator [ref=e244]
+          - generic [ref=e245]:
+            - generic [ref=e246]:
+              - paragraph [ref=e247]: ENERGY STAR Score
+              - paragraph [ref=e248]: "45"
+              - paragraph [ref=e249]: "Target: 71 (-26 below)"
+            - generic [ref=e250]:
+              - paragraph [ref=e251]: Status
+              - paragraph [ref=e252]:
+                - generic [ref=e253]: Pending
+              - paragraph [ref=e255]: Since Mar 11, 2026
+            - generic [ref=e256]:
+              - paragraph [ref=e257]: Penalty Exposure
+              - paragraph [ref=e258]: $2,260,000
+              - paragraph [ref=e259]: "Max: $2,260,000"
+          - separator [ref=e260]
+          - generic [ref=e261]:
+            - button "Energy" [ref=e262] [cursor=pointer]
+            - button "Benchmarking" [ref=e263] [cursor=pointer]
+            - button "BEPS" [ref=e264] [cursor=pointer]
+            - button "Retrofit" [ref=e265] [cursor=pointer]
+            - button "Financing" [ref=e266] [cursor=pointer]
+            - button "Operations" [ref=e267] [cursor=pointer]
+            - button "Provenance" [ref=e268] [cursor=pointer]
+            - button "Compliance" [ref=e269] [cursor=pointer]
+            - button "Capital" [ref=e270] [cursor=pointer]
+            - button "Alerts" [ref=e271] [cursor=pointer]
+          - generic [ref=e272]:
+            - generic [ref=e275]:
+              - list [ref=e277]:
+                - listitem [ref=e278]:
+                  - img "Electric legend icon" [ref=e279]
+                  - text: Electric
+              - application [ref=e281]:
+                - generic [ref=e282]:
+                  - generic [ref=e283]:
+                    - generic [ref=e285]: Jan '25
+                    - generic [ref=e287]: Feb '25
+                    - generic [ref=e289]: Mar '25
+                    - generic [ref=e291]: Apr '25
+                    - generic [ref=e293]: May '25
+                    - generic [ref=e295]: Jun '25
+                    - generic [ref=e297]: Jul '25
+                    - generic [ref=e299]: Aug '25
+                    - generic [ref=e301]: Sep '25
+                    - generic [ref=e303]: Oct '25
+                    - generic [ref=e305]: Nov '25
+                    - generic [ref=e307]: Dec '25
+                  - generic [ref=e308]:
+                    - generic [ref=e310]: "0"
+                    - generic [ref=e312]: 250k
+                    - generic [ref=e314]: 500k
+                    - generic [ref=e316]: 750k
+                    - generic [ref=e318]: 1000k
+            - paragraph [ref=e319]: "Last data received: December 1, 2025 (100d ago)"
+            - table [ref=e322]:
+              - rowgroup [ref=e323]:
+                - row "Period Fuel Consumption kBtu Cost Source" [ref=e324]:
+                  - columnheader "Period" [ref=e325]
+                  - columnheader "Fuel" [ref=e326]
+                  - columnheader "Consumption" [ref=e327]
+                  - columnheader "kBtu" [ref=e328]
+                  - columnheader "Cost" [ref=e329]
+                  - columnheader "Source" [ref=e330]
+              - rowgroup [ref=e331]:
+                - row "Dec 1 – Dec 31, 2025 ELECTRIC 150,000 KWH 511,800 $34,800 CSV_UPLOAD" [ref=e332]:
+                  - cell "Dec 1 – Dec 31, 2025" [ref=e333]
+                  - cell "ELECTRIC" [ref=e334]
+                  - cell "150,000 KWH" [ref=e335]
+                  - cell "511,800" [ref=e336]
+                  - cell "$34,800" [ref=e337]
+                  - cell "CSV_UPLOAD" [ref=e338]
+                - row "Nov 1 – Nov 30, 2025 ELECTRIC 140,000 KWH 477,680 $32,400 CSV_UPLOAD" [ref=e339]:
+                  - cell "Nov 1 – Nov 30, 2025" [ref=e340]
+                  - cell "ELECTRIC" [ref=e341]
+                  - cell "140,000 KWH" [ref=e342]
+                  - cell "477,680" [ref=e343]
+                  - cell "$32,400" [ref=e344]
+                  - cell "CSV_UPLOAD" [ref=e345]
+                - row "Oct 1 – Oct 31, 2025 ELECTRIC 150,000 KWH 511,800 $34,800 CSV_UPLOAD" [ref=e346]:
+                  - cell "Oct 1 – Oct 31, 2025" [ref=e347]
+                  - cell "ELECTRIC" [ref=e348]
+                  - cell "150,000 KWH" [ref=e349]
+                  - cell "511,800" [ref=e350]
+                  - cell "$34,800" [ref=e351]
+                  - cell "CSV_UPLOAD" [ref=e352]
+                - row "Sep 1 – Sep 30, 2025 ELECTRIC 190,000 KWH 648,280 $44,400 CSV_UPLOAD" [ref=e353]:
+                  - cell "Sep 1 – Sep 30, 2025" [ref=e354]
+                  - cell "ELECTRIC" [ref=e355]
+                  - cell "190,000 KWH" [ref=e356]
+                  - cell "648,280" [ref=e357]
+                  - cell "$44,400" [ref=e358]
+                  - cell "CSV_UPLOAD" [ref=e359]
+                - row "Aug 1 – Aug 31, 2025 ELECTRIC 225,000 KWH 767,700 $52,800 CSV_UPLOAD" [ref=e360]:
+                  - cell "Aug 1 – Aug 31, 2025" [ref=e361]
+                  - cell "ELECTRIC" [ref=e362]
+                  - cell "225,000 KWH" [ref=e363]
+                  - cell "767,700" [ref=e364]
+                  - cell "$52,800" [ref=e365]
+                  - cell "CSV_UPLOAD" [ref=e366]
+                - row "Jul 1 – Jul 31, 2025 ELECTRIC 235,000 KWH 801,820 $55,200 CSV_UPLOAD" [ref=e367]:
+                  - cell "Jul 1 – Jul 31, 2025" [ref=e368]
+                  - cell "ELECTRIC" [ref=e369]
+                  - cell "235,000 KWH" [ref=e370]
+                  - cell "801,820" [ref=e371]
+                  - cell "$55,200" [ref=e372]
+                  - cell "CSV_UPLOAD" [ref=e373]
+                - row "Jun 1 – Jun 30, 2025 ELECTRIC 210,000 KWH 716,520 $49,200 CSV_UPLOAD" [ref=e374]:
+                  - cell "Jun 1 – Jun 30, 2025" [ref=e375]
+                  - cell "ELECTRIC" [ref=e376]
+                  - cell "210,000 KWH" [ref=e377]
+                  - cell "716,520" [ref=e378]
+                  - cell "$49,200" [ref=e379]
+                  - cell "CSV_UPLOAD" [ref=e380]
+                - row "May 1 – May 31, 2025 ELECTRIC 165,000 KWH 562,980 $38,400 CSV_UPLOAD" [ref=e381]:
+                  - cell "May 1 – May 31, 2025" [ref=e382]
+                  - cell "ELECTRIC" [ref=e383]
+                  - cell "165,000 KWH" [ref=e384]
+                  - cell "562,980" [ref=e385]
+                  - cell "$38,400" [ref=e386]
+                  - cell "CSV_UPLOAD" [ref=e387]
+                - row "Apr 1 – Apr 30, 2025 ELECTRIC 140,000 KWH 477,680 $32,400 CSV_UPLOAD" [ref=e388]:
+                  - cell "Apr 1 – Apr 30, 2025" [ref=e389]
+                  - cell "ELECTRIC" [ref=e390]
+                  - cell "140,000 KWH" [ref=e391]
+                  - cell "477,680" [ref=e392]
+                  - cell "$32,400" [ref=e393]
+                  - cell "CSV_UPLOAD" [ref=e394]
+                - row "Mar 1 – Mar 31, 2025 ELECTRIC 130,000 KWH 443,560 $30,000 CSV_UPLOAD" [ref=e395]:
+                  - cell "Mar 1 – Mar 31, 2025" [ref=e396]
+                  - cell "ELECTRIC" [ref=e397]
+                  - cell "130,000 KWH" [ref=e398]
+                  - cell "443,560" [ref=e399]
+                  - cell "$30,000" [ref=e400]
+                  - cell "CSV_UPLOAD" [ref=e401]
+                - row "Feb 1 – Feb 28, 2025 ELECTRIC 135,000 KWH 460,620 $31,200 CSV_UPLOAD" [ref=e402]:
+                  - cell "Feb 1 – Feb 28, 2025" [ref=e403]
+                  - cell "ELECTRIC" [ref=e404]
+                  - cell "135,000 KWH" [ref=e405]
+                  - cell "460,620" [ref=e406]
+                  - cell "$31,200" [ref=e407]
+                  - cell "CSV_UPLOAD" [ref=e408]
+                - row "Jan 1 – Jan 31, 2025 ELECTRIC 145,000 KWH 494,740 $33,600 CSV_UPLOAD" [ref=e409]:
+                  - cell "Jan 1 – Jan 31, 2025" [ref=e410]
+                  - cell "ELECTRIC" [ref=e411]
+                  - cell "145,000 KWH" [ref=e412]
+                  - cell "494,740" [ref=e413]
+                  - cell "$33,600" [ref=e414]
+                  - cell "CSV_UPLOAD" [ref=e415]
+  - generic [ref=e416]: "0"

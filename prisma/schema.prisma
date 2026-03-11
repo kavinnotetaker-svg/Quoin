@@ -485,7 +485,7 @@ model EnergyReading {
   ingestedAt      DateTime     @default(now()) @map("ingested_at")
   meterId         String?      @map("meter_id")
 
-  building Building @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  building Building @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
   meter    Meter?   @relation(fields: [meterId], references: [id])
 
   @@index([buildingId, periodStart(sort: Desc)])

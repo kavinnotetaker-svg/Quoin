@@ -1,0 +1,1259 @@
+{
+  "buildingContext": {
+    "address": "1472-1498 37th St NW, Washington, DC 20057",
+    "buildingId": "cmmf8l602000da4hsalaty4pe",
+    "buildingName": "ICC",
+    "grossSquareFeet": 226000,
+    "organizationId": "cmmbkrhnm00004whs4lngkhtc",
+    "ownershipType": "PRIVATE",
+    "propertyType": "OFFICE"
+  },
+  "complianceResult": {
+    "alternativeCompliance": {
+      "performance": {
+        "amountDue": 2260000,
+        "calculation": {
+          "adjustedAmount": 2260000,
+          "formulaKey": "DC_BEPS_CYCLE_1_PERFORMANCE_ADJUSTMENT",
+          "intermediateValues": {
+            "derivedFromPathway": "PERFORMANCE"
+          },
+          "maxAmount": 2260000,
+          "rawInputs": {
+            "agreementMultiplier": null,
+            "agreementPathway": null,
+            "grossSquareFeet": 226000,
+            "pathway": "PERFORMANCE"
+          },
+          "remainingPenaltyFraction": 1
+        },
+        "findings": [
+          {
+            "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+            "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+            "metadata": {
+              "amountDue": 2260000,
+              "maxAmount": 2260000,
+              "maxPenaltyCap": 7500000,
+              "pathway": "PERFORMANCE",
+              "penaltyPerSquareFoot": 10,
+              "remainingPenaltyFraction": 1
+            },
+            "severity": "INFO",
+            "status": "PASS"
+          }
+        ],
+        "maxAmount": 2260000,
+        "pathway": "PERFORMANCE",
+        "reasonCodes": [],
+        "reductionPct": 0,
+        "remainingPenaltyFraction": 1
+      },
+      "prescriptive": {
+        "amountDue": 2260000,
+        "calculation": {
+          "adjustedAmount": 2260000,
+          "formulaKey": "DC_BEPS_CYCLE_1_PRESCRIPTIVE_ADJUSTMENT",
+          "intermediateValues": {
+            "derivedFromPathway": "PRESCRIPTIVE"
+          },
+          "maxAmount": 2260000,
+          "rawInputs": {
+            "agreementMultiplier": null,
+            "agreementPathway": null,
+            "grossSquareFeet": 226000,
+            "pathway": "PRESCRIPTIVE"
+          },
+          "remainingPenaltyFraction": 1
+        },
+        "findings": [
+          {
+            "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+            "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+            "metadata": {
+              "amountDue": 2260000,
+              "maxAmount": 2260000,
+              "maxPenaltyCap": 7500000,
+              "pathway": "PRESCRIPTIVE",
+              "penaltyPerSquareFoot": 10,
+              "remainingPenaltyFraction": 1
+            },
+            "severity": "INFO",
+            "status": "PASS"
+          }
+        ],
+        "maxAmount": 2260000,
+        "pathway": "PRESCRIPTIVE",
+        "reasonCodes": [],
+        "reductionPct": 0,
+        "remainingPenaltyFraction": 1
+      },
+      "recommended": {
+        "amountDue": 2260000,
+        "calculation": {
+          "adjustedAmount": 2260000,
+          "formulaKey": "DC_BEPS_CYCLE_1_PERFORMANCE_ADJUSTMENT",
+          "intermediateValues": {
+            "derivedFromPathway": "PERFORMANCE"
+          },
+          "maxAmount": 2260000,
+          "rawInputs": {
+            "agreementMultiplier": null,
+            "agreementPathway": null,
+            "grossSquareFeet": 226000,
+            "pathway": "PERFORMANCE"
+          },
+          "remainingPenaltyFraction": 1
+        },
+        "findings": [
+          {
+            "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+            "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+            "metadata": {
+              "amountDue": 2260000,
+              "maxAmount": 2260000,
+              "maxPenaltyCap": 7500000,
+              "pathway": "PERFORMANCE",
+              "penaltyPerSquareFoot": 10,
+              "remainingPenaltyFraction": 1
+            },
+            "severity": "INFO",
+            "status": "PASS"
+          }
+        ],
+        "maxAmount": 2260000,
+        "pathway": "PERFORMANCE",
+        "reasonCodes": [],
+        "reductionPct": 0,
+        "remainingPenaltyFraction": 1
+      },
+      "standardTarget": null,
+      "trajectory": null
+    },
+    "evaluation": {
+      "alternativeCompliance": {
+        "performance": {
+          "amountDue": 2260000,
+          "calculation": {
+            "adjustedAmount": 2260000,
+            "formulaKey": "DC_BEPS_CYCLE_1_PERFORMANCE_ADJUSTMENT",
+            "intermediateValues": {
+              "derivedFromPathway": "PERFORMANCE"
+            },
+            "maxAmount": 2260000,
+            "rawInputs": {
+              "agreementMultiplier": null,
+              "agreementPathway": null,
+              "grossSquareFeet": 226000,
+              "pathway": "PERFORMANCE"
+            },
+            "remainingPenaltyFraction": 1
+          },
+          "findings": [
+            {
+              "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+              "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+              "metadata": {
+                "amountDue": 2260000,
+                "maxAmount": 2260000,
+                "maxPenaltyCap": 7500000,
+                "pathway": "PERFORMANCE",
+                "penaltyPerSquareFoot": 10,
+                "remainingPenaltyFraction": 1
+              },
+              "severity": "INFO",
+              "status": "PASS"
+            }
+          ],
+          "maxAmount": 2260000,
+          "pathway": "PERFORMANCE",
+          "reasonCodes": [],
+          "reductionPct": 0,
+          "remainingPenaltyFraction": 1
+        },
+        "prescriptive": {
+          "amountDue": 2260000,
+          "calculation": {
+            "adjustedAmount": 2260000,
+            "formulaKey": "DC_BEPS_CYCLE_1_PRESCRIPTIVE_ADJUSTMENT",
+            "intermediateValues": {
+              "derivedFromPathway": "PRESCRIPTIVE"
+            },
+            "maxAmount": 2260000,
+            "rawInputs": {
+              "agreementMultiplier": null,
+              "agreementPathway": null,
+              "grossSquareFeet": 226000,
+              "pathway": "PRESCRIPTIVE"
+            },
+            "remainingPenaltyFraction": 1
+          },
+          "findings": [
+            {
+              "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+              "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+              "metadata": {
+                "amountDue": 2260000,
+                "maxAmount": 2260000,
+                "maxPenaltyCap": 7500000,
+                "pathway": "PRESCRIPTIVE",
+                "penaltyPerSquareFoot": 10,
+                "remainingPenaltyFraction": 1
+              },
+              "severity": "INFO",
+              "status": "PASS"
+            }
+          ],
+          "maxAmount": 2260000,
+          "pathway": "PRESCRIPTIVE",
+          "reasonCodes": [],
+          "reductionPct": 0,
+          "remainingPenaltyFraction": 1
+        },
+        "recommended": {
+          "amountDue": 2260000,
+          "calculation": {
+            "adjustedAmount": 2260000,
+            "formulaKey": "DC_BEPS_CYCLE_1_PERFORMANCE_ADJUSTMENT",
+            "intermediateValues": {
+              "derivedFromPathway": "PERFORMANCE"
+            },
+            "maxAmount": 2260000,
+            "rawInputs": {
+              "agreementMultiplier": null,
+              "agreementPathway": null,
+              "grossSquareFeet": 226000,
+              "pathway": "PERFORMANCE"
+            },
+            "remainingPenaltyFraction": 1
+          },
+          "findings": [
+            {
+              "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+              "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+              "metadata": {
+                "amountDue": 2260000,
+                "maxAmount": 2260000,
+                "maxPenaltyCap": 7500000,
+                "pathway": "PERFORMANCE",
+                "penaltyPerSquareFoot": 10,
+                "remainingPenaltyFraction": 1
+              },
+              "severity": "INFO",
+              "status": "PASS"
+            }
+          ],
+          "maxAmount": 2260000,
+          "pathway": "PERFORMANCE",
+          "reasonCodes": [],
+          "reductionPct": 0,
+          "remainingPenaltyFraction": 1
+        },
+        "standardTarget": null,
+        "trajectory": null
+      },
+      "applicability": {
+        "applicable": true,
+        "cycle": "CYCLE_1",
+        "filingYear": 2026,
+        "findings": [
+          {
+            "code": "BUILDING_IN_SCOPE",
+            "message": "Building is in scope for BEPS evaluation for the requested cycle.",
+            "metadata": {
+              "cycleEndYear": 2026,
+              "cycleStartYear": 2021,
+              "filingYear": 2026,
+              "minGrossSquareFeetApplied": 50000,
+              "ownershipType": "PRIVATE"
+            },
+            "severity": "INFO",
+            "status": "PASS"
+          }
+        ],
+        "reasonCodes": [],
+        "status": "APPLICABLE"
+      },
+      "applicable": true,
+      "cycle": "CYCLE_1",
+      "evaluatedAt": "2026-03-11T17:03:13.198Z",
+      "filingYear": 2026,
+      "findings": [
+        {
+          "code": "BUILDING_IN_SCOPE",
+          "message": "Building is in scope for BEPS evaluation for the requested cycle.",
+          "metadata": {
+            "cycleEndYear": 2026,
+            "cycleStartYear": 2021,
+            "filingYear": 2026,
+            "minGrossSquareFeetApplied": 50000,
+            "ownershipType": "PRIVATE"
+          },
+          "severity": "INFO",
+          "status": "PASS"
+        },
+        {
+          "code": "SUPPORTED_PATHWAYS_IDENTIFIED",
+          "message": "Supported BEPS pathways were identified from the active rule package.",
+          "metadata": {
+            "supportedPathways": [
+              "PERFORMANCE",
+              "STANDARD_TARGET",
+              "PRESCRIPTIVE"
+            ]
+          },
+          "severity": "INFO",
+          "status": "PASS"
+        },
+        {
+          "code": "PERFORMANCE_PATHWAY_ELIGIBLE",
+          "message": "Performance pathway is eligible based on current score routing.",
+          "metadata": {
+            "currentScore": 45,
+            "thresholdScore": 55
+          },
+          "severity": "INFO",
+          "status": "PASS"
+        },
+        {
+          "code": "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+          "message": "Standard target pathway is not the routed score-based pathway for this building.",
+          "metadata": {
+            "currentScore": 45,
+            "thresholdScore": 55
+          },
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "PRESCRIPTIVE_PATHWAY_ELIGIBLE",
+          "message": "Prescriptive pathway is available as an alternative compliance pathway.",
+          "severity": "INFO",
+          "status": "PASS"
+        },
+        {
+          "code": "MISSING_BASELINE_INPUT",
+          "message": "Baseline input is required for exact performance pathway evaluation.",
+          "metadata": {
+            "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+          },
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "MISSING_BASELINE_ADJUSTED_SITE_EUI",
+          "message": "Performance pathway baseline metric is missing.",
+          "metadata": {
+            "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+          },
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+          "message": "Standard target pathway is not eligible for this building under current routing.",
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "MISSING_EVALUATION_INPUT",
+          "message": "Prescriptive points earned are required for exact penalty adjustment.",
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "MISSING_PRESCRIPTIVE_POINTS_EARNED",
+          "message": "Prescriptive pathway points earned are required.",
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "MISSING_EVALUATION_INPUT",
+          "message": "Prescriptive requirements status is required because pathway compliance is milestone-based, not points-only.",
+          "metadata": {
+            "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+          },
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "MISSING_PRESCRIPTIVE_REQUIREMENTS",
+          "message": "Prescriptive pathway requirements status is missing.",
+          "metadata": {
+            "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+          },
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "TRAJECTORY_PATHWAY_INELIGIBLE",
+          "message": "Trajectory pathway is not eligible for this building under current routing.",
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+          "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+          "metadata": {
+            "amountDue": 2260000,
+            "maxAmount": 2260000,
+            "maxPenaltyCap": 7500000,
+            "pathway": "PERFORMANCE",
+            "penaltyPerSquareFoot": 10,
+            "remainingPenaltyFraction": 1
+          },
+          "severity": "INFO",
+          "status": "PASS"
+        },
+        {
+          "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+          "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+          "metadata": {
+            "amountDue": 2260000,
+            "maxAmount": 2260000,
+            "maxPenaltyCap": 7500000,
+            "pathway": "PRESCRIPTIVE",
+            "penaltyPerSquareFoot": 10,
+            "remainingPenaltyFraction": 1
+          },
+          "severity": "INFO",
+          "status": "PASS"
+        }
+      ],
+      "governance": {
+        "cycleId": "BEPS_CYCLE_1",
+        "factorSetKey": "DC_BEPS_CYCLE_1_FACTORS_V1",
+        "factorSetVersion": "dc-cycle-1-factors-v1",
+        "rulePackageKey": "DC_BEPS_CYCLE_1",
+        "ruleVersion": "dc-cycle-1-2021-v1"
+      },
+      "governedConfig": {
+        "alternativeCompliance": {
+          "agreementRequired": true,
+          "allowedAgreementPathways": [
+            "PERFORMANCE",
+            "STANDARD_TARGET",
+            "PRESCRIPTIVE"
+          ],
+          "maxPenaltyCap": 7500000,
+          "penaltyPerSquareFoot": 10
+        },
+        "applicability": {
+          "cycleEndYear": 2026,
+          "cycleStartYear": 2021,
+          "minGrossSquareFeetApplied": 50000,
+          "minGrossSquareFeetDistrict": 10000,
+          "minGrossSquareFeetPrivate": 50000,
+          "ownershipClassFallback": "PRIVATE",
+          "recentConstructionExemptionYears": 5
+        },
+        "pathwayRouting": {
+          "performanceScoreThreshold": 55,
+          "preferredPathway": null,
+          "prescriptiveAlwaysEligible": true,
+          "supportedPathways": [
+            "PERFORMANCE",
+            "STANDARD_TARGET",
+            "PRESCRIPTIVE"
+          ]
+        },
+        "performance": {
+          "defaultBaselineYears": [
+            2018,
+            2019
+          ],
+          "defaultEvaluationYears": [
+            2026
+          ],
+          "delayedCycle1Option": {
+            "baselineYears": [
+              2018,
+              2019
+            ],
+            "comparisonYear": 2026,
+            "evaluationYears": [
+              2026
+            ],
+            "optionYear": 2021
+          },
+          "nonScoreEligibleMetric": "WEATHER_NORMALIZED_SITE_EUI_AVERAGE",
+          "requiredReductionFraction": 0.2,
+          "scoreEligibleMetric": "ADJUSTED_SITE_EUI_AVERAGE"
+        },
+        "prescriptive": {
+          "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES",
+          "pointsNeededForPropertyType": 25
+        },
+        "standardTarget": {
+          "buildingTargetScore": 71,
+          "exactTargetScoreForPropertyType": 71,
+          "maxGapForPropertyType": 15,
+          "nonScoreEligibleMetric": "WEATHER_NORMALIZED_SOURCE_EUI",
+          "propertyTypeMappingConstraint": null,
+          "scoreEligibleMetric": "ENERGY_STAR_SCORE"
+        },
+        "trajectory": {
+          "finalTargetYear": 2026,
+          "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE",
+          "targetCount": 0,
+          "targetYears": []
+        }
+      },
+      "inputSummary": {
+        "alternativeComplianceAgreementMultiplier": null,
+        "alternativeComplianceAgreementPathway": null,
+        "baselineAdjustedSiteEui": null,
+        "baselineScore": null,
+        "baselineWeatherNormalizedSiteEui": null,
+        "baselineWeatherNormalizedSourceEui": null,
+        "canonicalRefs": {
+          "alternativeComplianceAgreementId": null,
+          "metricInputId": "cmmmaf9qu0011cohsxbc7znu0",
+          "prescriptiveItemIds": []
+        },
+        "currentAdjustedSiteEui": 146.1573982300885,
+        "currentScore": 45,
+        "currentWeatherNormalizedSiteEui": 134.24559292035397,
+        "currentWeatherNormalizedSourceEui": null,
+        "delayedCycle1OptionApplied": false,
+        "isEnergyStarScoreEligible": true,
+        "maxPenaltyOverrideReason": null,
+        "ownershipType": "PRIVATE",
+        "prescriptivePointsEarned": null,
+        "prescriptivePointsNeeded": null,
+        "prescriptiveRequirementsMet": null,
+        "requestAlternativeComplianceAgreement": null,
+        "sources": {
+          "alternativeComplianceAgreementMultiplier": "NONE",
+          "alternativeComplianceAgreementPathway": "NONE",
+          "baselineAdjustedSiteEui": "NONE",
+          "baselineScore": "NONE",
+          "baselineWeatherNormalizedSiteEui": "NONE",
+          "baselineWeatherNormalizedSourceEui": "NONE",
+          "currentAdjustedSiteEui": "CANONICAL_METRIC_INPUT",
+          "currentScore": "CANONICAL_METRIC_INPUT",
+          "currentWeatherNormalizedSiteEui": "CANONICAL_METRIC_INPUT",
+          "currentWeatherNormalizedSourceEui": "NONE",
+          "delayedCycle1OptionApplied": "CANONICAL_METRIC_INPUT",
+          "isEnergyStarScoreEligible": "DERIVED_FROM_SCORE",
+          "maxPenaltyOverrideReason": "NONE",
+          "ownershipType": "BUILDING",
+          "prescriptivePointsEarned": "NONE",
+          "prescriptivePointsNeeded": "NONE",
+          "prescriptiveRequirementsMet": "NONE",
+          "requestAlternativeComplianceAgreement": "NONE"
+        }
+      },
+      "overallStatus": "PENDING_DATA",
+      "pathwayEligibility": {
+        "eligiblePathways": [
+          "PERFORMANCE",
+          "PRESCRIPTIVE"
+        ],
+        "findings": [
+          {
+            "code": "SUPPORTED_PATHWAYS_IDENTIFIED",
+            "message": "Supported BEPS pathways were identified from the active rule package.",
+            "metadata": {
+              "supportedPathways": [
+                "PERFORMANCE",
+                "STANDARD_TARGET",
+                "PRESCRIPTIVE"
+              ]
+            },
+            "severity": "INFO",
+            "status": "PASS"
+          },
+          {
+            "code": "PERFORMANCE_PATHWAY_ELIGIBLE",
+            "message": "Performance pathway is eligible based on current score routing.",
+            "metadata": {
+              "currentScore": 45,
+              "thresholdScore": 55
+            },
+            "severity": "INFO",
+            "status": "PASS"
+          },
+          {
+            "code": "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+            "message": "Standard target pathway is not the routed score-based pathway for this building.",
+            "metadata": {
+              "currentScore": 45,
+              "thresholdScore": 55
+            },
+            "severity": "ERROR",
+            "status": "FAIL"
+          },
+          {
+            "code": "PRESCRIPTIVE_PATHWAY_ELIGIBLE",
+            "message": "Prescriptive pathway is available as an alternative compliance pathway.",
+            "severity": "INFO",
+            "status": "PASS"
+          }
+        ],
+        "preferredPathway": "PERFORMANCE",
+        "reasonCodes": [
+          "STANDARD_TARGET_PATHWAY_INELIGIBLE"
+        ],
+        "supportedPathways": [
+          "PERFORMANCE",
+          "STANDARD_TARGET",
+          "PRESCRIPTIVE"
+        ]
+      },
+      "pathwayResults": {
+        "performance": {
+          "calculation": {
+            "adjustedAmount": null,
+            "formulaKey": "DC_BEPS_CYCLE_1_PERFORMANCE_ADJUSTMENT",
+            "intermediateValues": {},
+            "maxAmount": null,
+            "rawInputs": {
+              "baselineValue": null,
+              "currentValue": 146.1573982300885,
+              "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+            },
+            "remainingPenaltyFraction": null
+          },
+          "compliant": false,
+          "eligible": true,
+          "evaluationStatus": "PENDING_DATA",
+          "findings": [
+            {
+              "code": "MISSING_BASELINE_INPUT",
+              "message": "Baseline input is required for exact performance pathway evaluation.",
+              "metadata": {
+                "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+              },
+              "severity": "ERROR",
+              "status": "FAIL"
+            },
+            {
+              "code": "MISSING_BASELINE_ADJUSTED_SITE_EUI",
+              "message": "Performance pathway baseline metric is missing.",
+              "metadata": {
+                "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+              },
+              "severity": "ERROR",
+              "status": "FAIL"
+            }
+          ],
+          "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE",
+          "metrics": {
+            "baselineValue": null,
+            "currentValue": 146.1573982300885,
+            "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+          },
+          "pathway": "PERFORMANCE",
+          "progressPct": null,
+          "reasonCodes": [
+            "MISSING_BASELINE_INPUT",
+            "MISSING_BASELINE_ADJUSTED_SITE_EUI"
+          ],
+          "reductionPct": null
+        },
+        "prescriptive": {
+          "calculation": {
+            "adjustedAmount": null,
+            "formulaKey": "DC_BEPS_CYCLE_1_PRESCRIPTIVE_ADJUSTMENT",
+            "intermediateValues": {
+              "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+            },
+            "maxAmount": null,
+            "rawInputs": {
+              "pointsEarned": null,
+              "pointsNeeded": 25
+            },
+            "remainingPenaltyFraction": null
+          },
+          "compliant": false,
+          "eligible": true,
+          "evaluationStatus": "PENDING_DATA",
+          "findings": [
+            {
+              "code": "MISSING_EVALUATION_INPUT",
+              "message": "Prescriptive points earned are required for exact penalty adjustment.",
+              "severity": "ERROR",
+              "status": "FAIL"
+            },
+            {
+              "code": "MISSING_PRESCRIPTIVE_POINTS_EARNED",
+              "message": "Prescriptive pathway points earned are required.",
+              "severity": "ERROR",
+              "status": "FAIL"
+            },
+            {
+              "code": "MISSING_EVALUATION_INPUT",
+              "message": "Prescriptive requirements status is required because pathway compliance is milestone-based, not points-only.",
+              "metadata": {
+                "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+              },
+              "severity": "ERROR",
+              "status": "FAIL"
+            },
+            {
+              "code": "MISSING_PRESCRIPTIVE_REQUIREMENTS",
+              "message": "Prescriptive pathway requirements status is missing.",
+              "metadata": {
+                "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+              },
+              "severity": "ERROR",
+              "status": "FAIL"
+            }
+          ],
+          "metricBasis": null,
+          "metrics": {
+            "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES",
+            "pointsEarned": null,
+            "pointsNeeded": 25
+          },
+          "pathway": "PRESCRIPTIVE",
+          "progressPct": null,
+          "reasonCodes": [
+            "MISSING_EVALUATION_INPUT",
+            "MISSING_PRESCRIPTIVE_POINTS_EARNED",
+            "MISSING_EVALUATION_INPUT",
+            "MISSING_PRESCRIPTIVE_REQUIREMENTS"
+          ],
+          "reductionPct": null
+        },
+        "standardTarget": {
+          "calculation": {
+            "adjustedAmount": null,
+            "formulaKey": "DC_BEPS_CYCLE_1_STANDARD_TARGET_ADJUSTMENT",
+            "intermediateValues": {},
+            "maxAmount": null,
+            "rawInputs": {},
+            "remainingPenaltyFraction": null
+          },
+          "compliant": false,
+          "eligible": false,
+          "evaluationStatus": "INELIGIBLE",
+          "findings": [
+            {
+              "code": "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+              "message": "Standard target pathway is not eligible for this building under current routing.",
+              "severity": "ERROR",
+              "status": "FAIL"
+            }
+          ],
+          "metricBasis": null,
+          "metrics": {},
+          "pathway": "STANDARD_TARGET",
+          "progressPct": null,
+          "reasonCodes": [
+            "STANDARD_TARGET_PATHWAY_INELIGIBLE"
+          ],
+          "reductionPct": null
+        },
+        "trajectory": {
+          "calculation": {
+            "adjustedAmount": null,
+            "formulaKey": "DC_BEPS_TRAJECTORY_ADJUSTMENT",
+            "intermediateValues": {},
+            "maxAmount": null,
+            "rawInputs": {},
+            "remainingPenaltyFraction": null
+          },
+          "compliant": false,
+          "eligible": false,
+          "evaluationStatus": "INELIGIBLE",
+          "findings": [
+            {
+              "code": "TRAJECTORY_PATHWAY_INELIGIBLE",
+              "message": "Trajectory pathway is not eligible for this building under current routing.",
+              "severity": "ERROR",
+              "status": "FAIL"
+            }
+          ],
+          "metricBasis": null,
+          "metrics": {},
+          "pathway": "TRAJECTORY",
+          "progressPct": null,
+          "reasonCodes": [
+            "TRAJECTORY_PATHWAY_INELIGIBLE"
+          ],
+          "reductionPct": null
+        }
+      },
+      "reasonCodes": [
+        "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+        "MISSING_BASELINE_INPUT",
+        "MISSING_BASELINE_ADJUSTED_SITE_EUI",
+        "MISSING_EVALUATION_INPUT",
+        "MISSING_PRESCRIPTIVE_POINTS_EARNED",
+        "MISSING_PRESCRIPTIVE_REQUIREMENTS",
+        "TRAJECTORY_PATHWAY_INELIGIBLE"
+      ],
+      "selectedPathway": "PERFORMANCE"
+    },
+    "findings": [
+      {
+        "code": "BUILDING_IN_SCOPE",
+        "message": "Building is in scope for BEPS evaluation for the requested cycle.",
+        "metadata": {
+          "cycleEndYear": 2026,
+          "cycleStartYear": 2021,
+          "filingYear": 2026,
+          "minGrossSquareFeetApplied": 50000,
+          "ownershipType": "PRIVATE"
+        },
+        "severity": "INFO",
+        "status": "PASS"
+      },
+      {
+        "code": "SUPPORTED_PATHWAYS_IDENTIFIED",
+        "message": "Supported BEPS pathways were identified from the active rule package.",
+        "metadata": {
+          "supportedPathways": [
+            "PERFORMANCE",
+            "STANDARD_TARGET",
+            "PRESCRIPTIVE"
+          ]
+        },
+        "severity": "INFO",
+        "status": "PASS"
+      },
+      {
+        "code": "PERFORMANCE_PATHWAY_ELIGIBLE",
+        "message": "Performance pathway is eligible based on current score routing.",
+        "metadata": {
+          "currentScore": 45,
+          "thresholdScore": 55
+        },
+        "severity": "INFO",
+        "status": "PASS"
+      },
+      {
+        "code": "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+        "message": "Standard target pathway is not the routed score-based pathway for this building.",
+        "metadata": {
+          "currentScore": 45,
+          "thresholdScore": 55
+        },
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "PRESCRIPTIVE_PATHWAY_ELIGIBLE",
+        "message": "Prescriptive pathway is available as an alternative compliance pathway.",
+        "severity": "INFO",
+        "status": "PASS"
+      },
+      {
+        "code": "MISSING_BASELINE_INPUT",
+        "message": "Baseline input is required for exact performance pathway evaluation.",
+        "metadata": {
+          "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+        },
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "MISSING_BASELINE_ADJUSTED_SITE_EUI",
+        "message": "Performance pathway baseline metric is missing.",
+        "metadata": {
+          "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+        },
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+        "message": "Standard target pathway is not eligible for this building under current routing.",
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "MISSING_EVALUATION_INPUT",
+        "message": "Prescriptive points earned are required for exact penalty adjustment.",
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "MISSING_PRESCRIPTIVE_POINTS_EARNED",
+        "message": "Prescriptive pathway points earned are required.",
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "MISSING_EVALUATION_INPUT",
+        "message": "Prescriptive requirements status is required because pathway compliance is milestone-based, not points-only.",
+        "metadata": {
+          "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+        },
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "MISSING_PRESCRIPTIVE_REQUIREMENTS",
+        "message": "Prescriptive pathway requirements status is missing.",
+        "metadata": {
+          "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+        },
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "TRAJECTORY_PATHWAY_INELIGIBLE",
+        "message": "Trajectory pathway is not eligible for this building under current routing.",
+        "severity": "ERROR",
+        "status": "FAIL"
+      },
+      {
+        "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+        "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+        "metadata": {
+          "amountDue": 2260000,
+          "maxAmount": 2260000,
+          "maxPenaltyCap": 7500000,
+          "pathway": "PERFORMANCE",
+          "penaltyPerSquareFoot": 10,
+          "remainingPenaltyFraction": 1
+        },
+        "severity": "INFO",
+        "status": "PASS"
+      },
+      {
+        "code": "ALTERNATIVE_COMPLIANCE_CALCULATED",
+        "message": "Alternative compliance amount was calculated from governed BEPS pathway and factor inputs.",
+        "metadata": {
+          "amountDue": 2260000,
+          "maxAmount": 2260000,
+          "maxPenaltyCap": 7500000,
+          "pathway": "PRESCRIPTIVE",
+          "penaltyPerSquareFoot": 10,
+          "remainingPenaltyFraction": 1
+        },
+        "severity": "INFO",
+        "status": "PASS"
+      }
+    ],
+    "reasonCodes": [
+      "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+      "MISSING_BASELINE_INPUT",
+      "MISSING_BASELINE_ADJUSTED_SITE_EUI",
+      "MISSING_EVALUATION_INPUT",
+      "MISSING_PRESCRIPTIVE_POINTS_EARNED",
+      "MISSING_PRESCRIPTIVE_REQUIREMENTS",
+      "TRAJECTORY_PATHWAY_INELIGIBLE"
+    ]
+  },
+  "evidenceManifest": [],
+  "exportVersion": "beps-filing-packet-export-v1",
+  "filingSummary": {
+    "complianceCycle": "CYCLE_1",
+    "filedAt": null,
+    "filingRecordId": "cmmmaffce001dcohs0lifqi1b",
+    "filingStatus": "GENERATED",
+    "filingType": "BEPS_COMPLIANCE",
+    "filingYear": 2026
+  },
+  "governance": {
+    "calculationManifestId": "cmmmaffbc0019cohs4b94debz",
+    "codeVersion": "dev",
+    "complianceRunId": "cmmmaffb30018cohsgtta9zkn",
+    "executedAt": "2026-03-11T17:03:13.203Z",
+    "factorSetKey": "DC_BEPS_CYCLE_1_FACTORS_V1",
+    "factorSetVersion": "dc-cycle-1-factors-v1",
+    "factorSetVersionId": "cmmkuvp4c000c34hsn5us96ma",
+    "implementationKey": "beps/evaluator-v1",
+    "rulePackageKey": "DC_BEPS_CYCLE_1",
+    "ruleVersion": "dc-cycle-1-2021-v1",
+    "ruleVersionId": "cmmkuvp3s000834hssmkrsybp"
+  },
+  "packet": {
+    "finalizedAt": "2026-03-11T17:03:50.994Z",
+    "finalizedById": "user_3ASD7rzkuCCPYm493XKKuxyZe1l",
+    "finalizedByType": "USER",
+    "generatedAt": "2026-03-11T17:03:32.883Z",
+    "id": "cmmmafuhl001lcohsphytqb4b",
+    "packetHash": "d2a3093b7580a768a7841a0eb6b568c6a288abd827b6559ec6efa5b6ba80c0cb",
+    "staleMarkedAt": null,
+    "status": "FINALIZED",
+    "version": 1
+  },
+  "pathwaySummary": {
+    "overallStatus": "PENDING_DATA",
+    "pathwayEligibility": {
+      "eligiblePathways": [
+        "PERFORMANCE",
+        "PRESCRIPTIVE"
+      ],
+      "findings": [
+        {
+          "code": "SUPPORTED_PATHWAYS_IDENTIFIED",
+          "message": "Supported BEPS pathways were identified from the active rule package.",
+          "metadata": {
+            "supportedPathways": [
+              "PERFORMANCE",
+              "STANDARD_TARGET",
+              "PRESCRIPTIVE"
+            ]
+          },
+          "severity": "INFO",
+          "status": "PASS"
+        },
+        {
+          "code": "PERFORMANCE_PATHWAY_ELIGIBLE",
+          "message": "Performance pathway is eligible based on current score routing.",
+          "metadata": {
+            "currentScore": 45,
+            "thresholdScore": 55
+          },
+          "severity": "INFO",
+          "status": "PASS"
+        },
+        {
+          "code": "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+          "message": "Standard target pathway is not the routed score-based pathway for this building.",
+          "metadata": {
+            "currentScore": 45,
+            "thresholdScore": 55
+          },
+          "severity": "ERROR",
+          "status": "FAIL"
+        },
+        {
+          "code": "PRESCRIPTIVE_PATHWAY_ELIGIBLE",
+          "message": "Prescriptive pathway is available as an alternative compliance pathway.",
+          "severity": "INFO",
+          "status": "PASS"
+        }
+      ],
+      "preferredPathway": "PERFORMANCE",
+      "reasonCodes": [
+        "STANDARD_TARGET_PATHWAY_INELIGIBLE"
+      ],
+      "supportedPathways": [
+        "PERFORMANCE",
+        "STANDARD_TARGET",
+        "PRESCRIPTIVE"
+      ]
+    },
+    "pathwayResults": {
+      "performance": {
+        "calculation": {
+          "adjustedAmount": null,
+          "formulaKey": "DC_BEPS_CYCLE_1_PERFORMANCE_ADJUSTMENT",
+          "intermediateValues": {},
+          "maxAmount": null,
+          "rawInputs": {
+            "baselineValue": null,
+            "currentValue": 146.1573982300885,
+            "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+          },
+          "remainingPenaltyFraction": null
+        },
+        "compliant": false,
+        "eligible": true,
+        "evaluationStatus": "PENDING_DATA",
+        "findings": [
+          {
+            "code": "MISSING_BASELINE_INPUT",
+            "message": "Baseline input is required for exact performance pathway evaluation.",
+            "metadata": {
+              "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+            },
+            "severity": "ERROR",
+            "status": "FAIL"
+          },
+          {
+            "code": "MISSING_BASELINE_ADJUSTED_SITE_EUI",
+            "message": "Performance pathway baseline metric is missing.",
+            "metadata": {
+              "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+            },
+            "severity": "ERROR",
+            "status": "FAIL"
+          }
+        ],
+        "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE",
+        "metrics": {
+          "baselineValue": null,
+          "currentValue": 146.1573982300885,
+          "metricBasis": "ADJUSTED_SITE_EUI_AVERAGE"
+        },
+        "pathway": "PERFORMANCE",
+        "progressPct": null,
+        "reasonCodes": [
+          "MISSING_BASELINE_INPUT",
+          "MISSING_BASELINE_ADJUSTED_SITE_EUI"
+        ],
+        "reductionPct": null
+      },
+      "prescriptive": {
+        "calculation": {
+          "adjustedAmount": null,
+          "formulaKey": "DC_BEPS_CYCLE_1_PRESCRIPTIVE_ADJUSTMENT",
+          "intermediateValues": {
+            "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+          },
+          "maxAmount": null,
+          "rawInputs": {
+            "pointsEarned": null,
+            "pointsNeeded": 25
+          },
+          "remainingPenaltyFraction": null
+        },
+        "compliant": false,
+        "eligible": true,
+        "evaluationStatus": "PENDING_DATA",
+        "findings": [
+          {
+            "code": "MISSING_EVALUATION_INPUT",
+            "message": "Prescriptive points earned are required for exact penalty adjustment.",
+            "severity": "ERROR",
+            "status": "FAIL"
+          },
+          {
+            "code": "MISSING_PRESCRIPTIVE_POINTS_EARNED",
+            "message": "Prescriptive pathway points earned are required.",
+            "severity": "ERROR",
+            "status": "FAIL"
+          },
+          {
+            "code": "MISSING_EVALUATION_INPUT",
+            "message": "Prescriptive requirements status is required because pathway compliance is milestone-based, not points-only.",
+            "metadata": {
+              "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+            },
+            "severity": "ERROR",
+            "status": "FAIL"
+          },
+          {
+            "code": "MISSING_PRESCRIPTIVE_REQUIREMENTS",
+            "message": "Prescriptive pathway requirements status is missing.",
+            "metadata": {
+              "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES"
+            },
+            "severity": "ERROR",
+            "status": "FAIL"
+          }
+        ],
+        "metricBasis": null,
+        "metrics": {
+          "complianceBasis": "APPROVED_MEASURES_AND_MILESTONES",
+          "pointsEarned": null,
+          "pointsNeeded": 25
+        },
+        "pathway": "PRESCRIPTIVE",
+        "progressPct": null,
+        "reasonCodes": [
+          "MISSING_EVALUATION_INPUT",
+          "MISSING_PRESCRIPTIVE_POINTS_EARNED",
+          "MISSING_EVALUATION_INPUT",
+          "MISSING_PRESCRIPTIVE_REQUIREMENTS"
+        ],
+        "reductionPct": null
+      },
+      "standardTarget": {
+        "calculation": {
+          "adjustedAmount": null,
+          "formulaKey": "DC_BEPS_CYCLE_1_STANDARD_TARGET_ADJUSTMENT",
+          "intermediateValues": {},
+          "maxAmount": null,
+          "rawInputs": {},
+          "remainingPenaltyFraction": null
+        },
+        "compliant": false,
+        "eligible": false,
+        "evaluationStatus": "INELIGIBLE",
+        "findings": [
+          {
+            "code": "STANDARD_TARGET_PATHWAY_INELIGIBLE",
+            "message": "Standard target pathway is not eligible for this building under current routing.",
+            "severity": "ERROR",
+            "status": "FAIL"
+          }
+        ],
+        "metricBasis": null,
+        "metrics": {},
+        "pathway": "STANDARD_TARGET",
+        "progressPct": null,
+        "reasonCodes": [
+          "STANDARD_TARGET_PATHWAY_INELIGIBLE"
+        ],
+        "reductionPct": null
+      },
+      "trajectory": {
+        "calculation": {
+          "adjustedAmount": null,
+          "formulaKey": "DC_BEPS_TRAJECTORY_ADJUSTMENT",
+          "intermediateValues": {},
+          "maxAmount": null,
+          "rawInputs": {},
+          "remainingPenaltyFraction": null
+        },
+        "compliant": false,
+        "eligible": false,
+        "evaluationStatus": "INELIGIBLE",
+        "findings": [
+          {
+            "code": "TRAJECTORY_PATHWAY_INELIGIBLE",
+            "message": "Trajectory pathway is not eligible for this building under current routing.",
+            "severity": "ERROR",
+            "status": "FAIL"
+          }
+        ],
+        "metricBasis": null,
+        "metrics": {},
+        "pathway": "TRAJECTORY",
+        "progressPct": null,
+        "reasonCodes": [
+          "TRAJECTORY_PATHWAY_INELIGIBLE"
+        ],
+        "reductionPct": null
+      }
+    },
+    "selectedPathway": "PERFORMANCE"
+  },
+  "warnings": [
+    {
+      "code": "NO_LINKED_EVIDENCE",
+      "message": "No evidence artifacts are currently linked to this BEPS filing.",
+      "severity": "WARNING"
+    },
+    {
+      "code": "MISSING_PATHWAY_SUPPORT_EVIDENCE",
+      "message": "No pathway support evidence is linked for the selected BEPS pathway.",
+      "severity": "WARNING"
+    }
+  ],
+  "workflowHistory": {
+    "eventCount": 2,
+    "events": [
+      {
+        "action": "CREATED",
+        "createdAt": "2026-03-11T17:03:13.312Z",
+        "createdById": "user_3ASD7rzkuCCPYm493XKKuxyZe1l",
+        "createdByType": "USER",
+        "eventPayload": {
+          "complianceCycle": "CYCLE_1",
+          "complianceRunId": "cmmmaffb30018cohsgtta9zkn",
+          "filingYear": 2026
+        },
+        "fromStatus": null,
+        "id": "cmmmaffds001ecohsliwsns32",
+        "notes": "Governed BEPS filing created from evaluation output.",
+        "toStatus": "GENERATED"
+      },
+      {
+        "action": "EVALUATION_REFRESH",
+        "createdAt": "2026-03-11T17:03:13.316Z",
+        "createdById": "user_3ASD7rzkuCCPYm493XKKuxyZe1l",
+        "createdByType": "USER",
+        "eventPayload": {
+          "complianceCycle": "CYCLE_1",
+          "complianceRunId": "cmmmaffb30018cohsgtta9zkn",
+          "filingYear": 2026
+        },
+        "fromStatus": null,
+        "id": "cmmmaffdw001fcohs3bkthgi4",
+        "notes": "Governed BEPS evaluation payload refreshed.",
+        "toStatus": "GENERATED"
+      }
+    ],
+    "filingStatus": "GENERATED"
+  }
+}

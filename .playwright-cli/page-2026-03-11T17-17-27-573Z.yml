@@ -1,0 +1,120 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e52]
+  - generic [ref=e53]:
+    - complementary [ref=e54]:
+      - link "Quoin" [ref=e56] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e57]:
+        - link "Dashboard" [ref=e58] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e59]
+          - text: Dashboard
+        - link "Buildings" [ref=e64] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e65]
+          - text: Buildings
+        - link "Reports" [ref=e69] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e70]
+          - text: Reports
+        - link "Settings" [ref=e73] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e74]
+          - text: Settings
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - button "Open organization switcher" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "JBG's logo" [ref=e84]
+            - generic "JBG" [ref=e87]
+          - img [ref=e88]
+        - button "Open user menu" [ref=e91] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e94]
+      - main [ref=e96]:
+        - generic [ref=e97]:
+          - heading "Settings" [level=1] [ref=e99]
+          - generic [ref=e100]:
+            - generic [ref=e101]:
+              - paragraph [ref=e102]: Organization Selected
+              - paragraph [ref=e103]: "Yes"
+            - generic [ref=e104]:
+              - paragraph [ref=e105]: Organization Synced
+              - paragraph [ref=e106]: "Yes"
+            - generic [ref=e107]:
+              - paragraph [ref=e108]: Buildings
+              - paragraph [ref=e109]: "2"
+            - generic [ref=e110]:
+              - paragraph [ref=e111]: Onboarding Complete
+              - paragraph [ref=e112]: "Yes"
+          - generic [ref=e113]:
+            - generic [ref=e114]:
+              - generic [ref=e116]:
+                - heading "Active Rule Packages" [level=3] [ref=e117]
+                - paragraph [ref=e118]: Governed rule packages and active versions currently loaded into the platform.
+              - generic [ref=e119]:
+                - generic [ref=e120]:
+                  - generic [ref=e121]: DC_BENCHMARKING_2025
+                  - generic [ref=e122]: DC Benchmarking Annual Submission Workflow
+                  - generic [ref=e124]:
+                    - generic [ref=e125]: bootstrap-2026-03-09 • ACTIVE
+                    - generic [ref=e126]: Effective Dec 31, 2024, 07:00 PM
+                    - generic [ref=e127]: Source DC benchmarking binding authority bootstrap metadata
+                - generic [ref=e128]:
+                  - generic [ref=e129]: DC_BEPS_CYCLE_1
+                  - generic [ref=e130]: DC BEPS Cycle 1
+                  - generic [ref=e132]:
+                    - generic [ref=e133]: dc-cycle-1-2021-v1 • ACTIVE
+                    - generic [ref=e134]: Effective Dec 31, 2020, 07:00 PM
+                    - generic [ref=e135]: Source DC BEPS Cycle 1 binding authority metadata
+                - generic [ref=e136]:
+                  - generic [ref=e137]: DC_BEPS_CYCLE_2
+                  - generic [ref=e138]: DC BEPS Cycle 2
+                  - generic [ref=e140]:
+                    - generic [ref=e141]: dc-cycle-2-bootstrap-v1 • ACTIVE
+                    - generic [ref=e142]: Effective Dec 31, 2026, 07:00 PM
+                    - generic [ref=e143]: Source DOEE BEPS Monthly Update May 27 2021
+            - generic [ref=e144]:
+              - generic [ref=e146]:
+                - heading "Active Factor Sets" [level=3] [ref=e147]
+                - paragraph [ref=e148]: Governed factor sets and standards tables available to the compliance engines.
+              - generic [ref=e149]:
+                - generic [ref=e150]:
+                  - generic [ref=e151]: DC_BEPS_CYCLE_1_FACTORS_V1
+                  - generic [ref=e152]: dc-cycle-1-factors-v1 • ACTIVE
+                  - generic [ref=e153]: Effective Dec 31, 2020, 07:00 PM
+                  - generic [ref=e154]: Source Guide to the 2021 Building Energy Performance Standards
+                - generic [ref=e155]:
+                  - generic [ref=e156]: DC_BEPS_CYCLE_2_FACTORS_V1
+                  - generic [ref=e157]: dc-cycle-2-factors-v1 • ACTIVE
+                  - generic [ref=e158]: Effective Dec 31, 2026, 07:00 PM
+                  - generic [ref=e159]: Source DOEE BEPS Monthly Update May 27 2021
+                - generic [ref=e160]:
+                  - generic [ref=e161]: DC_CURRENT_STANDARDS
+                  - generic [ref=e162]: bootstrap-2026-03-09 • ACTIVE
+                  - generic [ref=e163]: Effective Dec 31, 2023, 07:00 PM
+                  - generic [ref=e164]: Source DC benchmarking guidance bootstrap metadata
+          - generic [ref=e165]:
+            - generic [ref=e167]:
+              - heading "Portfolio Manager Autopilot Status" [level=3] [ref=e168]
+              - paragraph [ref=e169]: Current PM sync and readiness state across the portfolio.
+            - table [ref=e171]:
+              - rowgroup [ref=e172]:
+                - row "Building Reporting Year Sync Readiness Submission" [ref=e173]:
+                  - columnheader "Building" [ref=e174]
+                  - columnheader "Reporting Year" [ref=e175]
+                  - columnheader "Sync" [ref=e176]
+                  - columnheader "Readiness" [ref=e177]
+                  - columnheader "Submission" [ref=e178]
+              - rowgroup [ref=e179]:
+                - row "ICC 2025 SUCCEEDED BLOCKED BLOCKED" [ref=e180]:
+                  - cell "ICC" [ref=e181]
+                  - cell "2025" [ref=e182]
+                  - cell "SUCCEEDED" [ref=e183]
+                  - cell "BLOCKED" [ref=e184]
+                  - cell "BLOCKED" [ref=e185]
+                - row "John R. Thompson Jr. Intercollegiate Athletic Center 2025 NOT_STARTED PENDING NONE" [ref=e186]:
+                  - cell "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e187]
+                  - cell "2025" [ref=e188]
+                  - cell "NOT_STARTED" [ref=e189]
+                  - cell "PENDING" [ref=e190]
+                  - cell "NONE" [ref=e191]

@@ -1,0 +1,100 @@
+- generic [ref=e1]:
+  - alert [ref=e3]
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - link "Quoin" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e8]:
+        - link "Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e10]
+          - text: Dashboard
+        - link "Buildings" [ref=e15] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e16]
+          - text: Buildings
+        - link "Reports" [ref=e20] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e21]
+          - text: Reports
+        - link "Settings" [ref=e24] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e25]
+          - text: Settings
+    - generic [ref=e28]:
+      - banner [ref=e29]:
+        - button "Open organization switcher" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]:
+            - img "JBG's logo" [ref=e35]
+            - generic "JBG" [ref=e38]
+          - img [ref=e39]
+        - button "Open user menu" [ref=e42] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e45]
+      - main [ref=e47]:
+        - generic [ref=e516]:
+          - generic [ref=e517]:
+            - generic [ref=e518]:
+              - generic [ref=e519]:
+                - heading "John R. Thompson Jr. Intercollegiate Athletic Center" [level=1] [ref=e520]
+                - paragraph [ref=e521]: 1360 West Rd, Washington, DC 20057
+                - paragraph [ref=e522]: Office | 144,000 SF | Built 2014
+              - generic [ref=e523]:
+                - button "Upload Data" [ref=e524] [cursor=pointer]
+                - button "Delete" [ref=e525] [cursor=pointer]
+            - generic [ref=e526]:
+              - generic [ref=e527]: "ESPM Property ID:"
+              - generic [ref=e528]: "88776124"
+              - button "Edit" [ref=e529] [cursor=pointer]
+          - separator [ref=e530]
+          - generic [ref=e531]:
+            - generic [ref=e532]:
+              - paragraph [ref=e533]: ENERGY STAR Score
+              - paragraph [ref=e534]: "52"
+              - paragraph [ref=e535]: "Target: 71 (-19 below)"
+            - generic [ref=e536]:
+              - paragraph [ref=e537]: Status
+              - paragraph [ref=e538]:
+                - generic [ref=e539]: Non-Compliant
+              - paragraph [ref=e541]: Since Mar 6, 2026
+            - generic [ref=e542]:
+              - paragraph [ref=e543]: Penalty Exposure
+              - paragraph [ref=e544]: $385,352
+              - paragraph [ref=e545]: "Max: $1,440,000"
+          - separator [ref=e546]
+          - generic [ref=e547]:
+            - button "Energy" [ref=e548] [cursor=pointer]
+            - button "Benchmarking" [ref=e549] [cursor=pointer]
+            - button "BEPS" [ref=e550] [cursor=pointer]
+            - button "Retrofit" [ref=e551] [cursor=pointer]
+            - button "Financing" [ref=e552] [cursor=pointer]
+            - button "Operations" [ref=e553] [cursor=pointer]
+            - button "Provenance" [ref=e554] [cursor=pointer]
+            - button "Compliance" [ref=e555] [cursor=pointer]
+            - button "Capital" [ref=e556] [cursor=pointer]
+            - button "Alerts" [active] [ref=e557] [cursor=pointer]
+          - generic [ref=e884]:
+            - generic [ref=e885]:
+              - generic [ref=e886]:
+                - paragraph [ref=e887]: Active Alerts
+                - paragraph [ref=e888]: "0"
+              - generic [ref=e889]:
+                - paragraph [ref=e890]: Critical
+                - paragraph [ref=e891]: "0"
+              - generic [ref=e892]:
+                - paragraph [ref=e893]: High
+                - paragraph [ref=e894]: "0"
+              - generic [ref=e895]:
+                - paragraph [ref=e896]: Medium
+                - paragraph [ref=e897]: "0"
+              - generic [ref=e898]:
+                - paragraph [ref=e899]: Low
+                - paragraph [ref=e900]: "0"
+            - generic [ref=e901]:
+              - button "All" [ref=e902] [cursor=pointer]
+              - button "Active" [ref=e903] [cursor=pointer]
+              - button "Acknowledged" [ref=e904] [cursor=pointer]
+              - button "Resolved" [ref=e905] [cursor=pointer]
+            - generic [ref=e906]:
+              - img [ref=e907]
+              - paragraph [ref=e909]: No drift alerts detected. Your building is performing within expected ranges.
+  - generic [ref=e730]: CPACE

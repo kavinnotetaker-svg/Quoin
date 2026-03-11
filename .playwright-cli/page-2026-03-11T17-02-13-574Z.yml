@@ -1,0 +1,114 @@
+- generic [ref=e1]:
+  - alert [ref=e52]
+  - generic [ref=e53]:
+    - complementary [ref=e54]:
+      - link "Quoin" [ref=e56] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e57]:
+        - link "Dashboard" [ref=e58] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e59]
+          - text: Dashboard
+        - link "Buildings" [ref=e64] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e65]
+          - text: Buildings
+        - link "Reports" [ref=e69] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e70]
+          - text: Reports
+        - link "Settings" [ref=e73] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e74]
+          - text: Settings
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - button "Open organization switcher" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "JBG's logo" [ref=e84]
+            - generic "JBG" [ref=e87]
+          - img [ref=e88]
+        - button "Open user menu" [ref=e91] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e94]
+      - main [ref=e96]:
+        - generic [ref=e248]:
+          - generic [ref=e249]:
+            - generic [ref=e250]:
+              - generic [ref=e251]:
+                - heading "ICC" [level=1] [ref=e252]
+                - paragraph [ref=e253]: 1472-1498 37th St NW, Washington, DC 20057
+                - paragraph [ref=e254]: Office | 226,000 SF | Built 1982
+              - generic [ref=e255]:
+                - button "Upload Data" [ref=e256] [cursor=pointer]
+                - button "Delete" [ref=e257] [cursor=pointer]
+            - generic [ref=e258]:
+              - generic [ref=e259]: "ESPM Property ID:"
+              - generic [ref=e260]: "88762425"
+              - button "Edit" [ref=e261] [cursor=pointer]
+          - separator [ref=e262]
+          - generic [ref=e263]:
+            - generic [ref=e264]:
+              - paragraph [ref=e265]: ENERGY STAR Score
+              - paragraph [ref=e266]: "45"
+              - paragraph [ref=e267]: "Target: 71 (-26 below)"
+            - generic [ref=e268]:
+              - paragraph [ref=e269]: Status
+              - paragraph [ref=e270]:
+                - generic [ref=e271]: Non-Compliant
+              - paragraph [ref=e273]: Since Mar 6, 2026
+            - generic [ref=e274]:
+              - paragraph [ref=e275]: Penalty Exposure
+              - paragraph [ref=e276]: $827,606
+              - paragraph [ref=e277]: "Max: $2,260,000"
+          - separator [ref=e278]
+          - generic [ref=e279]:
+            - button "Energy" [ref=e280] [cursor=pointer]
+            - button "Benchmarking" [active] [ref=e281] [cursor=pointer]
+            - button "BEPS" [ref=e282] [cursor=pointer]
+            - button "Retrofit" [ref=e283] [cursor=pointer]
+            - button "Financing" [ref=e284] [cursor=pointer]
+            - button "Operations" [ref=e285] [cursor=pointer]
+            - button "Provenance" [ref=e286] [cursor=pointer]
+            - button "Compliance" [ref=e287] [cursor=pointer]
+            - button "Capital" [ref=e288] [cursor=pointer]
+            - button "Alerts" [ref=e289] [cursor=pointer]
+          - generic [ref=e715]:
+            - generic [ref=e716]:
+              - generic [ref=e717]:
+                - generic [ref=e718]:
+                  - heading "Portfolio Manager Sync" [level=3] [ref=e719]
+                  - paragraph [ref=e720]: Refresh PM property, meter, consumption, and metrics data, then rerun benchmarking autopilot.
+                - generic [ref=e722]:
+                  - spinbutton [ref=e723]: "2025"
+                  - button "Sync PM" [ref=e724] [cursor=pointer]
+                  - button "Evaluate Readiness" [ref=e725] [cursor=pointer]
+              - generic [ref=e726]:
+                - generic [ref=e727]:
+                  - paragraph [ref=e728]: Sync Status
+                  - paragraph [ref=e729]: NOT_STARTED
+                - generic [ref=e730]:
+                  - paragraph [ref=e731]: Last Attempt
+                  - paragraph [ref=e732]: —
+                - generic [ref=e733]:
+                  - paragraph [ref=e734]: Last Success
+                  - paragraph [ref=e735]: —
+                - generic [ref=e736]:
+                  - paragraph [ref=e737]: QA Status
+                  - paragraph [ref=e738]: NOT_AVAILABLE
+            - generic [ref=e739]:
+              - generic [ref=e740]:
+                - generic [ref=e742]:
+                  - heading "QA Findings" [level=3] [ref=e743]
+                  - paragraph [ref=e744]: Deterministic PM sync QA checks for linkage, sharing, coverage, and overlap.
+                - paragraph [ref=e746]: No QA findings are available for this building yet.
+              - generic [ref=e747]:
+                - generic [ref=e749]:
+                  - heading "Readiness" [level=3] [ref=e750]
+                  - paragraph [ref=e751]: Canonical annual benchmarking submission state for the selected reporting year.
+                - paragraph [ref=e753]: No benchmark submission exists yet for the selected reporting year.
+            - generic [ref=e754]:
+              - generic [ref=e756]:
+                - heading "Benchmark Submissions" [level=3] [ref=e757]
+                - paragraph [ref=e758]: Recent governed annual benchmarking submissions for this building.
+              - paragraph [ref=e760]: No benchmark submissions exist for this building yet.
+  - generic [ref=e686]: "0"

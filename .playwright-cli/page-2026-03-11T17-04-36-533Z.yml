@@ -1,0 +1,172 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e52]
+  - generic [ref=e53]:
+    - complementary [ref=e54]:
+      - link "Quoin" [ref=e56] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e57]:
+        - link "Dashboard" [ref=e58] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e59]
+          - text: Dashboard
+        - link "Buildings" [ref=e64] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e65]
+          - text: Buildings
+        - link "Reports" [ref=e69] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e70]
+          - text: Reports
+        - link "Settings" [ref=e73] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e74]
+          - text: Settings
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - button "Open organization switcher" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "JBG's logo" [ref=e84]
+            - generic "JBG" [ref=e87]
+          - img [ref=e88]
+        - button "Open user menu" [ref=e91] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e94]
+      - main [ref=e96]:
+        - generic [ref=e248]:
+          - generic [ref=e249]:
+            - generic [ref=e250]:
+              - generic [ref=e251]:
+                - heading "ICC" [level=1] [ref=e252]
+                - paragraph [ref=e253]: 1472-1498 37th St NW, Washington, DC 20057
+                - paragraph [ref=e254]: Office | 226,000 SF | Built 1982
+              - generic [ref=e255]:
+                - button "Upload Data" [ref=e256] [cursor=pointer]
+                - button "Delete" [ref=e257] [cursor=pointer]
+            - generic [ref=e258]:
+              - generic [ref=e259]: "ESPM Property ID:"
+              - generic [ref=e260]: "88762425"
+              - button "Edit" [ref=e261] [cursor=pointer]
+          - separator [ref=e262]
+          - generic [ref=e263]:
+            - generic [ref=e264]:
+              - paragraph [ref=e265]: ENERGY STAR Score
+              - paragraph [ref=e266]: "45"
+              - paragraph [ref=e267]: "Target: 71 (-26 below)"
+            - generic [ref=e268]:
+              - paragraph [ref=e269]: Status
+              - paragraph [ref=e270]:
+                - generic [ref=e271]: Non-Compliant
+              - paragraph [ref=e273]: Since Mar 6, 2026
+            - generic [ref=e274]:
+              - paragraph [ref=e275]: Penalty Exposure
+              - paragraph [ref=e276]: $827,606
+              - paragraph [ref=e277]: "Max: $2,260,000"
+          - separator [ref=e278]
+          - generic [ref=e279]:
+            - button "Energy" [ref=e280] [cursor=pointer]
+            - button "Benchmarking" [ref=e281] [cursor=pointer]
+            - button "BEPS" [ref=e282] [cursor=pointer]
+            - button "Retrofit" [ref=e283] [cursor=pointer]
+            - button "Financing" [ref=e284] [cursor=pointer]
+            - button "Operations" [ref=e285] [cursor=pointer]
+            - button "Provenance" [ref=e286] [cursor=pointer]
+            - button "Compliance" [ref=e287] [cursor=pointer]
+            - button "Capital" [ref=e288] [cursor=pointer]
+            - button "Alerts" [ref=e289] [cursor=pointer]
+          - generic [ref=e938]:
+            - generic [ref=e939]:
+              - generic [ref=e940]:
+                - generic [ref=e941]:
+                  - heading "BEPS Evaluation" [level=3] [ref=e942]
+                  - paragraph [ref=e943]: Evaluate BEPS, refresh canonical metrics, and manage governed filing packets.
+                - generic [ref=e945]:
+                  - combobox [ref=e946]:
+                    - option "CYCLE_1"
+                    - option "CYCLE_2" [selected]
+                    - option "CYCLE_3"
+                  - button "Refresh Metrics" [ref=e947] [cursor=pointer]
+                  - button "Evaluate BEPS" [ref=e948] [cursor=pointer]
+              - generic [ref=e949]:
+                - generic [ref=e950]:
+                  - paragraph [ref=e951]: Cycle
+                  - paragraph [ref=e952]: CYCLE_2
+                - generic [ref=e953]:
+                  - paragraph [ref=e954]: Filing Year
+                  - paragraph [ref=e955]: "2028"
+                - generic [ref=e956]:
+                  - paragraph [ref=e957]: Ownership
+                  - paragraph [ref=e958]: PRIVATE
+                - generic [ref=e959]:
+                  - paragraph [ref=e960]: Score Eligible
+                  - paragraph [ref=e961]: —
+            - generic [ref=e962]:
+              - generic [ref=e963]:
+                - generic [ref=e965]:
+                  - heading "Canonical Metric Input" [level=3] [ref=e966]
+                  - paragraph [ref=e967]: Current persisted BEPS metric inputs and manual admin upsert surface.
+                - generic [ref=e968]:
+                  - generic [ref=e969]:
+                    - generic [ref=e970]: Baseline adjusted site EUI
+                    - textbox "Baseline adjusted site EUI" [ref=e971]
+                  - generic [ref=e972]:
+                    - generic [ref=e973]: Evaluation adjusted site EUI
+                    - textbox "Evaluation adjusted site EUI" [ref=e974]: "146.1573982300885"
+                  - generic [ref=e975]:
+                    - generic [ref=e976]: Baseline WN source EUI
+                    - textbox "Baseline WN source EUI" [ref=e977]
+                  - generic [ref=e978]:
+                    - generic [ref=e979]: Evaluation WN source EUI
+                    - textbox "Evaluation WN source EUI" [ref=e980]
+                  - generic [ref=e981]:
+                    - generic [ref=e982]: Baseline ENERGY STAR score
+                    - textbox "Baseline ENERGY STAR score" [ref=e983]
+                  - generic [ref=e984]:
+                    - generic [ref=e985]: Evaluation ENERGY STAR score
+                    - textbox "Evaluation ENERGY STAR score" [ref=e986]: "45"
+                - button "Save Canonical Metrics" [ref=e988] [cursor=pointer]
+              - generic [ref=e989]:
+                - generic [ref=e991]:
+                  - heading "Latest BEPS Filing" [level=3] [ref=e992]
+                  - paragraph [ref=e993]: Current governed BEPS run, filing status, and deterministic packet state.
+                - paragraph [ref=e995]: No governed BEPS filing exists for this cycle yet.
+            - generic [ref=e996]:
+              - generic [ref=e997]:
+                - generic [ref=e999]:
+                  - heading "Prescriptive Progress" [level=3] [ref=e1000]
+                  - paragraph [ref=e1001]: Manual admin surface for canonical prescriptive milestones.
+                - generic [ref=e1002]:
+                  - generic [ref=e1003]:
+                    - generic [ref=e1004]: Name
+                    - textbox "Name" [ref=e1005]
+                  - generic [ref=e1006]:
+                    - generic [ref=e1007]: Points possible
+                    - textbox "Points possible" [ref=e1008]
+                  - generic [ref=e1009]:
+                    - generic [ref=e1010]: Points earned
+                    - textbox "Points earned" [ref=e1011]
+                - button "Save Prescriptive Item" [ref=e1013] [cursor=pointer]
+                - paragraph [ref=e1016]: No canonical prescriptive items exist yet.
+              - generic [ref=e1017]:
+                - generic [ref=e1019]:
+                  - heading "Alternative Compliance Agreement" [level=3] [ref=e1020]
+                  - paragraph [ref=e1021]: Canonical ACP/agreement record for the selected cycle.
+                - generic [ref=e1022]:
+                  - generic [ref=e1023]:
+                    - generic [ref=e1024]: Agreement identifier
+                    - textbox "Agreement identifier" [ref=e1025]
+                  - generic [ref=e1026]:
+                    - generic [ref=e1027]: Multiplier
+                    - textbox "Multiplier" [ref=e1028]
+                - button "Save ACP Agreement" [ref=e1030] [cursor=pointer]
+                - paragraph [ref=e1033]: No canonical alternative compliance agreement exists yet.
+            - generic [ref=e1034]:
+              - generic [ref=e1036]:
+                - heading "Recent Outcomes" [level=3] [ref=e1037]
+                - paragraph [ref=e1038]: Recent governed BEPS filing outcomes for this building.
+              - generic [ref=e1040]:
+                - generic [ref=e1041]:
+                  - generic [ref=e1042]: CYCLE_1 • GENERATED
+                  - generic [ref=e1043]: Year 2026
+                - generic [ref=e1044]: Evidence artifacts 0 • Created Mar 11, 2026, 01:03 PM
+                - group [ref=e1045]:
+                  - generic "Payload" [ref=e1046] [cursor=pointer]
+  - generic [ref=e686]: "0"

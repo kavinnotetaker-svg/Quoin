@@ -1,0 +1,32 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]: Quoin
+      - generic [ref=e5]:
+        - link "Sign in" [ref=e6] [cursor=pointer]:
+          - /url: /sign-in
+        - link "Get started" [ref=e7] [cursor=pointer]:
+          - /url: /sign-up
+    - main [ref=e8]:
+      - heading "DC BEPS compliance, automated." [level=1] [ref=e9]:
+        - text: DC BEPS compliance,
+        - text: automated.
+      - paragraph [ref=e10]: Quoin ingests your energy data, calculates compliance status, and structures financing — so you hit the December 2026 deadline without hiring a consultant.
+      - generic [ref=e11]:
+        - link "Start free" [ref=e12] [cursor=pointer]:
+          - /url: /sign-up
+        - link "Sign in" [ref=e13] [cursor=pointer]:
+          - /url: /sign-in
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - paragraph [ref=e16]: Ingest
+          - paragraph [ref=e17]: CSV upload, ENERGY STAR sync, or Green Button — your energy data, normalized automatically.
+        - generic [ref=e18]:
+          - paragraph [ref=e19]: Comply
+          - paragraph [ref=e20]: Real-time BEPS score, penalty exposure, and compliance pathway recommendations.
+        - generic [ref=e21]:
+          - paragraph [ref=e22]: Finance
+          - paragraph [ref=e23]: CLEER, C-PACE, AHRA, and IRA programs — structured into a capital stack that works.
+    - contentinfo [ref=e24]:
+      - paragraph [ref=e25]: Quoin · Washington, DC
+  - alert [ref=e26]

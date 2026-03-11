@@ -1,0 +1,128 @@
+- generic [ref=e1]:
+  - alert [ref=e52]
+  - generic [ref=e53]:
+    - complementary [ref=e54]:
+      - link [ref=e952] [cursor=pointer]:
+        - /url: /dashboard
+        - text: Quoin
+      - navigation [ref=e57]:
+        - link [ref=e953] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e59]
+          - text: Dashboard
+        - link [ref=e954] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e65]
+          - text: Buildings
+        - link [ref=e955] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e70]
+          - text: Reports
+        - link [ref=e956] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e74]
+          - text: Settings
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - button "Close organization switcher" [expanded] [active] [ref=e957] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "JBG's logo" [ref=e84]
+            - generic "JBG" [ref=e87]
+          - img [ref=e88]
+        - button [ref=e959] [cursor=pointer]:
+          - img [ref=e960]
+      - main [ref=e96]:
+        - generic [ref=e230]:
+          - generic [ref=e231]:
+            - generic [ref=e232]:
+              - generic [ref=e233]:
+                - heading [level=1] [ref=e961]: John R. Thompson Jr. Intercollegiate Athletic Center
+                - paragraph [ref=e235]: 1360 West Rd, Washington, DC 20057
+                - paragraph [ref=e236]: Office | 144,000 SF | Built 2014
+              - generic [ref=e237]:
+                - button [ref=e962] [cursor=pointer]: Upload Data
+                - button [ref=e963] [cursor=pointer]: Delete
+            - generic [ref=e240]:
+              - generic [ref=e241]: "ESPM Property ID:"
+              - generic [ref=e242]: "88776124"
+              - button [ref=e964] [cursor=pointer]: Edit
+          - separator [ref=e244]
+          - generic [ref=e245]:
+            - generic [ref=e246]:
+              - paragraph [ref=e247]: ENERGY STAR Score
+              - paragraph [ref=e248]: "52"
+              - paragraph [ref=e249]: "Target: 71 (-19 below)"
+            - generic [ref=e250]:
+              - paragraph [ref=e251]: Status
+              - paragraph [ref=e252]:
+                - generic [ref=e253]: Non-Compliant
+              - paragraph [ref=e255]: Since Mar 6, 2026
+            - generic [ref=e256]:
+              - paragraph [ref=e257]: Penalty Exposure
+              - paragraph [ref=e258]: $385,352
+              - paragraph [ref=e259]: "Max: $1,440,000"
+          - separator [ref=e260]
+          - generic [ref=e261]:
+            - button [ref=e965] [cursor=pointer]: Energy
+            - button [ref=e966] [cursor=pointer]: Benchmarking
+            - button [ref=e967] [cursor=pointer]: BEPS
+            - button [ref=e968] [cursor=pointer]: Retrofit
+            - button [ref=e969] [cursor=pointer]: Financing
+            - button [ref=e970] [cursor=pointer]: Operations
+            - button [ref=e971] [cursor=pointer]: Provenance
+            - button [ref=e972] [cursor=pointer]: Compliance
+            - button [ref=e973] [cursor=pointer]: Capital
+            - button [ref=e974] [cursor=pointer]: Alerts
+          - generic [ref=e926]:
+            - generic [ref=e927]:
+              - generic [ref=e928]:
+                - paragraph [ref=e929]: Active Alerts
+                - paragraph [ref=e930]: "0"
+              - generic [ref=e931]:
+                - paragraph [ref=e932]: Critical
+                - paragraph [ref=e933]: "0"
+              - generic [ref=e934]:
+                - paragraph [ref=e935]: High
+                - paragraph [ref=e936]: "0"
+              - generic [ref=e937]:
+                - paragraph [ref=e938]: Medium
+                - paragraph [ref=e939]: "0"
+              - generic [ref=e940]:
+                - paragraph [ref=e941]: Low
+                - paragraph [ref=e942]: "0"
+            - generic [ref=e943]:
+              - button [ref=e975] [cursor=pointer]: All
+              - button [ref=e976] [cursor=pointer]: Active
+              - button [ref=e977] [cursor=pointer]: Acknowledged
+              - button [ref=e978] [cursor=pointer]: Resolved
+            - generic [ref=e948]:
+              - img [ref=e949]
+              - paragraph [ref=e951]: No drift alerts detected. Your building is performing within expected ranges.
+  - dialog "JBG is active" [ref=e980]:
+    - menu [ref=e982]:
+      - generic [ref=e983]:
+        - generic [ref=e984]:
+          - img "JBG's logo" [ref=e987]
+          - generic [ref=e989]:
+            - generic "JBG" [ref=e990]
+            - generic [ref=e991]: Admin
+        - menu [ref=e992]:
+          - menuitem "Manage" [ref=e993] [cursor=pointer]:
+            - img [ref=e995]
+            - text: Manage
+      - group "List of all accounts" [ref=e997]:
+        - menuitem "Kavin S's logo Personal account" [ref=e998] [cursor=pointer]:
+          - generic [ref=e999]:
+            - img "Kavin S's logo" [ref=e1002]
+            - generic [ref=e1006]: Personal account
+      - menuitem "Create organization" [ref=e1007] [cursor=pointer]:
+        - img [ref=e1009]
+        - text: Create organization
+    - generic [ref=e1014]:
+      - generic [ref=e1016]:
+        - paragraph [ref=e1017]: Secured by
+        - link "Clerk logo" [ref=e1018] [cursor=pointer]:
+          - /url: https://go.clerk.com/components
+          - img [ref=e1019]
+      - paragraph [ref=e1024]: Development mode
+  - generic [ref=e710]: CPACE

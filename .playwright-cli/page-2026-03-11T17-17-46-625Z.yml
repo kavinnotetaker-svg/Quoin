@@ -1,0 +1,71 @@
+- generic [ref=e1]:
+  - alert [ref=e52]
+  - generic [ref=e53]:
+    - complementary [ref=e54]:
+      - link "Quoin" [ref=e56] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e57]:
+        - link "Dashboard" [ref=e58] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e59]
+          - text: Dashboard
+        - link "Buildings" [active] [ref=e64] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e65]
+          - text: Buildings
+        - link "Reports" [ref=e69] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e70]
+          - text: Reports
+        - link "Settings" [ref=e73] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e74]
+          - text: Settings
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - button "Open organization switcher" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "JBG's logo" [ref=e84]
+            - generic "JBG" [ref=e87]
+          - img [ref=e88]
+        - button "Open user menu" [ref=e91] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e94]
+      - main [ref=e96]:
+        - generic [ref=e192]:
+          - generic [ref=e193]:
+            - heading "Buildings" [level=1] [ref=e195]
+            - link "Add building" [ref=e196] [cursor=pointer]:
+              - /url: /onboarding
+              - img [ref=e197]
+              - text: Add building
+          - textbox "Search buildings..." [ref=e198]
+          - table [ref=e200]:
+            - rowgroup [ref=e201]:
+              - row "Name Type Score Status Penalty Updated" [ref=e202]:
+                - columnheader "Name" [ref=e203]
+                - columnheader "Type" [ref=e204]
+                - columnheader "Score" [ref=e205]
+                - columnheader "Status" [ref=e206]
+                - columnheader "Penalty" [ref=e207]
+                - columnheader "Updated" [ref=e208]
+            - rowgroup [ref=e209]:
+              - row "ICC Office 45 Pending $2,260,000 Today" [ref=e210]:
+                - cell "ICC" [ref=e211]:
+                  - link "ICC" [ref=e212] [cursor=pointer]:
+                    - /url: /buildings/cmmf8l602000da4hsalaty4pe
+                - cell "Office" [ref=e213]
+                - cell "45" [ref=e214]
+                - cell "Pending" [ref=e215]:
+                  - generic [ref=e216]: Pending
+                - cell "$2,260,000" [ref=e218]
+                - cell "Today" [ref=e219]
+              - row "John R. Thompson Jr. Intercollegiate Athletic Center Office 52 Non-Compliant $385,352 4d ago" [ref=e220]:
+                - cell "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e221]:
+                  - link "John R. Thompson Jr. Intercollegiate Athletic Center" [ref=e222] [cursor=pointer]:
+                    - /url: /buildings/cmmfast4n001fa4hsoq8btz8x
+                - cell "Office" [ref=e223]
+                - cell "52" [ref=e224]
+                - cell "Non-Compliant" [ref=e225]:
+                  - generic [ref=e226]: Non-Compliant
+                - cell "$385,352" [ref=e228]
+                - cell "4d ago" [ref=e229]

@@ -1,0 +1,130 @@
+- generic [ref=e1]:
+  - alert [ref=e52]
+  - generic [ref=e53]:
+    - complementary [ref=e54]:
+      - link "Quoin" [ref=e56] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e57]:
+        - link "Dashboard" [ref=e58] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e59]
+          - text: Dashboard
+        - link "Buildings" [ref=e64] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e65]
+          - text: Buildings
+        - link "Reports" [ref=e69] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e70]
+          - text: Reports
+        - link "Settings" [ref=e73] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e74]
+          - text: Settings
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - button "Open organization switcher" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "JBG's logo" [ref=e84]
+            - generic "JBG" [ref=e87]
+          - img [ref=e88]
+        - button "Open user menu" [ref=e91] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e94]
+      - main [ref=e96]:
+        - generic [ref=e230]:
+          - generic [ref=e231]:
+            - generic [ref=e232]:
+              - generic [ref=e233]:
+                - heading "John R. Thompson Jr. Intercollegiate Athletic Center" [level=1] [ref=e234]
+                - paragraph [ref=e235]: 1360 West Rd, Washington, DC 20057
+                - paragraph [ref=e236]: Office | 144,000 SF | Built 2014
+              - generic [ref=e237]:
+                - button "Upload Data" [ref=e238] [cursor=pointer]
+                - button "Delete" [ref=e239] [cursor=pointer]
+            - generic [ref=e240]:
+              - generic [ref=e241]: "ESPM Property ID:"
+              - generic [ref=e242]: "88776124"
+              - button "Edit" [ref=e243] [cursor=pointer]
+          - separator [ref=e244]
+          - generic [ref=e245]:
+            - generic [ref=e246]:
+              - paragraph [ref=e247]: ENERGY STAR Score
+              - paragraph [ref=e248]: "52"
+              - paragraph [ref=e249]: "Target: 71 (-19 below)"
+            - generic [ref=e250]:
+              - paragraph [ref=e251]: Status
+              - paragraph [ref=e252]:
+                - generic [ref=e253]: Non-Compliant
+              - paragraph [ref=e255]: Since Mar 6, 2026
+            - generic [ref=e256]:
+              - paragraph [ref=e257]: Penalty Exposure
+              - paragraph [ref=e258]: $385,352
+              - paragraph [ref=e259]: "Max: $1,440,000"
+          - separator [ref=e260]
+          - generic [ref=e261]:
+            - button "Energy" [ref=e262] [cursor=pointer]
+            - button "Benchmarking" [ref=e263] [cursor=pointer]
+            - button "BEPS" [ref=e264] [cursor=pointer]
+            - button "Retrofit" [ref=e265] [cursor=pointer]
+            - button "Financing" [ref=e266] [cursor=pointer]
+            - button "Operations" [ref=e267] [cursor=pointer]
+            - button "Provenance" [ref=e268] [cursor=pointer]
+            - button "Compliance" [active] [ref=e269] [cursor=pointer]
+            - button "Capital" [ref=e270] [cursor=pointer]
+            - button "Alerts" [ref=e271] [cursor=pointer]
+          - generic [ref=e711]:
+            - generic [ref=e712]:
+              - generic [ref=e713]:
+                - 'heading "Pathway: PERFORMANCE" [level=3] [ref=e714]'
+                - generic [ref=e715]:
+                  - generic [ref=e717]:
+                    - generic [ref=e718]: Current Adjusted Site EUI
+                    - generic [ref=e719]: N/A
+                  - generic [ref=e720]:
+                    - generic [ref=e721]:
+                      - generic [ref=e722]: Target Reduction (20%)
+                      - generic [ref=e723]: Required
+                    - paragraph [ref=e724]: This building scored 52, falling below the 55 threshold, so the 1-100 score gap is ignored.
+              - generic [ref=e725]:
+                - heading "Penalty Risk Exposure" [level=3] [ref=e726]
+                - generic [ref=e727]:
+                  - generic [ref=e728]:
+                    - generic [ref=e730]: Reduced Penalty
+                    - generic [ref=e732]: $385,352
+                  - generic [ref=e735]:
+                    - generic [ref=e736]: $0
+                    - generic [ref=e737]: "Max: $0"
+            - generic [ref=e738]:
+              - heading "Compliance History" [level=3] [ref=e739]
+              - generic [ref=e742]:
+                - generic [ref=e745]:
+                  - text: Mar 6, 2026—
+                  - generic [ref=e746]: "Score: 52"
+                  - text: "|"
+                  - generic [ref=e747]: Non-Compliant
+                  - text: "|Pipeline"
+                - generic [ref=e751]:
+                  - text: Mar 6, 2026—
+                  - generic [ref=e752]: "Score: 52"
+                  - text: "|"
+                  - generic [ref=e753]: Non-Compliant
+                  - text: "|Pipeline"
+                - generic [ref=e757]:
+                  - text: Mar 6, 2026—
+                  - generic [ref=e758]: "Score: 52"
+                  - text: "|"
+                  - generic [ref=e759]: Non-Compliant
+                  - text: "|Pipeline"
+                - generic [ref=e763]:
+                  - text: Mar 6, 2026—
+                  - generic [ref=e764]: "Score: —"
+                  - text: "|"
+                  - generic [ref=e765]: Pending
+                  - text: "|Pipeline"
+                - generic [ref=e769]:
+                  - text: Mar 6, 2026—
+                  - generic [ref=e770]: "Score: 52"
+                  - text: "|"
+                  - generic [ref=e771]: Non-Compliant
+                  - text: "|Pipeline"
+  - generic [ref=e710]: "0"

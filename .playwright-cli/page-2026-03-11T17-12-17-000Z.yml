@@ -1,0 +1,182 @@
+- generic [ref=e1]:
+  - alert [ref=e52]
+  - generic [ref=e53]:
+    - complementary [ref=e54]:
+      - link "Quoin" [ref=e56] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=e57]:
+        - link "Dashboard" [ref=e58] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e59]
+          - text: Dashboard
+        - link "Buildings" [ref=e64] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e65]
+          - text: Buildings
+        - link "Reports" [active] [ref=e69] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e70]
+          - text: Reports
+        - link "Settings" [ref=e73] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e74]
+          - text: Settings
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - button "Open organization switcher" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "JBG's logo" [ref=e84]
+            - generic "JBG" [ref=e87]
+          - img [ref=e88]
+        - button "Open user menu" [ref=e91] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e94]
+      - main [ref=e96]:
+        - generic [ref=e1312]:
+          - heading "Reports" [level=1] [ref=e1314]
+          - generic [ref=e1315]:
+            - generic [ref=e1317]:
+              - heading "Report Scope" [level=3] [ref=e1318]
+              - paragraph [ref=e1319]: Choose a building to inspect the generated compliance and exemption report data.
+            - generic [ref=e1320]:
+              - generic [ref=e1321]:
+                - generic [ref=e1322]: Building
+                - combobox "Building" [ref=e1323]:
+                  - option "Select a building"
+                  - option "ICC" [selected]
+                  - option "John R. Thompson Jr. Intercollegiate Athletic Center"
+              - generic [ref=e1324]:
+                - generic [ref=e1325]: Reporting year
+                - spinbutton "Reporting year" [ref=e1326]: "2025"
+          - generic [ref=e1327]:
+            - generic [ref=e1328]:
+              - generic [ref=e1329]:
+                - heading "Compliance Report" [level=3] [ref=e1330]
+                - paragraph [ref=e1331]: Current generated report payload from the report router.
+              - button "Download JSON" [ref=e1333] [cursor=pointer]
+            - generic [ref=e1334]:
+              - generic [ref=e1335]:
+                - paragraph [ref=e1336]: Compliance Status
+                - paragraph [ref=e1337]: PENDING_DATA
+              - generic [ref=e1338]:
+                - paragraph [ref=e1339]: ENERGY STAR Score
+                - paragraph [ref=e1340]: "45"
+              - generic [ref=e1341]:
+                - paragraph [ref=e1342]: Site EUI
+                - paragraph [ref=e1343]: "165.54238938053098"
+              - generic [ref=e1344]:
+                - paragraph [ref=e1345]: Estimated Penalty
+                - paragraph [ref=e1346]: $2,260,000
+            - generic [ref=e1347]:
+              - generic [ref=e1348]:
+                - heading "Energy History" [level=4] [ref=e1349]
+                - generic [ref=e1350]:
+                  - generic [ref=e1351]:
+                    - generic [ref=e1352]: ELECTRIC
+                    - generic [ref=e1353]: 12/31/2024 - 1/30/2025
+                    - generic [ref=e1354]: 955,360 kBtu • CSV_UPLOAD
+                  - generic [ref=e1355]:
+                    - generic [ref=e1356]: ELECTRIC
+                    - generic [ref=e1357]: 12/31/2024 - 1/30/2025
+                    - generic [ref=e1358]: 955,360 kBtu • CSV_UPLOAD
+                  - generic [ref=e1359]:
+                    - generic [ref=e1360]: ELECTRIC
+                    - generic [ref=e1361]: 12/31/2024 - 1/30/2025
+                    - generic [ref=e1362]: 494,740 kBtu • CSV_UPLOAD
+                  - generic [ref=e1363]:
+                    - generic [ref=e1364]: ELECTRIC
+                    - generic [ref=e1365]: 12/31/2024 - 1/30/2025
+                    - generic [ref=e1366]: 955,360 kBtu • CSV_UPLOAD
+                  - generic [ref=e1367]:
+                    - generic [ref=e1368]: ELECTRIC
+                    - generic [ref=e1369]: 1/31/2025 - 2/27/2025
+                    - generic [ref=e1370]: 887,120 kBtu • CSV_UPLOAD
+                  - generic [ref=e1371]:
+                    - generic [ref=e1372]: ELECTRIC
+                    - generic [ref=e1373]: 1/31/2025 - 2/27/2025
+                    - generic [ref=e1374]: 887,120 kBtu • CSV_UPLOAD
+                  - generic [ref=e1375]:
+                    - generic [ref=e1376]: ELECTRIC
+                    - generic [ref=e1377]: 1/31/2025 - 2/27/2025
+                    - generic [ref=e1378]: 887,120 kBtu • CSV_UPLOAD
+                  - generic [ref=e1379]:
+                    - generic [ref=e1380]: ELECTRIC
+                    - generic [ref=e1381]: 1/31/2025 - 2/27/2025
+                    - generic [ref=e1382]: 460,620 kBtu • CSV_UPLOAD
+              - generic [ref=e1383]:
+                - heading "Recent Pipeline Runs" [level=4] [ref=e1384]
+                - generic [ref=e1385]:
+                  - generic [ref=e1386]:
+                    - generic [ref=e1387]: DATA_INGESTION
+                    - generic [ref=e1388]: FAILED
+                  - generic [ref=e1389]:
+                    - generic [ref=e1390]: DATA_INGESTION
+                    - generic [ref=e1391]: FAILED
+                  - generic [ref=e1392]:
+                    - generic [ref=e1393]: DATA_INGESTION
+                    - generic [ref=e1394]: FAILED
+                  - generic [ref=e1395]:
+                    - generic [ref=e1396]: DATA_INGESTION
+                    - generic [ref=e1397]: FAILED
+                  - generic [ref=e1398]:
+                    - generic [ref=e1399]: DATA_INGESTION
+                    - generic [ref=e1400]: FAILED
+                  - generic [ref=e1401]:
+                    - generic [ref=e1402]: DATA_INGESTION
+                    - generic [ref=e1403]: FAILED
+                  - generic [ref=e1404]:
+                    - generic [ref=e1405]: DATA_INGESTION
+                    - generic [ref=e1406]: FAILED
+                  - generic [ref=e1407]:
+                    - generic [ref=e1408]: DATA_INGESTION
+                    - generic [ref=e1409]: FAILED
+                  - generic [ref=e1410]:
+                    - generic [ref=e1411]: DATA_INGESTION
+                    - generic [ref=e1412]: COMPLETED
+                  - generic [ref=e1413]:
+                    - generic [ref=e1414]: DATA_INGESTION
+                    - generic [ref=e1415]: COMPLETED
+          - generic [ref=e1416]:
+            - generic [ref=e1417]:
+              - generic [ref=e1418]:
+                - heading "Exemption Report" [level=3] [ref=e1419]
+                - paragraph [ref=e1420]: Current exemption filing package payload generated from the deterministic screener.
+              - button "Download JSON" [ref=e1422] [cursor=pointer]
+            - generic [ref=e1423]:
+              - generic [ref=e1424]:
+                - paragraph [ref=e1425]: Eligible
+                - paragraph [ref=e1426]: "No"
+              - generic [ref=e1427]:
+                - paragraph [ref=e1428]: Qualified Exemptions
+                - paragraph [ref=e1429]: "0"
+              - generic [ref=e1430]:
+                - paragraph [ref=e1431]: Penalty Savings If Exempt
+                - paragraph [ref=e1432]: $2,260,000
+              - generic [ref=e1433]:
+                - paragraph [ref=e1434]: DOEE Deadline
+                - paragraph [ref=e1435]: 2026-12-31
+            - generic [ref=e1436]:
+              - generic [ref=e1437]:
+                - heading "Checklist" [level=4] [ref=e1438]
+                - generic [ref=e1439]:
+                  - generic [ref=e1440]:
+                    - generic [ref=e1441]: ENERGY STAR Portfolio Manager property linked
+                    - generic [ref=e1442]: READY
+                    - generic [ref=e1443]: Property has compliance data on file.
+                  - generic [ref=e1444]:
+                    - generic [ref=e1445]: 12+ months of energy consumption data
+                    - generic [ref=e1446]: READY
+                    - generic [ref=e1447]: Sufficient energy history available for DOEE submission.
+                  - generic [ref=e1448]:
+                    - generic [ref=e1449]: Occupancy exemption documentation
+                    - generic [ref=e1450]: NOT_APPLICABLE
+                    - generic [ref=e1451]: Building does not qualify for occupancy exemption (occupancy >= 50%).
+                  - generic [ref=e1452]:
+                    - generic [ref=e1453]: Financial distress documentation
+                    - generic [ref=e1454]: NOT_APPLICABLE
+                    - generic [ref=e1455]: No financial distress indicators flagged.
+              - generic [ref=e1456]:
+                - heading "Benchmark Submissions" [level=4] [ref=e1457]
+                - generic [ref=e1459]:
+                  - generic [ref=e1460]: Reporting year 2025
+                  - generic [ref=e1461]: BLOCKED
+  - generic [ref=e686]: "0"

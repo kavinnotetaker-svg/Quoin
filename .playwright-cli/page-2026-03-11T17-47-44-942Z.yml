@@ -1,0 +1,126 @@
+- generic [ref=e1]:
+  - alert [ref=e3]
+  - generic [ref=e4]:
+    - button [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - complementary [ref=e7]:
+      - generic [ref=e8]:
+        - link "Quoin" [ref=e9] [cursor=pointer]:
+          - /url: /dashboard
+        - button [ref=e10] [cursor=pointer]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e16]
+          - text: Dashboard
+        - link "Buildings" [ref=e21] [cursor=pointer]:
+          - /url: /buildings
+          - img [ref=e22]
+          - text: Buildings
+        - link "Reports" [ref=e26] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e27]
+          - text: Reports
+        - link "Settings" [ref=e30] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e31]
+          - text: Settings
+    - generic [ref=e34]:
+      - banner [ref=e35]:
+        - button "Open organization switcher" [ref=e37] [cursor=pointer]:
+          - generic [ref=e38]:
+            - img "JBG's logo" [ref=e41]
+            - generic "JBG" [ref=e44]
+          - img [ref=e45]
+        - button "Open user menu" [ref=e48] [cursor=pointer]:
+          - img "Kavin S's logo" [ref=e51]
+      - main [ref=e53]:
+        - generic [ref=e230]:
+          - generic [ref=e231]:
+            - generic [ref=e232]:
+              - generic [ref=e233]:
+                - heading "ICC" [level=1] [ref=e234]
+                - paragraph [ref=e235]: 1472-1498 37th St NW, Washington, DC 20057
+                - paragraph [ref=e236]: Office | 226,000 SF | Built 1982
+              - generic [ref=e237]:
+                - button "Upload Data" [ref=e238] [cursor=pointer]
+                - button "Delete" [ref=e239] [cursor=pointer]
+            - generic [ref=e240]:
+              - generic [ref=e241]: "ESPM Property ID:"
+              - generic [ref=e242]: "88762425"
+              - button "Edit" [ref=e243] [cursor=pointer]
+          - separator [ref=e244]
+          - generic [ref=e245]:
+            - generic [ref=e246]:
+              - paragraph [ref=e247]: ENERGY STAR Score
+              - paragraph [ref=e248]: "45"
+              - paragraph [ref=e249]: "Target: 71 (-26 below)"
+            - generic [ref=e250]:
+              - paragraph [ref=e251]: Status
+              - paragraph [ref=e252]:
+                - generic [ref=e253]: Pending
+              - paragraph [ref=e255]: Since Mar 11, 2026
+            - generic [ref=e256]:
+              - paragraph [ref=e257]: Penalty Exposure
+              - paragraph [ref=e258]: $2,712,000
+              - paragraph [ref=e259]: "Max: $2,260,000"
+          - separator [ref=e260]
+          - generic [ref=e261]:
+            - button "Energy" [ref=e262] [cursor=pointer]
+            - button "Benchmarking" [ref=e263] [cursor=pointer]
+            - button "BEPS" [ref=e264] [cursor=pointer]
+            - button "Retrofit" [ref=e265] [cursor=pointer]
+            - button "Financing" [active] [ref=e266] [cursor=pointer]
+            - button "Operations" [ref=e267] [cursor=pointer]
+            - button "Provenance" [ref=e268] [cursor=pointer]
+            - button "Compliance" [ref=e269] [cursor=pointer]
+            - button "Capital" [ref=e270] [cursor=pointer]
+            - button "Alerts" [ref=e271] [cursor=pointer]
+          - generic [ref=e706]:
+            - generic [ref=e707]:
+              - generic [ref=e709]:
+                - heading "Create Financing Case" [level=3] [ref=e710]
+                - paragraph [ref=e711]: Select one or more retrofit candidates to create a governed financing case.
+              - generic [ref=e712]:
+                - generic [ref=e713]: Case name
+                - textbox "Case name" [ref=e714]
+              - generic [ref=e716]:
+                - checkbox "Manual LED_LIGHTING_RETROFIT Capex $120,000 • Savings $15,000" [ref=e717]
+                - generic [ref=e718]:
+                  - generic [ref=e719]: Manual
+                  - generic [ref=e720]: LED_LIGHTING_RETROFIT
+                  - generic [ref=e721]: Capex $120,000 • Savings $15,000
+              - button "Create Financing Case" [disabled] [ref=e723]
+            - generic [ref=e724]:
+              - generic [ref=e725]:
+                - generic [ref=e727]:
+                  - heading "Financing Cases" [level=3] [ref=e728]
+                  - paragraph [ref=e729]: Canonical financing cases and linked retrofit bundles for this building.
+                - button "Manual SINGLE_CANDIDATE Capex $120,000 Savings $15,000 Avoided penalty $180,800 Compliance uplift 8.00%" [ref=e731] [cursor=pointer]:
+                  - generic [ref=e732]:
+                    - generic [ref=e733]: Manual
+                    - generic [ref=e734]: SINGLE_CANDIDATE
+                  - generic [ref=e735]:
+                    - generic [ref=e736]: Capex $120,000
+                    - generic [ref=e737]: Savings $15,000
+                    - generic [ref=e738]: Avoided penalty $180,800
+                    - generic [ref=e739]: Compliance uplift 8.00%
+              - generic [ref=e740]:
+                - generic [ref=e741]:
+                  - generic [ref=e742]:
+                    - heading "Financing Packet" [level=3] [ref=e743]
+                    - paragraph [ref=e744]: Generate, finalize, inspect, and export the deterministic financing packet for the selected case.
+                  - generic [ref=e745]:
+                    - button "Generate" [ref=e746] [cursor=pointer]
+                    - button "Finalize" [ref=e747] [cursor=pointer]
+                    - button "Export JSON" [ref=e748] [cursor=pointer]
+                - generic [ref=e749]:
+                  - generic [ref=e750]:
+                    - generic [ref=e751]: Packet v1 • STALE
+                    - generic [ref=e752]: 0ec30dd3c202d6608bf71b86d1da79d94302a84efe49a8d004c38b0820132c39
+                  - generic [ref=e753]:
+                    - generic [ref=e754]: Warnings
+                    - list [ref=e755]:
+                      - listitem [ref=e756]: One or more retrofit candidates do not have a linked support source artifact.
+  - generic [ref=e416]: "0"

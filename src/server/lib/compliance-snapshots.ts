@@ -3,26 +3,21 @@ export const LATEST_SNAPSHOT_ORDER = [
   { id: "desc" as const },
 ];
 
+type LatestComplianceSnapshotInput = {
+  buildingId: string;
+  organizationId?: string;
+  where?: Record<string, unknown>;
+  select?: Record<string, unknown>;
+  include?: Record<string, unknown>;
+};
+
 type ComplianceSnapshotLookupClient = {
-  complianceSnapshot: {
-    findFirst: (args: {
-      where: Record<string, unknown>;
-      orderBy: typeof LATEST_SNAPSHOT_ORDER;
-      select?: Record<string, unknown>;
-      include?: Record<string, unknown>;
-    }) => Promise<unknown>;
-  };
+  complianceSnapshot: any;
 };
 
 export async function getLatestComplianceSnapshot(
   db: ComplianceSnapshotLookupClient,
-  input: {
-    buildingId: string;
-    organizationId?: string;
-    where?: Record<string, unknown>;
-    select?: Record<string, unknown>;
-    include?: Record<string, unknown>;
-  },
+  input: LatestComplianceSnapshotInput,
 ) {
   return db.complianceSnapshot.findFirst({
     where: {
