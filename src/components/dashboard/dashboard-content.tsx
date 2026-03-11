@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { KPIRow } from "./kpi-row";
 import { BuildingTable } from "./building-table";
 import { BuildingMap } from "./building-map";
+import { PortfolioInsights } from "./portfolio-insights";
 
 const STATUS_FILTERS = [
   { label: "All", value: undefined },
@@ -206,6 +207,15 @@ export function DashboardContent() {
           {b.pagination.total} total)
         </p>
       )}
+
+      <hr className="border-gray-200" />
+
+      <PortfolioInsights
+        buildings={b.buildings.map((building) => ({
+          id: building.id,
+          name: building.name,
+        }))}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { createWorker } from "@/server/lib/queue";
 import { getTenantClient } from "@/server/lib/db";
+import { getLatestComplianceSnapshot } from "@/server/lib/compliance-snapshots";
 import { scoreECMs, type BuildingProfile } from "@/server/pipelines/pathway-analysis/ecm-scorer";
 import { screenCLEER } from "./eligibility/cleer";
 import { screenCPACE } from "./eligibility/cpace";
@@ -46,9 +47,8 @@ export function startCapitalStructuringWorker() {
         throw new Error(`Building ${data.buildingId} not found`);
       }
 
-      const latestSnapshot = await tenantDb.complianceSnapshot.findFirst({
-        where: { buildingId: data.buildingId },
-        orderBy: { snapshotDate: "desc" },
+      const latestSnapshot = await getLatestComplianceSnapshot(tenantDb, {
+        buildingId: data.buildingId,
       });
 
       // Step 1: ECM scoring

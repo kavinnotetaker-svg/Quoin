@@ -175,6 +175,7 @@ export interface SnapshotInput {
   siteEui: number;
   sourceEui: number;
   weatherNormalizedSiteEui: number | null;
+  weatherNormalizedSourceEui?: number | null;
   dataQualityScore?: number;
 }
 
@@ -205,6 +206,7 @@ export function buildSnapshotData(input: SnapshotInput) {
     energyStarScore: input.energyStarScore,
     siteEui: input.siteEui,
     sourceEui: input.sourceEui,
+    weatherNormalizedSourceEui: input.weatherNormalizedSourceEui ?? null,
     complianceStatus: status,
     complianceGap: gap,
     estimatedPenalty: penalty,

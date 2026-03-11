@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma, getTenantClient } from "@/server/lib/db";
 import {
   exchangeCodeForTokens,
   encryptToken,
 } from "@/server/integrations/green-button";
+import {
+  TenantAccessError,
+  requireTenantContextFromSession,
+} from "@/server/lib/tenant-access";
 
 function getGreenButtonConfig() {
   const clientId = process.env["GREEN_BUTTON_CLIENT_ID"];
@@ -39,11 +41,15 @@ function getGreenButtonConfig() {
  * Exchanges the code for tokens and stores them encrypted on the building.
  */
 export async function GET(req: NextRequest) {
-  const { userId, orgId } = await auth();
-  if (!userId || !orgId) {
-    return NextResponse.redirect(
-      new URL("/sign-in", req.nextUrl.origin),
-    );
+  let tenant;
+  try {
+    tenant = await requireTenantContextFromSession();
+  } catch (error) {
+    if (error instanceof TenantAccessError) {
+      return NextResponse.redirect(new URL("/sign-in", req.nextUrl.origin));
+    }
+
+    throw error;
   }
 
   const code = req.nextUrl.searchParams.get("code");
@@ -89,21 +95,20 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const org = await prisma.organization.findUnique({
-    where: { clerkOrgId: orgId },
+  const building = await tenant.tenantDb.building.findUnique({
+    where: { id: buildingId },
+    select: { id: true },
   });
-  if (!org) {
+  if (!building) {
     return NextResponse.redirect(
       new URL("/dashboard?gb=error", req.nextUrl.origin),
     );
   }
 
-  const tenantDb = getTenantClient(org.id);
-
   try {
     const tokens = await exchangeCodeForTokens(config, code);
 
-    await tenantDb.greenButtonConnection.upsert({
+    await tenant.tenantDb.greenButtonConnection.upsert({
       where: { buildingId },
       update: {
         status: "ACTIVE",
@@ -115,7 +120,7 @@ export async function GET(req: NextRequest) {
       },
       create: {
         buildingId,
-        organizationId: org.id,
+        organizationId: tenant.organizationId,
         status: "ACTIVE",
         accessToken: encryptToken(tokens.accessToken, encryptionKey),
         refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
@@ -125,7 +130,7 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    await tenantDb.building.update({
+    await tenant.tenantDb.building.update({
       where: { id: buildingId },
       data: {
         greenButtonStatus: "ACTIVE",
@@ -139,7 +144,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("[Green Button] Token exchange failed:", err);
 
-    await tenantDb.building.update({
+    await tenant.tenantDb.building.update({
       where: { id: buildingId },
       data: { greenButtonStatus: "FAILED" },
     });

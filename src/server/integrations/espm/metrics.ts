@@ -72,6 +72,9 @@ export class MetricsService {
       siteIntensity: getNumericValue("siteIntensity"),
       sourceIntensity: getNumericValue("sourceIntensity"),
       weatherNormalizedSiteIntensity: getNumericValue("weatherNormalizedSiteIntensity"),
+      weatherNormalizedSourceIntensity: getNumericValue(
+        "weatherNormalizedSourceIntensity",
+      ),
       directGHGEmissions: getNumericValue("directGHGEmissions"),
       medianScore: getNumericValue("medianScore"),
     };

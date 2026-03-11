@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma, getTenantClient } from "@/server/lib/db";
 import { processCSVUpload } from "@/server/pipelines/data-ingestion/logic";
 import type { MeterType } from "@/server/pipelines/data-ingestion/types";
+import {
+  TenantAccessError,
+  requireTenantContextFromSession,
+} from "@/server/lib/tenant-access";
 
 export async function POST(req: NextRequest) {
-  const { userId, orgId } = await auth();
-  if (!userId || !orgId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  let tenant;
+  try {
+    tenant = await requireTenantContextFromSession();
+  } catch (error) {
+    if (error instanceof TenantAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
 
-  const org = await prisma.organization.findUnique({
-    where: { clerkOrgId: orgId },
-  });
-  if (!org) {
-    return NextResponse.json(
-      { error: "Organization not found" },
-      { status: 404 },
-    );
+    throw error;
   }
-
-  const tenantDb = getTenantClient(org.id);
 
   try {
     const formData = await req.formData();
@@ -60,7 +56,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const building = await tenantDb.building.findUnique({
+    const building = await tenant.tenantDb.building.findUnique({
       where: { id: buildingId },
     });
     if (!building) {
@@ -75,11 +71,11 @@ export async function POST(req: NextRequest) {
     const result = await processCSVUpload({
       csvContent,
       buildingId,
-      organizationId: org.id,
+      organizationId: tenant.organizationId,
       buildingGSF: building.grossSquareFeet,
       meterTypeHint: (meterTypeHint as MeterType) || undefined,
       unitHint: unitHint || undefined,
-      tenantDb,
+      tenantDb: tenant.tenantDb,
     });
 
     // Run pipeline inline to create ComplianceSnapshot
@@ -94,10 +90,10 @@ export async function POST(req: NextRequest) {
       }
       const pipelineResult = await runIngestionPipeline({
         buildingId,
-        organizationId: org.id,
+        organizationId: tenant.organizationId,
         uploadBatchId: result.uploadBatchId,
         triggerType: "CSV_UPLOAD",
-        tenantDb,
+        tenantDb: tenant.tenantDb,
         espmClient,
       });
       console.log("[Upload] Pipeline result:", pipelineResult.summary);

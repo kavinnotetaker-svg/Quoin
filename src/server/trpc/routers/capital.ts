@@ -7,6 +7,7 @@ import { screenCPACE } from "@/server/pipelines/capital-structuring/eligibility/
 import { screenAHRA } from "@/server/pipelines/capital-structuring/eligibility/ahra";
 import { assembleCapitalStack } from "@/server/pipelines/capital-structuring/logic";
 import type { BuildingCapitalProfile } from "@/server/pipelines/capital-structuring/eligibility/types";
+import { getLatestComplianceSnapshot } from "@/server/lib/compliance-snapshots";
 
 const capitalAnalysisOutput = z.object({
   buildingId: z.string(),
@@ -79,9 +80,8 @@ export const capitalRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Building not found" });
       }
 
-      const latestSnapshot = await ctx.tenantDb.complianceSnapshot.findFirst({
-        where: { buildingId: input.buildingId },
-        orderBy: { snapshotDate: "desc" },
+      const latestSnapshot = await getLatestComplianceSnapshot(ctx.tenantDb, {
+        buildingId: input.buildingId,
       });
 
       // Check for existing capital pipeline run with narrative

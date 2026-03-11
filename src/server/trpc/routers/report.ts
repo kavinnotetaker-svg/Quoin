@@ -2,6 +2,11 @@ import { z } from "zod";
 import { tenantProcedure, router } from "../init";
 import { TRPCError } from "@trpc/server";
 import {
+  getLatestComplianceSnapshot,
+  LATEST_SNAPSHOT_ORDER,
+} from "@/server/lib/compliance-snapshots";
+import { dedupeEnergyReadings } from "@/server/lib/energy-readings";
+import {
   screenForExemptions,
   type FinancialDistressIndicators,
 } from "@/server/pipelines/pathway-analysis/exemption-screener";
@@ -136,9 +141,8 @@ export const reportRouter = router({
         });
       }
 
-      const latestSnapshot = await ctx.tenantDb.complianceSnapshot.findFirst({
-        where: { buildingId: input.buildingId },
-        orderBy: { snapshotDate: "desc" },
+      const latestSnapshot = await getLatestComplianceSnapshot(ctx.tenantDb, {
+        buildingId: input.buildingId,
       });
 
       const twoYearsAgo = new Date();
@@ -149,15 +153,19 @@ export const reportRouter = router({
           buildingId: input.buildingId,
           periodStart: { gte: twoYearsAgo },
         },
-        orderBy: { periodStart: "asc" },
+        orderBy: [{ periodStart: "asc" }, { ingestedAt: "desc" }, { id: "desc" }],
         select: {
+          id: true,
           periodStart: true,
           periodEnd: true,
           consumptionKbtu: true,
           meterType: true,
           source: true,
+          meterId: true,
+          ingestedAt: true,
         },
       });
+      const dedupedReadings = dedupeEnergyReadings(readings);
 
       const runs = await ctx.tenantDb.pipelineRun.findMany({
         where: { buildingId: input.buildingId },
@@ -190,13 +198,16 @@ export const reportRouter = router({
           dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
           snapshotDate: latestSnapshot?.snapshotDate?.toISOString() ?? null,
         },
-        energyHistory: readings.map(
+        energyHistory: dedupedReadings.map(
           (r: {
+            id: string;
             periodStart: Date;
             periodEnd: Date;
             consumptionKbtu: number;
             meterType: string;
             source: string;
+            meterId: string | null;
+            ingestedAt: Date;
           }) => ({
             periodStart: r.periodStart.toISOString(),
             periodEnd: r.periodEnd.toISOString(),
@@ -255,14 +266,13 @@ export const reportRouter = router({
         });
       }
 
-      const latestSnapshot = await ctx.tenantDb.complianceSnapshot.findFirst({
-        where: { buildingId: input.buildingId },
-        orderBy: { snapshotDate: "desc" },
+      const latestSnapshot = await getLatestComplianceSnapshot(ctx.tenantDb, {
+        buildingId: input.buildingId,
       });
 
       const snapshots = await ctx.tenantDb.complianceSnapshot.findMany({
         where: { buildingId: input.buildingId },
-        orderBy: { snapshotDate: "desc" },
+        orderBy: LATEST_SNAPSHOT_ORDER,
         take: 12,
         select: {
           snapshotDate: true,
@@ -281,13 +291,19 @@ export const reportRouter = router({
           buildingId: input.buildingId,
           periodStart: { gte: threeYearsAgo },
         },
-        orderBy: { periodStart: "asc" },
+        orderBy: [{ periodStart: "asc" }, { ingestedAt: "desc" }, { id: "desc" }],
         select: {
+          id: true,
           periodStart: true,
           consumptionKbtu: true,
           meterType: true,
+          meterId: true,
+          periodEnd: true,
+          source: true,
+          ingestedAt: true,
         },
       });
+      const dedupedReadings = dedupeEnergyReadings(readings);
 
       // Run exemption screener
       const occupancyPct = input.occupancyPct ??
@@ -354,7 +370,7 @@ export const reportRouter = router({
       const checklist = buildFilingChecklist({
         hasOccupancyData: occupancyPct !== null,
         hasFinancialData: financialApplicable,
-        hasEnergyHistory: readings.length >= 12,
+        hasEnergyHistory: dedupedReadings.length >= 12,
         hasComplianceSnapshot: latestSnapshot !== null,
         occupancyApplicable,
         financialApplicable,
@@ -406,11 +422,16 @@ export const reportRouter = router({
             complianceStatus: s.complianceStatus,
           }),
         ),
-        energyHistory: readings.map(
+        energyHistory: dedupedReadings.map(
           (r: {
+            id: string;
             periodStart: Date;
             consumptionKbtu: number;
             meterType: string;
+            meterId: string | null;
+            periodEnd: Date;
+            source: string;
+            ingestedAt: Date;
           }) => ({
             periodStart: r.periodStart.toISOString(),
             consumptionKbtu: r.consumptionKbtu,

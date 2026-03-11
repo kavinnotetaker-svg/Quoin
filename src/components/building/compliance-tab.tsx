@@ -53,6 +53,7 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
     latestSnap?.energyStarScore ?? null,
     building.bepsTargetScore
   );
+  const maxPenaltyExposure = Math.min(building.grossSquareFeet * 10, 7_500_000);
 
   return (
     <div className="space-y-6">
@@ -158,13 +159,13 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
               </div>
               <div className="overflow-hidden h-4 mb-4 text-xs flex rounded bg-red-100">
                 <div
-                  style={{ width: `${Math.min(((latestSnap.estimatedPenalty ?? 0) / Math.max(building.maxPenaltyExposure, 1)) * 100, 100)}%` }}
+                  style={{ width: `${Math.min(((latestSnap.estimatedPenalty ?? 0) / Math.max(maxPenaltyExposure, 1)) * 100, 100)}%` }}
                   className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-500"
                 ></div>
               </div>
               <div className="flex justify-between text-xs text-gray-500">
                 <span>$0</span>
-                <span>Max: ${(building.maxPenaltyExposure).toLocaleString()}</span>
+                <span>Max: ${maxPenaltyExposure.toLocaleString()}</span>
               </div>
             </div>
           </div>

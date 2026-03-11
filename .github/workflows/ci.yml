@@ -44,16 +44,26 @@ jobs:
 
       - run: npm ci
 
-      - run: npx prisma generate
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Validate fresh Prisma db
+        run: npm run db:validate:fresh
 
       - name: TypeScript check
-        run: npx tsc --noEmit
-
-      - name: Run migrations
-        run: npx prisma migrate deploy
+        run: npm run typecheck
 
       - name: Run unit tests
-        run: npm test
+        run: npm run test:unit
+
+      - name: Run DB-backed integration tests
+        run: npm run test:integration:db
+
+      - name: Build app
+        run: npm run build
 
       - name: Run evals
         run: npm run eval

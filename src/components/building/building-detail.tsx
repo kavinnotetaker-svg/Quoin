@@ -5,9 +5,15 @@ import { trpc } from "@/lib/trpc";
 import { BuildingHeader } from "./building-header";
 import { ScoreSection } from "./score-section";
 import { EnergyTab } from "./energy-tab";
+import { BenchmarkingTab } from "./benchmarking-tab";
+import { BepsTab } from "./beps-tab";
 import { ComplianceTab } from "./compliance-tab";
 import { CapitalTab } from "./capital-tab";
 import { AlertsTab } from "./alerts-tab";
+import { OperationsTab } from "./operations-tab";
+import { ProvenanceTab } from "./provenance-tab";
+import { RetrofitTab } from "./retrofit-tab";
+import { FinancingTab } from "./financing-tab";
 import { UploadModal } from "./upload-modal";
 
 interface Tab {
@@ -18,6 +24,12 @@ interface Tab {
 
 const TABS: Tab[] = [
   { key: "energy", label: "Energy" },
+  { key: "benchmarking", label: "Benchmarking" },
+  { key: "beps", label: "BEPS" },
+  { key: "retrofit", label: "Retrofit" },
+  { key: "financing", label: "Financing" },
+  { key: "operations", label: "Operations" },
+  { key: "provenance", label: "Provenance" },
   { key: "compliance", label: "Compliance" },
   { key: "capital", label: "Capital" },
   { key: "alerts", label: "Alerts" },
@@ -81,7 +93,7 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
       <hr className="border-gray-200" />
 
       {/* Tabs */}
-      <div className="flex gap-4 border-b border-gray-200 text-[13px]">
+      <div className="flex flex-wrap gap-4 border-b border-gray-200 text-[13px]">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -105,6 +117,12 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
 
       {/* Tab content */}
       {activeTab === "energy" && <EnergyTab buildingId={buildingId} />}
+      {activeTab === "benchmarking" && <BenchmarkingTab buildingId={buildingId} />}
+      {activeTab === "beps" && <BepsTab buildingId={buildingId} />}
+      {activeTab === "retrofit" && <RetrofitTab buildingId={buildingId} />}
+      {activeTab === "financing" && <FinancingTab buildingId={buildingId} />}
+      {activeTab === "operations" && <OperationsTab buildingId={buildingId} />}
+      {activeTab === "provenance" && <ProvenanceTab buildingId={buildingId} />}
       {activeTab === "compliance" && (
         <ComplianceTab buildingId={buildingId} />
       )}

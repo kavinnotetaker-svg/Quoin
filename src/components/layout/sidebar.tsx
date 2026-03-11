@@ -12,20 +12,25 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  disabled?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/buildings", label: "Buildings", icon: Building2 },
   {
-    href: "#",
+    href: "/reports",
     label: "Reports",
     icon: FileText,
-    disabled: true,
   },
   {
-    href: "#",
+    href: "/settings",
     label: "Settings",
     icon: Settings,
-    disabled: true,
   },
 ];
 
@@ -75,8 +80,7 @@ export function Sidebar() {
         <nav className="flex-1 px-2 py-3">
           {NAV_ITEMS.map((item) => {
             const active =
-              !item.disabled &&
-              (pathname === item.href || pathname.startsWith(item.href + "/"));
+              pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
             return (
               <Link
@@ -84,11 +88,9 @@ export function Sidebar() {
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-2 rounded px-2 py-1.5 text-[13px] ${
-                  item.disabled
-                    ? "pointer-events-none text-gray-300"
-                    : active
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  active
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
                 <Icon size={16} strokeWidth={1.5} />

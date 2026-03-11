@@ -10,6 +10,15 @@ import { syncWithESPM, type ESPMSyncResult } from "./espm-sync";
 import type { ESPM } from "@/server/integrations/espm";
 import type { UploadResult, NormalizedReading, MeterType } from "./types";
 import { prisma } from "@/server/lib/db";
+import { getLatestComplianceSnapshot } from "@/server/lib/compliance-snapshots";
+import {
+  BOOTSTRAP_FACTOR_SET_KEY,
+  BOOTSTRAP_RULE_PACKAGE_KEYS,
+  getActiveFactorSetVersion,
+  getActiveRuleVersion,
+  recordComplianceEvaluation,
+} from "@/server/compliance/provenance";
+import { refreshDerivedBepsMetricInput } from "@/server/compliance/beps";
 
 interface ProcessCSVParams {
   csvContent: string;
@@ -283,6 +292,7 @@ export async function runIngestionPipeline(
     // Step 3: Optional ESPM sync
     let energyStarScore: number | null = null;
     let weatherNormalizedSiteEui: number | null = null;
+    let weatherNormalizedSourceEui: number | null = null;
     let effectiveEspmId = building.espmPropertyId;
 
     if (!effectiveEspmId && input.espmClient) {
@@ -319,6 +329,10 @@ export async function runIngestionPipeline(
       if (espmSyncResult.metrics?.weatherNormalizedSiteIntensity != null) {
         weatherNormalizedSiteEui = espmSyncResult.metrics.weatherNormalizedSiteIntensity;
       }
+      if (espmSyncResult.metrics?.weatherNormalizedSourceIntensity != null) {
+        weatherNormalizedSourceEui =
+          espmSyncResult.metrics.weatherNormalizedSourceIntensity;
+      }
       if (espmSyncResult.pushError) {
         errors.push(`ESPM push failed: ${espmSyncResult.pushError} `);
       }
@@ -340,9 +354,11 @@ export async function runIngestionPipeline(
 
     // Carry forward previous score if ESPM didn't return one
     if (energyStarScore == null) {
-      const prevSnapshot = await prisma.complianceSnapshot.findFirst({
-        where: { buildingId: input.buildingId, energyStarScore: { not: null } },
-        orderBy: { snapshotDate: "desc" },
+      const prevSnapshot = await getLatestComplianceSnapshot(prisma, {
+        buildingId: input.buildingId,
+        where: {
+          energyStarScore: { not: null },
+        },
       });
       if (prevSnapshot?.energyStarScore != null) {
         energyStarScore = prevSnapshot.energyStarScore;
@@ -350,7 +366,7 @@ export async function runIngestionPipeline(
       }
     }
 
-    // Step 4: Build and persist ComplianceSnapshot (append-only)
+    // Step 4: Build snapshot payload and resolve provenance references
     const snapshotData = buildSnapshotData({
       buildingId: input.buildingId,
       organizationId: input.organizationId,
@@ -360,12 +376,14 @@ export async function runIngestionPipeline(
       siteEui: eui.siteEui,
       sourceEui: eui.sourceEui,
       weatherNormalizedSiteEui,
+      weatherNormalizedSourceEui,
       dataQualityScore,
     });
 
-    const snapshot = await prisma.complianceSnapshot.create({
-      data: snapshotData,
-    });
+    const [ruleVersion, factorSetVersion] = await Promise.all([
+      getActiveRuleVersion(BOOTSTRAP_RULE_PACKAGE_KEYS.bepsCycle1),
+      getActiveFactorSetVersion(BOOTSTRAP_FACTOR_SET_KEY),
+    ]);
 
     // Step 5: Create PipelineRun audit record
     const durationMs = Date.now() - startTime;
@@ -386,7 +404,6 @@ export async function runIngestionPipeline(
           newReadings: uploadReadings.length,
         },
         outputSummary: {
-          snapshotId: snapshot.id,
           energyStarScore,
           siteEui: eui.siteEui,
           sourceEui: eui.sourceEui,
@@ -401,15 +418,108 @@ export async function runIngestionPipeline(
     });
     pipelineRunId = pipelineRun.id;
 
-    // Link snapshot to pipeline run
-    await prisma.complianceSnapshot.update({
-      where: { id: snapshot.id },
-      data: { pipelineRunId: pipelineRun.id },
+    const provenance = await recordComplianceEvaluation({
+      organizationId: input.organizationId,
+      buildingId: input.buildingId,
+      ruleVersionId: ruleVersion.id,
+      factorSetVersionId: factorSetVersion.id,
+      pipelineRunId: pipelineRun.id,
+      runType: "SNAPSHOT_REFRESH",
+      status: "SUCCEEDED",
+      inputSnapshotRef: `data_ingestion:${input.uploadBatchId}`,
+      inputSnapshotPayload: {
+        buildingId: input.buildingId,
+        organizationId: input.organizationId,
+        uploadBatchId: input.uploadBatchId,
+        triggerType: input.triggerType,
+        readingsLoaded: readings.length,
+        newReadings: uploadReadings.length,
+        energyStarScore,
+        weatherNormalizedSiteEui,
+        weatherNormalizedSourceEui,
+        siteEui: eui.siteEui,
+        sourceEui: eui.sourceEui,
+        monthsCovered: eui.monthsCovered,
+        fuelBreakdown: eui.fuelBreakdown,
+        dataQualityScore,
+      },
+      resultPayload: {
+        complianceStatus: snapshotData.complianceStatus,
+        complianceGap: snapshotData.complianceGap,
+        estimatedPenalty: snapshotData.estimatedPenalty,
+        energyStarScore,
+        siteEui: eui.siteEui,
+        sourceEui: eui.sourceEui,
+        weatherNormalizedSiteEui,
+        monthsCovered: eui.monthsCovered,
+        errors,
+      },
+      producedByType: "SYSTEM",
+      producedById: "data-ingestion-pipeline",
+      manifest: {
+        implementationKey: "data-ingestion/snapshot-v1",
+        payload: {
+          readingCount: eui.readingCount,
+          monthsCovered: eui.monthsCovered,
+          fuelBreakdown: eui.fuelBreakdown,
+          espmSynced: espmSyncResult?.pushed ?? false,
+        },
+      },
+      snapshotData: {
+        ...snapshotData,
+        pipelineRunId: pipelineRun.id,
+        penaltyInputsJson: {
+          grossSquareFeet: building.grossSquareFeet,
+          bepsTargetScore: building.bepsTargetScore,
+          maxPenaltyExposure: building.maxPenaltyExposure,
+          energyStarScore,
+          dataQualityScore,
+          monthsCovered: eui.monthsCovered,
+        },
+      },
+      evidenceArtifacts: [
+        {
+          artifactType: "ENERGY_DATA",
+          name: "Energy data upload batch",
+          artifactRef: input.uploadBatchId,
+          metadata: {
+            triggerType: input.triggerType,
+            readingsLoaded: readings.length,
+            newReadings: uploadReadings.length,
+          },
+        },
+      ],
+    });
+
+    await prisma.pipelineRun.update({
+      where: { id: pipelineRun.id },
+      data: {
+        outputSummary: {
+          snapshotId: provenance.complianceSnapshot?.id ?? null,
+          complianceRunId: provenance.complianceRun.id,
+          calculationManifestId: provenance.manifest.id,
+          energyStarScore,
+          siteEui: eui.siteEui,
+          sourceEui: eui.sourceEui,
+          weatherNormalizedSiteEui,
+          weatherNormalizedSourceEui,
+          complianceStatus: snapshotData.complianceStatus,
+          estimatedPenalty: snapshotData.estimatedPenalty,
+          monthsCovered: eui.monthsCovered,
+          espmSynced: espmSyncResult?.pushed ?? false,
+        },
+      },
+    });
+
+    await refreshDerivedBepsMetricInput({
+      organizationId: input.organizationId,
+      buildingId: input.buildingId,
+      cycle: building.complianceCycle,
     });
 
     return {
       success: true,
-      snapshotId: snapshot.id,
+      snapshotId: provenance.complianceSnapshot?.id ?? null,
       pipelineRunId: pipelineRun.id,
       espmSync: espmSyncResult,
       errors,

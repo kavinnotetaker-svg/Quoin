@@ -107,6 +107,7 @@ describe("ESPM XML Parser", () => {
       siteIntensity: 62.3,
       sourceIntensity: 145.8,
       weatherNormalizedSiteIntensity: 59.8,
+      weatherNormalizedSourceIntensity: null,
       directGHGEmissions: 285.4,
       medianScore: 50,
     };

@@ -2,6 +2,11 @@ import { z } from "zod";
 import { router, tenantProcedure, protectedProcedure } from "../init";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/server/lib/db";
+import {
+  getLatestComplianceSnapshot,
+  LATEST_SNAPSHOT_ORDER,
+} from "@/server/lib/compliance-snapshots";
+import { dedupeEnergyReadings } from "@/server/lib/energy-readings";
 
 const createBuildingInput = z.object({
   name: z.string().min(1).max(200),
@@ -81,7 +86,7 @@ export const buildingRouter = router({
           orderBy: { [sortBy]: sortOrder },
           include: {
             complianceSnapshots: {
-              orderBy: { snapshotDate: "desc" },
+              orderBy: LATEST_SNAPSHOT_ORDER,
               take: 1,
             },
           },
@@ -92,7 +97,7 @@ export const buildingRouter = router({
       return {
         buildings: buildings.map((b) => ({
           ...b,
-          latestSnapshot: b.complianceSnapshots?.[0] ?? null,
+          latestSnapshot: b.complianceSnapshots[0] ?? null,
         })),
         pagination: {
           page,
@@ -110,7 +115,7 @@ export const buildingRouter = router({
         where: { id: input.id },
         include: {
           complianceSnapshots: {
-            orderBy: { snapshotDate: "desc" },
+            orderBy: LATEST_SNAPSHOT_ORDER,
             take: 1,
           },
         },
@@ -184,18 +189,62 @@ export const buildingRouter = router({
 
   delete: tenantProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      // Use admin client to bypass RLS for cascade operations
-      await prisma.driftAlert.deleteMany({ where: { buildingId: input.id } });
-      await prisma.energyReading.deleteMany({ where: { buildingId: input.id } });
-      await prisma.complianceSnapshot.deleteMany({ where: { buildingId: input.id } });
-      await prisma.pipelineRun.deleteMany({ where: { buildingId: input.id } });
-      await prisma.meter.deleteMany({ where: { buildingId: input.id } });
-      await prisma.greenButtonConnection.deleteMany({ where: { buildingId: input.id } });
-
-      await prisma.building.delete({
+    .mutation(async ({ ctx, input }) => {
+      const building = await ctx.tenantDb.building.findUnique({
         where: { id: input.id },
+        select: { id: true },
       });
+      if (!building) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Building not found",
+        });
+      }
+
+      await prisma.$transaction([
+        prisma.driftAlert.deleteMany({
+          where: {
+            buildingId: input.id,
+            organizationId: ctx.organizationId,
+          },
+        }),
+        prisma.energyReading.deleteMany({
+          where: {
+            buildingId: input.id,
+            organizationId: ctx.organizationId,
+          },
+        }),
+        prisma.complianceSnapshot.deleteMany({
+          where: {
+            buildingId: input.id,
+            organizationId: ctx.organizationId,
+          },
+        }),
+        prisma.pipelineRun.deleteMany({
+          where: {
+            buildingId: input.id,
+            organizationId: ctx.organizationId,
+          },
+        }),
+        prisma.meter.deleteMany({
+          where: {
+            buildingId: input.id,
+            organizationId: ctx.organizationId,
+          },
+        }),
+        prisma.greenButtonConnection.deleteMany({
+          where: {
+            buildingId: input.id,
+            organizationId: ctx.organizationId,
+          },
+        }),
+        prisma.building.deleteMany({
+          where: {
+            id: input.id,
+            organizationId: ctx.organizationId,
+          },
+        }),
+      ]);
 
       return { success: true };
     }),
@@ -218,9 +267,8 @@ export const buildingRouter = router({
   latestSnapshot: tenantProcedure
     .input(z.object({ buildingId: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.tenantDb.complianceSnapshot.findFirst({
-        where: { buildingId: input.buildingId },
-        orderBy: { snapshotDate: "desc" },
+      return getLatestComplianceSnapshot(ctx.tenantDb, {
+        buildingId: input.buildingId,
       });
     }),
 
@@ -235,13 +283,15 @@ export const buildingRouter = router({
       const since = new Date();
       since.setMonth(since.getMonth() - input.months);
 
-      return ctx.tenantDb.energyReading.findMany({
+      const readings = await ctx.tenantDb.energyReading.findMany({
         where: {
           buildingId: input.buildingId,
           periodStart: { gte: since },
         },
-        orderBy: { periodStart: "asc" },
+        orderBy: [{ periodStart: "asc" }, { ingestedAt: "desc" }, { id: "desc" }],
       });
+
+      return dedupeEnergyReadings(readings);
     }),
 
   complianceHistory: tenantProcedure
@@ -263,7 +313,7 @@ export const buildingRouter = router({
     const buildings = await ctx.tenantDb.building.findMany({
       include: {
         complianceSnapshots: {
-          orderBy: { snapshotDate: "desc" },
+          orderBy: LATEST_SNAPSHOT_ORDER,
           take: 1,
         },
       },
@@ -284,7 +334,7 @@ export const buildingRouter = router({
     let scoreCount = 0;
 
     for (const building of buildings) {
-      const snapshot = building.complianceSnapshots[0];
+      const snapshot = building.complianceSnapshots[0] ?? null;
       if (snapshot) {
         switch (snapshot.complianceStatus) {
           case "NON_COMPLIANT":

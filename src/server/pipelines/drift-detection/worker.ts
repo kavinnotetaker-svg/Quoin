@@ -1,5 +1,6 @@
 import { createWorker } from "@/server/lib/queue";
 import { getTenantClient } from "@/server/lib/db";
+import { LATEST_SNAPSHOT_ORDER } from "@/server/lib/compliance-snapshots";
 import { detectDrift, type DriftDetectionInput, type MonthlyReading } from "./rules-engine";
 
 const DRIFT_QUEUE = "drift-detection";
@@ -74,7 +75,7 @@ export function startDriftDetectionWorker() {
       // Load latest two compliance snapshots for score comparison
       const snapshots = await tenantDb.complianceSnapshot.findMany({
         where: { buildingId: data.buildingId },
-        orderBy: { snapshotDate: "desc" },
+        orderBy: LATEST_SNAPSHOT_ORDER,
         take: 2,
       });
 

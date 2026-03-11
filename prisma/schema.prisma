@@ -29,6 +29,11 @@ enum PropertyType {
   OTHER
 }
 
+enum BuildingOwnershipType {
+  PRIVATE
+  DISTRICT
+}
+
 enum EspmShareStatus {
   PENDING
   LINKED
@@ -60,6 +65,7 @@ enum SelectedPathway {
   STANDARD
   PERFORMANCE
   PRESCRIPTIVE
+  TRAJECTORY
   NONE
 }
 
@@ -120,6 +126,188 @@ enum AlertStatus {
   RESOLVED
 }
 
+enum VersionStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+}
+
+enum ComplianceRunType {
+  SNAPSHOT_REFRESH
+  BENCHMARKING_EVALUATION
+  BEPS_EVALUATION
+}
+
+enum ComplianceRunStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum ActorType {
+  SYSTEM
+  USER
+}
+
+enum SourceArtifactType {
+  LAW
+  GUIDE
+  FORM
+  PM_EXPORT
+  UTILITY_FILE
+  CSV_UPLOAD
+  GENERATED_REPORT
+  OTHER
+}
+
+enum EvidenceArtifactType {
+  CALCULATION_OUTPUT
+  ENERGY_DATA
+  PM_REPORT
+  OWNER_ATTESTATION
+  SYSTEM_NOTE
+  OTHER
+}
+
+enum BenchmarkSubmissionStatus {
+  DRAFT
+  IN_REVIEW
+  READY
+  BLOCKED
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+enum FilingType {
+  BENCHMARKING
+  BEPS_COMPLIANCE
+  BEPS_EXEMPTION
+  BEPS_PATHWAY
+}
+
+enum FilingStatus {
+  DRAFT
+  GENERATED
+  FILED
+  ACCEPTED
+  REJECTED
+}
+
+enum FilingPacketStatus {
+  DRAFT
+  GENERATED
+  STALE
+  FINALIZED
+}
+
+enum FilingRecordEventAction {
+  CREATED
+  STATUS_TRANSITION
+  EVIDENCE_LINKED
+  EVALUATION_REFRESH
+  PACKET_GENERATED
+  PACKET_FINALIZED
+}
+
+enum BepsPathway {
+  PERFORMANCE
+  STANDARD_TARGET
+  PRESCRIPTIVE
+  TRAJECTORY
+}
+
+enum BepsPrescriptiveItemStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  WAIVED
+  REJECTED
+}
+
+enum AlternativeComplianceAgreementStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+  EXPIRED
+}
+
+enum PortfolioManagerSyncStatus {
+  IDLE
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+enum OperationalAnomalyType {
+  ABNORMAL_BASELOAD
+  OFF_HOURS_SCHEDULE_DRIFT
+  UNUSUAL_CONSUMPTION_SPIKE
+  UNUSUAL_CONSUMPTION_DROP
+  MISSING_OR_SUSPECT_METER_DATA
+  INCONSISTENT_METER_BEHAVIOR
+}
+
+enum OperationalAnomalyStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  DISMISSED
+}
+
+enum RetrofitProjectType {
+  LED_LIGHTING_RETROFIT
+  RETRO_COMMISSIONING
+  BMS_UPGRADE
+  VARIABLE_FREQUENCY_DRIVES
+  LOW_FLOW_FIXTURES
+  HEAT_PUMP_CONVERSION
+  ENVELOPE_AIR_SEALING
+  WINDOW_REPLACEMENT
+  ROOF_INSULATION_UPGRADE
+  ROOFTOP_SOLAR_PV
+  CUSTOM
+}
+
+enum RetrofitCandidateStatus {
+  DRAFT
+  ACTIVE
+  DEFERRED
+  COMPLETED
+  ARCHIVED
+}
+
+enum RetrofitCandidateSource {
+  MANUAL
+  ECM_LIBRARY
+  ANOMALY_DERIVED
+}
+
+enum RetrofitConfidenceBand {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum FinancingCaseType {
+  SINGLE_CANDIDATE
+  BUNDLE
+}
+
+enum FinancingCaseStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum FinancingPacketStatus {
+  DRAFT
+  GENERATED
+  STALE
+  FINALIZED
+}
+
 enum TriggerType {
   SCHEDULED
   MANUAL
@@ -148,63 +336,113 @@ model Organization {
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  users     User[]
-  buildings Building[]
+  memberships                         OrganizationMembership[]
+  buildings                           Building[]
+  complianceRuns                      ComplianceRun[]
+  sourceArtifacts                     SourceArtifact[]
+  evidenceArtifacts                   EvidenceArtifact[]
+  benchmarkSubmissions                BenchmarkSubmission[]
+  filingRecords                       FilingRecord[]
+  filingRecordEvents                  FilingRecordEvent[]
+  filingPackets                       FilingPacket[]
+  bepsMetricInputs                    BepsMetricInput[]
+  bepsPrescriptiveItems               BepsPrescriptiveItem[]
+  bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
+  portfolioManagerSyncStates          PortfolioManagerSyncState[]
+  operationalAnomalies                OperationalAnomaly[]
+  retrofitCandidates                  RetrofitCandidate[]
+  financingCases                      FinancingCase[]
+  financingCaseCandidates             FinancingCaseCandidate[]
+  financingPackets                    FinancingPacket[]
 
   @@map("organizations")
 }
 
 model User {
-  id             String   @id @default(cuid())
-  organizationId String   @map("organization_id")
-  clerkUserId    String   @unique @map("clerk_user_id")
-  email          String   @unique
-  name           String
-  role           UserRole @default(VIEWER)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique @map("clerk_user_id")
+  email       String   @unique
+  name        String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  memberships OrganizationMembership[]
 
-  @@index([organizationId])
   @@map("users")
 }
 
+model OrganizationMembership {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  userId            String   @map("user_id")
+  clerkMembershipId String?  @unique @map("clerk_membership_id")
+  role              UserRole @default(VIEWER)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_memberships")
+}
+
 model Building {
-  id                       String              @id @default(cuid())
-  organizationId           String              @map("organization_id")
-  name                     String
-  address                  String
-  latitude                 Float
-  longitude                Float
-  grossSquareFeet          Int                 @map("gross_square_feet")
-  propertyType             PropertyType        @map("property_type")
-  yearBuilt                Int?                @map("year_built")
-  espmPropertyId           BigInt?             @map("espm_property_id")
-  espmShareStatus          EspmShareStatus     @default(UNLINKED) @map("espm_share_status")
-  greenButtonStatus         GreenButtonStatus   @default(NONE) @map("green_button_status")
-  dataIngestionMethod      DataIngestionMethod @default(CSV_UPLOAD) @map("data_ingestion_method")
-  bepsTargetScore          Float               @map("beps_target_score")
-  maxPenaltyExposure       Float               @default(0) @map("max_penalty_exposure")
-  complianceCycle          ComplianceCycle     @default(CYCLE_1) @map("compliance_cycle")
-  selectedPathway          SelectedPathway     @default(NONE) @map("selected_pathway")
-  doeeBuildingId           String?             @map("doee_building_id")
-  baselineYear             Int?                @map("baseline_year")
-  targetEui                Float?              @map("target_eui")
-  ward                     Int?
-  hasFinancialDistress     Boolean             @default(false) @map("has_financial_distress")
-  occupancyRate            Float?              @map("occupancy_rate")
-  createdAt                DateTime            @default(now()) @map("created_at")
-  updatedAt                DateTime            @updatedAt @map("updated_at")
+  id                        String                @id @default(cuid())
+  organizationId            String                @map("organization_id")
+  name                      String
+  address                   String
+  latitude                  Float
+  longitude                 Float
+  grossSquareFeet           Int                   @map("gross_square_feet")
+  propertyType              PropertyType          @map("property_type")
+  ownershipType             BuildingOwnershipType @default(PRIVATE) @map("ownership_type")
+  yearBuilt                 Int?                  @map("year_built")
+  isEnergyStarScoreEligible Boolean?              @map("is_energy_star_score_eligible")
+  espmPropertyId            BigInt?               @map("espm_property_id")
+  espmShareStatus           EspmShareStatus       @default(UNLINKED) @map("espm_share_status")
+  greenButtonStatus         GreenButtonStatus     @default(NONE) @map("green_button_status")
+  dataIngestionMethod       DataIngestionMethod   @default(CSV_UPLOAD) @map("data_ingestion_method")
+  bepsTargetScore           Float                 @map("beps_target_score")
+  maxPenaltyExposure        Float                 @default(0) @map("max_penalty_exposure")
+  complianceCycle           ComplianceCycle       @default(CYCLE_1) @map("compliance_cycle")
+  selectedPathway           SelectedPathway       @default(NONE) @map("selected_pathway")
+  doeeBuildingId            String?               @map("doee_building_id")
+  baselineYear              Int?                  @map("baseline_year")
+  targetEui                 Float?                @map("target_eui")
+  ward                      Int?
+  hasFinancialDistress      Boolean               @default(false) @map("has_financial_distress")
+  occupancyRate             Float?                @map("occupancy_rate")
+  createdAt                 DateTime              @default(now()) @map("created_at")
+  updatedAt                 DateTime              @updatedAt @map("updated_at")
 
-  organization          Organization              @relation(fields: [organizationId], references: [id])
-  energyReadings        EnergyReading[]
-  complianceSnapshots   ComplianceSnapshot[]
-  pipelineRuns          PipelineRun[]
-  greenButtonConnection GreenButtonConnection?
-  meters                Meter[]
-  driftAlerts           DriftAlert[]
+  organization                        Organization                         @relation(fields: [organizationId], references: [id])
+  energyReadings                      EnergyReading[]
+  complianceSnapshots                 ComplianceSnapshot[]
+  pipelineRuns                        PipelineRun[]
+  greenButtonConnection               GreenButtonConnection?
+  meters                              Meter[]
+  driftAlerts                         DriftAlert[]
+  complianceRuns                      ComplianceRun[]
+  sourceArtifacts                     SourceArtifact[]
+  evidenceArtifacts                   EvidenceArtifact[]
+  benchmarkSubmissions                BenchmarkSubmission[]
+  filingRecords                       FilingRecord[]
+  filingRecordEvents                  FilingRecordEvent[]
+  filingPackets                       FilingPacket[]
+  bepsMetricInputs                    BepsMetricInput[]
+  bepsPrescriptiveItems               BepsPrescriptiveItem[]
+  bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
+  portfolioManagerSyncStates          PortfolioManagerSyncState[]
+  operationalAnomalies                OperationalAnomaly[]
+  retrofitCandidates                  RetrofitCandidate[]
+  financingCases                      FinancingCase[]
+  financingCaseCandidates             FinancingCaseCandidate[]
+  financingPackets                    FinancingPacket[]
 
+  @@unique([id, organizationId])
   @@index([organizationId])
   @@map("buildings")
 }
@@ -220,8 +458,9 @@ model Meter {
   isActive       Boolean    @default(true) @map("is_active")
   createdAt      DateTime   @default(now()) @map("created_at")
 
-  building       Building        @relation(fields: [buildingId], references: [id])
-  energyReadings EnergyReading[]
+  building             Building             @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  energyReadings       EnergyReading[]
+  operationalAnomalies OperationalAnomaly[]
 
   @@index([buildingId])
   @@index([organizationId])
@@ -246,7 +485,7 @@ model EnergyReading {
   ingestedAt      DateTime     @default(now()) @map("ingested_at")
   meterId         String?      @map("meter_id")
 
-  building Building @relation(fields: [buildingId], references: [id])
+  building Building @relation(fields: [buildingId, organizationId], references: [id, organizationId])
   meter    Meter?   @relation(fields: [meterId], references: [id])
 
   @@index([buildingId, periodStart(sort: Desc)])
@@ -256,27 +495,32 @@ model EnergyReading {
 }
 
 model ComplianceSnapshot {
-  id               String           @id @default(cuid())
-  buildingId       String           @map("building_id")
-  organizationId   String           @map("organization_id")
-  snapshotDate     DateTime         @default(now()) @map("snapshot_date")
-  triggerType      SnapshotTrigger  @map("trigger_type")
-  pipelineRunId    String?          @map("pipeline_run_id")
-  energyStarScore  Float?           @map("energy_star_score")
-  siteEui          Float?           @map("site_eui")
-  sourceEui        Float?           @map("source_eui")
-  weatherNormalizedSiteEui Float?   @map("weather_normalized_site_eui")
-  complianceStatus ComplianceStatus @map("compliance_status")
-  complianceGap    Float?           @map("compliance_gap")
-  estimatedPenalty Float?           @map("estimated_penalty")
-  dataQualityScore Float?           @map("data_quality_score")
-  activePathway    SelectedPathway?  @map("active_pathway")
-  targetScore      Float?            @map("target_score")
-  targetEui        Float?            @map("target_eui")
-  penaltyInputsJson Json?            @map("penalty_inputs_json")
+  id                         String           @id @default(cuid())
+  buildingId                 String           @map("building_id")
+  organizationId             String           @map("organization_id")
+  snapshotDate               DateTime         @default(now()) @map("snapshot_date")
+  triggerType                SnapshotTrigger  @map("trigger_type")
+  pipelineRunId              String?          @map("pipeline_run_id")
+  energyStarScore            Float?           @map("energy_star_score")
+  siteEui                    Float?           @map("site_eui")
+  sourceEui                  Float?           @map("source_eui")
+  weatherNormalizedSiteEui   Float?           @map("weather_normalized_site_eui")
+  weatherNormalizedSourceEui Float?           @map("weather_normalized_source_eui")
+  complianceStatus           ComplianceStatus @map("compliance_status")
+  complianceGap              Float?           @map("compliance_gap")
+  estimatedPenalty           Float?           @map("estimated_penalty")
+  dataQualityScore           Float?           @map("data_quality_score")
+  activePathway              SelectedPathway? @map("active_pathway")
+  targetScore                Float?           @map("target_score")
+  targetEui                  Float?           @map("target_eui")
+  penaltyInputsJson          Json?            @map("penalty_inputs_json")
+  complianceRunId            String?          @unique @map("compliance_run_id")
 
-  building    Building     @relation(fields: [buildingId], references: [id])
-  pipelineRun PipelineRun? @relation(fields: [pipelineRunId], references: [id])
+  building                   Building          @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  pipelineRun                PipelineRun?      @relation(fields: [pipelineRunId], references: [id])
+  complianceRun              ComplianceRun?    @relation(fields: [complianceRunId], references: [id])
+  baselineBepsMetricInputs   BepsMetricInput[] @relation("BepsMetricBaselineSnapshot")
+  evaluationBepsMetricInputs BepsMetricInput[] @relation("BepsMetricEvaluationSnapshot")
 
   @@index([buildingId, snapshotDate(sort: Desc)])
   @@index([organizationId, buildingId])
@@ -297,8 +541,9 @@ model GreenButtonConnection {
   connectedAt    DateTime          @default(now()) @map("connected_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  building Building @relation(fields: [buildingId], references: [id])
+  building Building @relation(fields: [buildingId, organizationId], references: [id, organizationId])
 
+  @@unique([buildingId, organizationId])
   @@index([organizationId])
   @@map("green_button_connections")
 }
@@ -317,41 +562,624 @@ model PipelineRun {
   llmModel       String?        @map("llm_model")
   llmCostCents   Int?           @map("llm_cost_cents")
   durationMs     Int?           @map("duration_ms")
-  errorMessage   String?        @db.Text @map("error_message")
+  errorMessage   String?        @map("error_message") @db.Text
   startedAt      DateTime?      @map("started_at")
   completedAt    DateTime?      @map("completed_at")
   createdAt      DateTime       @default(now()) @map("created_at")
 
-  building            Building?            @relation(fields: [buildingId], references: [id])
+  building            Building?            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
   complianceSnapshots ComplianceSnapshot[]
   driftAlerts         DriftAlert[]
+  complianceRuns      ComplianceRun[]
 
+  @@unique([id, organizationId])
   @@index([pipelineType, status, createdAt(sort: Desc)])
   @@index([organizationId, buildingId])
   @@map("pipeline_runs")
 }
 
 model DriftAlert {
-  id              String        @id @default(cuid())
-  organizationId  String        @map("organization_id")
-  buildingId      String        @map("building_id")
-  pipelineRunId   String?       @map("pipeline_run_id")
-  ruleId          String        @map("rule_id")
-  severity        AlertSeverity
-  status          AlertStatus   @default(ACTIVE)
-  title           String
-  description     String        @db.Text
-  currentValue    Float         @map("current_value")
-  threshold       Float
-  aiRootCause     String?       @db.Text @map("ai_root_cause")
-  detectedAt      DateTime      @default(now()) @map("detected_at")
-  acknowledgedAt  DateTime?     @map("acknowledged_at")
-  resolvedAt      DateTime?     @map("resolved_at")
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  buildingId     String        @map("building_id")
+  pipelineRunId  String?       @map("pipeline_run_id")
+  ruleId         String        @map("rule_id")
+  severity       AlertSeverity
+  status         AlertStatus   @default(ACTIVE)
+  title          String
+  description    String        @db.Text
+  currentValue   Float         @map("current_value")
+  threshold      Float
+  aiRootCause    String?       @map("ai_root_cause") @db.Text
+  detectedAt     DateTime      @default(now()) @map("detected_at")
+  acknowledgedAt DateTime?     @map("acknowledged_at")
+  resolvedAt     DateTime?     @map("resolved_at")
 
-  building    Building     @relation(fields: [buildingId], references: [id])
+  building    Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
   pipelineRun PipelineRun? @relation(fields: [pipelineRunId], references: [id])
 
   @@index([buildingId, status, detectedAt(sort: Desc)])
   @@index([organizationId, buildingId])
   @@map("drift_alerts")
+}
+
+model RulePackage {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  name         String
+  jurisdiction String   @default("DC")
+  description  String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  versions   RuleVersion[]
+  bepsCycles BepsCycleRegistry[]
+
+  @@map("rule_packages")
+}
+
+model RuleVersion {
+  id                String        @id @default(cuid())
+  rulePackageId     String        @map("rule_package_id")
+  sourceArtifactId  String?       @map("source_artifact_id")
+  version           String
+  status            VersionStatus @default(DRAFT)
+  effectiveFrom     DateTime      @map("effective_from")
+  effectiveTo       DateTime?     @map("effective_to")
+  implementationKey String        @map("implementation_key")
+  sourceMetadata    Json          @default("{}") @map("source_metadata")
+  configJson        Json          @default("{}") @map("config_json")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  rulePackage          RulePackage           @relation(fields: [rulePackageId], references: [id], onDelete: Cascade)
+  sourceArtifact       SourceArtifact?       @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  complianceRuns       ComplianceRun[]
+  calculationManifests CalculationManifest[]
+  benchmarkSubmissions BenchmarkSubmission[]
+
+  @@unique([rulePackageId, version])
+  @@index([rulePackageId, status, effectiveFrom(sort: Desc)])
+  @@map("rule_versions")
+}
+
+model FactorSetVersion {
+  id               String        @id @default(cuid())
+  key              String
+  sourceArtifactId String?       @map("source_artifact_id")
+  version          String
+  status           VersionStatus @default(DRAFT)
+  effectiveFrom    DateTime      @map("effective_from")
+  effectiveTo      DateTime?     @map("effective_to")
+  sourceMetadata   Json          @default("{}") @map("source_metadata")
+  factorsJson      Json          @default("{}") @map("factors_json")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  sourceArtifact       SourceArtifact?       @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  complianceRuns       ComplianceRun[]
+  calculationManifests CalculationManifest[]
+  benchmarkSubmissions BenchmarkSubmission[]
+  bepsCycles           BepsCycleRegistry[]
+
+  @@unique([key, version])
+  @@index([key, status, effectiveFrom(sort: Desc)])
+  @@map("factor_set_versions")
+}
+
+model BepsCycleRegistry {
+  id                 String          @id @default(cuid())
+  cycleId            String          @unique @map("cycle_id")
+  complianceCycle    ComplianceCycle @unique @map("compliance_cycle")
+  cycleStartYear     Int             @map("cycle_start_year")
+  cycleEndYear       Int             @map("cycle_end_year")
+  baselineYearStart  Int             @map("baseline_year_start")
+  baselineYearEnd    Int             @map("baseline_year_end")
+  evaluationYear     Int             @map("evaluation_year")
+  rulePackageId      String          @map("rule_package_id")
+  factorSetVersionId String          @map("factor_set_version_id")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  rulePackage      RulePackage      @relation(fields: [rulePackageId], references: [id], onDelete: Cascade)
+  factorSetVersion FactorSetVersion @relation(fields: [factorSetVersionId], references: [id], onDelete: Cascade)
+
+  @@index([rulePackageId])
+  @@index([factorSetVersionId])
+  @@map("beps_cycle_registries")
+}
+
+model ComplianceRun {
+  id                 String              @id @default(cuid())
+  organizationId     String              @map("organization_id")
+  buildingId         String              @map("building_id")
+  ruleVersionId      String              @map("rule_version_id")
+  factorSetVersionId String              @map("factor_set_version_id")
+  pipelineRunId      String?             @map("pipeline_run_id")
+  runType            ComplianceRunType   @map("run_type")
+  status             ComplianceRunStatus @default(PENDING)
+  inputSnapshotRef   String              @map("input_snapshot_ref")
+  inputSnapshotHash  String              @map("input_snapshot_hash")
+  resultPayload      Json                @default("{}") @map("result_payload")
+  producedByType     ActorType           @map("produced_by_type")
+  producedById       String?             @map("produced_by_id")
+  executedAt         DateTime            @default(now()) @map("executed_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  building             Building              @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  ruleVersion          RuleVersion           @relation(fields: [ruleVersionId], references: [id])
+  factorSetVersion     FactorSetVersion      @relation(fields: [factorSetVersionId], references: [id])
+  pipelineRun          PipelineRun?          @relation(fields: [pipelineRunId], references: [id], onDelete: SetNull)
+  calculationManifest  CalculationManifest?
+  complianceSnapshots  ComplianceSnapshot[]
+  evidenceArtifacts    EvidenceArtifact[]
+  benchmarkSubmissions BenchmarkSubmission[]
+  filingRecords        FilingRecord[]
+
+  @@index([organizationId, buildingId, executedAt(sort: Desc)])
+  @@index([ruleVersionId, executedAt(sort: Desc)])
+  @@index([factorSetVersionId, executedAt(sort: Desc)])
+  @@map("compliance_runs")
+}
+
+model CalculationManifest {
+  id                 String   @id @default(cuid())
+  complianceRunId    String   @unique @map("compliance_run_id")
+  ruleVersionId      String   @map("rule_version_id")
+  factorSetVersionId String   @map("factor_set_version_id")
+  codeVersion        String   @map("code_version")
+  implementationKey  String   @map("implementation_key")
+  inputSnapshotRef   String   @map("input_snapshot_ref")
+  inputSnapshotHash  String   @map("input_snapshot_hash")
+  manifestPayload    Json     @default("{}") @map("manifest_payload")
+  executedAt         DateTime @map("executed_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  complianceRun    ComplianceRun    @relation(fields: [complianceRunId], references: [id], onDelete: Cascade)
+  ruleVersion      RuleVersion      @relation(fields: [ruleVersionId], references: [id])
+  factorSetVersion FactorSetVersion @relation(fields: [factorSetVersionId], references: [id])
+
+  @@index([executedAt(sort: Desc)])
+  @@map("calculation_manifests")
+}
+
+model SourceArtifact {
+  id             String             @id @default(cuid())
+  organizationId String?            @map("organization_id")
+  buildingId     String?            @map("building_id")
+  artifactType   SourceArtifactType @map("artifact_type")
+  name           String
+  storageUri     String?            @map("storage_uri")
+  externalUrl    String?            @map("external_url")
+  sourceHash     String?            @map("source_hash")
+  metadata       Json               @default("{}")
+  createdByType  ActorType          @map("created_by_type")
+  createdById    String?            @map("created_by_id")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  organization                        Organization?                        @relation(fields: [organizationId], references: [id])
+  building                            Building?                            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  ruleVersions                        RuleVersion[]
+  factorSetVersions                   FactorSetVersion[]
+  evidenceArtifacts                   EvidenceArtifact[]
+  bepsMetricInputs                    BepsMetricInput[]
+  bepsPrescriptiveItems               BepsPrescriptiveItem[]
+  bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
+  retrofitCandidates                  RetrofitCandidate[]
+
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@map("source_artifacts")
+}
+
+model EvidenceArtifact {
+  id                    String               @id @default(cuid())
+  organizationId        String               @map("organization_id")
+  buildingId            String?              @map("building_id")
+  complianceRunId       String?              @map("compliance_run_id")
+  benchmarkSubmissionId String?              @map("benchmark_submission_id")
+  filingRecordId        String?              @map("filing_record_id")
+  sourceArtifactId      String?              @map("source_artifact_id")
+  artifactType          EvidenceArtifactType @map("artifact_type")
+  name                  String
+  artifactRef           String?              @map("artifact_ref")
+  metadata              Json                 @default("{}")
+  createdByType         ActorType            @map("created_by_type")
+  createdById           String?              @map("created_by_id")
+  createdAt             DateTime             @default(now()) @map("created_at")
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  building            Building?            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  complianceRun       ComplianceRun?       @relation(fields: [complianceRunId], references: [id], onDelete: Cascade)
+  benchmarkSubmission BenchmarkSubmission? @relation(fields: [benchmarkSubmissionId], references: [id], onDelete: Cascade)
+  filingRecord        FilingRecord?        @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
+  sourceArtifact      SourceArtifact?      @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@index([complianceRunId])
+  @@index([benchmarkSubmissionId])
+  @@index([filingRecordId])
+  @@map("evidence_artifacts")
+}
+
+model BenchmarkSubmission {
+  id                   String                    @id @default(cuid())
+  organizationId       String                    @map("organization_id")
+  buildingId           String                    @map("building_id")
+  reportingYear        Int                       @map("reporting_year")
+  ruleVersionId        String                    @map("rule_version_id")
+  factorSetVersionId   String                    @map("factor_set_version_id")
+  complianceRunId      String?                   @map("compliance_run_id")
+  status               BenchmarkSubmissionStatus @default(DRAFT)
+  readinessEvaluatedAt DateTime?                 @map("readiness_evaluated_at")
+  submissionPayload    Json                      @default("{}") @map("submission_payload")
+  submittedAt          DateTime?                 @map("submitted_at")
+  createdByType        ActorType                 @map("created_by_type")
+  createdById          String?                   @map("created_by_id")
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  building          Building           @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  ruleVersion       RuleVersion        @relation(fields: [ruleVersionId], references: [id])
+  factorSetVersion  FactorSetVersion   @relation(fields: [factorSetVersionId], references: [id])
+  complianceRun     ComplianceRun?     @relation(fields: [complianceRunId], references: [id], onDelete: SetNull)
+  evidenceArtifacts EvidenceArtifact[]
+  filingRecords     FilingRecord[]
+
+  @@unique([buildingId, reportingYear])
+  @@index([organizationId, reportingYear])
+  @@map("benchmark_submissions")
+}
+
+model FilingRecord {
+  id                    String           @id @default(cuid())
+  organizationId        String           @map("organization_id")
+  buildingId            String           @map("building_id")
+  filingType            FilingType       @map("filing_type")
+  filingYear            Int?             @map("filing_year")
+  complianceCycle       ComplianceCycle? @map("compliance_cycle")
+  benchmarkSubmissionId String?          @map("benchmark_submission_id")
+  complianceRunId       String?          @map("compliance_run_id")
+  status                FilingStatus     @default(DRAFT)
+  filingPayload         Json             @default("{}") @map("filing_payload")
+  packetUri             String?          @map("packet_uri")
+  filedAt               DateTime?        @map("filed_at")
+  createdByType         ActorType        @map("created_by_type")
+  createdById           String?          @map("created_by_id")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  building            Building             @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  benchmarkSubmission BenchmarkSubmission? @relation(fields: [benchmarkSubmissionId], references: [id], onDelete: SetNull)
+  complianceRun       ComplianceRun?       @relation(fields: [complianceRunId], references: [id], onDelete: SetNull)
+  evidenceArtifacts   EvidenceArtifact[]
+  events              FilingRecordEvent[]
+  packets             FilingPacket[]
+
+  @@unique([buildingId, filingType, filingYear, complianceCycle])
+  @@index([organizationId, buildingId, filingType, createdAt(sort: Desc)])
+  @@map("filing_records")
+}
+
+model FilingRecordEvent {
+  id             String                  @id @default(cuid())
+  organizationId String                  @map("organization_id")
+  buildingId     String                  @map("building_id")
+  filingRecordId String                  @map("filing_record_id")
+  action         FilingRecordEventAction
+  fromStatus     FilingStatus?           @map("from_status")
+  toStatus       FilingStatus?           @map("to_status")
+  notes          String?
+  eventPayload   Json                    @default("{}") @map("event_payload")
+  createdByType  ActorType               @map("created_by_type")
+  createdById    String?                 @map("created_by_id")
+  createdAt      DateTime                @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  filingRecord FilingRecord @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@index([filingRecordId, createdAt(sort: Desc)])
+  @@map("filing_record_events")
+}
+
+model FilingPacket {
+  id              String             @id @default(cuid())
+  organizationId  String             @map("organization_id")
+  buildingId      String             @map("building_id")
+  filingRecordId  String             @map("filing_record_id")
+  filingYear      Int?               @map("filing_year")
+  complianceCycle ComplianceCycle?   @map("compliance_cycle")
+  version         Int
+  status          FilingPacketStatus @default(DRAFT)
+  packetHash      String             @map("packet_hash")
+  packetPayload   Json               @default("{}") @map("packet_payload")
+  generatedAt     DateTime           @default(now()) @map("generated_at")
+  staleMarkedAt   DateTime?          @map("stale_marked_at")
+  finalizedAt     DateTime?          @map("finalized_at")
+  finalizedByType ActorType?         @map("finalized_by_type")
+  finalizedById   String?            @map("finalized_by_id")
+  createdByType   ActorType          @map("created_by_type")
+  createdById     String?            @map("created_by_id")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  filingRecord FilingRecord @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([filingRecordId, version])
+  @@index([organizationId, buildingId, generatedAt(sort: Desc)])
+  @@index([filingRecordId, generatedAt(sort: Desc)])
+  @@map("filing_packets")
+}
+
+model BepsMetricInput {
+  id                                   String          @id @default(cuid())
+  organizationId                       String          @map("organization_id")
+  buildingId                           String          @map("building_id")
+  complianceCycle                      ComplianceCycle @map("compliance_cycle")
+  filingYear                           Int             @map("filing_year")
+  baselineYearStart                    Int?            @map("baseline_year_start")
+  baselineYearEnd                      Int?            @map("baseline_year_end")
+  evaluationYearStart                  Int?            @map("evaluation_year_start")
+  evaluationYearEnd                    Int?            @map("evaluation_year_end")
+  comparisonYear                       Int?            @map("comparison_year")
+  delayedCycle1OptionApplied           Boolean         @default(false) @map("delayed_cycle_1_option_applied")
+  baselineAdjustedSiteEui              Float?          @map("baseline_adjusted_site_eui")
+  evaluationAdjustedSiteEui            Float?          @map("evaluation_adjusted_site_eui")
+  baselineWeatherNormalizedSiteEui     Float?          @map("baseline_weather_normalized_site_eui")
+  evaluationWeatherNormalizedSiteEui   Float?          @map("evaluation_weather_normalized_site_eui")
+  baselineWeatherNormalizedSourceEui   Float?          @map("baseline_weather_normalized_source_eui")
+  evaluationWeatherNormalizedSourceEui Float?          @map("evaluation_weather_normalized_source_eui")
+  baselineEnergyStarScore              Float?          @map("baseline_energy_star_score")
+  evaluationEnergyStarScore            Float?          @map("evaluation_energy_star_score")
+  baselineSnapshotId                   String?         @map("baseline_snapshot_id")
+  evaluationSnapshotId                 String?         @map("evaluation_snapshot_id")
+  sourceArtifactId                     String?         @map("source_artifact_id")
+  notesJson                            Json            @default("{}") @map("notes_json")
+  createdAt                            DateTime        @default(now()) @map("created_at")
+  updatedAt                            DateTime        @updatedAt @map("updated_at")
+
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  building           Building            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  baselineSnapshot   ComplianceSnapshot? @relation("BepsMetricBaselineSnapshot", fields: [baselineSnapshotId], references: [id], onDelete: SetNull)
+  evaluationSnapshot ComplianceSnapshot? @relation("BepsMetricEvaluationSnapshot", fields: [evaluationSnapshotId], references: [id], onDelete: SetNull)
+  sourceArtifact     SourceArtifact?     @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+
+  @@unique([buildingId, complianceCycle, filingYear])
+  @@index([organizationId, buildingId, filingYear])
+  @@map("beps_metric_inputs")
+}
+
+model BepsPrescriptiveItem {
+  id               String                     @id @default(cuid())
+  organizationId   String                     @map("organization_id")
+  buildingId       String                     @map("building_id")
+  complianceCycle  ComplianceCycle            @map("compliance_cycle")
+  filingYear       Int                        @map("filing_year")
+  itemKey          String                     @map("item_key")
+  name             String
+  milestoneName    String?                    @map("milestone_name")
+  isRequired       Boolean                    @default(true) @map("is_required")
+  pointsPossible   Float                      @default(0) @map("points_possible")
+  pointsEarned     Float?                     @map("points_earned")
+  status           BepsPrescriptiveItemStatus @default(PLANNED)
+  completedAt      DateTime?                  @map("completed_at")
+  approvedAt       DateTime?                  @map("approved_at")
+  dueAt            DateTime?                  @map("due_at")
+  sourceArtifactId String?                    @map("source_artifact_id")
+  metadata         Json                       @default("{}")
+  createdAt        DateTime                   @default(now()) @map("created_at")
+  updatedAt        DateTime                   @updatedAt @map("updated_at")
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  building       Building        @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  sourceArtifact SourceArtifact? @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+
+  @@unique([buildingId, complianceCycle, filingYear, itemKey])
+  @@index([organizationId, buildingId, filingYear])
+  @@map("beps_prescriptive_items")
+}
+
+model BepsAlternativeComplianceAgreement {
+  id                  String                               @id @default(cuid())
+  organizationId      String                               @map("organization_id")
+  buildingId          String                               @map("building_id")
+  complianceCycle     ComplianceCycle                      @map("compliance_cycle")
+  filingYear          Int                                  @map("filing_year")
+  agreementIdentifier String                               @map("agreement_identifier")
+  pathway             BepsPathway                          @map("pathway")
+  multiplier          Float                                @map("multiplier")
+  status              AlternativeComplianceAgreementStatus @default(DRAFT)
+  effectiveFrom       DateTime                             @map("effective_from")
+  effectiveTo         DateTime?                            @map("effective_to")
+  sourceArtifactId    String?                              @map("source_artifact_id")
+  agreementPayload    Json                                 @default("{}") @map("agreement_payload")
+  createdAt           DateTime                             @default(now()) @map("created_at")
+  updatedAt           DateTime                             @updatedAt @map("updated_at")
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  building       Building        @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  sourceArtifact SourceArtifact? @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+
+  @@unique([buildingId, complianceCycle, filingYear, agreementIdentifier])
+  @@index([organizationId, buildingId, complianceCycle, filingYear, status])
+  @@map("beps_alternative_compliance_agreements")
+}
+
+model PortfolioManagerSyncState {
+  id                   String                     @id @default(cuid())
+  organizationId       String                     @map("organization_id")
+  buildingId           String                     @unique @map("building_id")
+  status               PortfolioManagerSyncStatus @default(IDLE)
+  lastAttemptedSyncAt  DateTime?                  @map("last_attempted_sync_at")
+  lastSuccessfulSyncAt DateTime?                  @map("last_successful_sync_at")
+  lastErrorMetadata    Json                       @default("{}") @map("last_error_metadata")
+  sourceMetadata       Json                       @default("{}") @map("source_metadata")
+  syncMetadata         Json                       @default("{}") @map("sync_metadata")
+  qaPayload            Json                       @default("{}") @map("qa_payload")
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_sync_states")
+}
+
+model OperationalAnomaly {
+  id                        String                   @id @default(cuid())
+  organizationId            String                   @map("organization_id")
+  buildingId                String                   @map("building_id")
+  meterId                   String?                  @map("meter_id")
+  anomalyType               OperationalAnomalyType   @map("anomaly_type")
+  severity                  AlertSeverity
+  status                    OperationalAnomalyStatus @default(ACTIVE)
+  detectionHash             String                   @map("detection_hash")
+  title                     String
+  summary                   String                   @db.Text
+  detectionWindowStart      DateTime                 @map("detection_window_start")
+  detectionWindowEnd        DateTime                 @map("detection_window_end")
+  comparisonWindowStart     DateTime?                @map("comparison_window_start")
+  comparisonWindowEnd       DateTime?                @map("comparison_window_end")
+  basisJson                 Json                     @default("{}") @map("basis_json")
+  reasonCodesJson           Json                     @default("[]") @map("reason_codes_json")
+  estimatedEnergyImpactKbtu Float?                   @map("estimated_energy_impact_kbtu")
+  attributionJson           Json                     @default("{}") @map("attribution_json")
+  metadata                  Json                     @default("{}")
+  acknowledgedAt            DateTime?                @map("acknowledged_at")
+  acknowledgedByType        ActorType?               @map("acknowledged_by_type")
+  acknowledgedById          String?                  @map("acknowledged_by_id")
+  dismissedAt               DateTime?                @map("dismissed_at")
+  dismissedByType           ActorType?               @map("dismissed_by_type")
+  dismissedById             String?                  @map("dismissed_by_id")
+  createdAt                 DateTime                 @default(now()) @map("created_at")
+  updatedAt                 DateTime                 @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  meter        Meter?       @relation(fields: [meterId], references: [id], onDelete: SetNull)
+
+  @@unique([buildingId, detectionHash])
+  @@index([organizationId, buildingId, status, severity, updatedAt(sort: Desc)])
+  @@index([meterId])
+  @@map("operational_anomalies")
+}
+
+model RetrofitCandidate {
+  id                            String                  @id @default(cuid())
+  organizationId                String                  @map("organization_id")
+  buildingId                    String                  @map("building_id")
+  sourceArtifactId              String?                 @map("source_artifact_id")
+  projectType                   RetrofitProjectType     @map("project_type")
+  candidateSource               RetrofitCandidateSource @default(MANUAL) @map("candidate_source")
+  status                        RetrofitCandidateStatus @default(DRAFT)
+  name                          String
+  description                   String?                 @db.Text
+  complianceCycle               ComplianceCycle?        @map("compliance_cycle")
+  targetFilingYear              Int?                    @map("target_filing_year")
+  estimatedCapex                Float                   @map("estimated_capex")
+  estimatedIncentiveAmount      Float                   @default(0) @map("estimated_incentive_amount")
+  estimatedAnnualSavingsKbtu    Float?                  @map("estimated_annual_savings_kbtu")
+  estimatedAnnualSavingsUsd     Float?                  @map("estimated_annual_savings_usd")
+  estimatedSiteEuiReduction     Float?                  @map("estimated_site_eui_reduction")
+  estimatedSourceEuiReduction   Float?                  @map("estimated_source_eui_reduction")
+  estimatedBepsImprovementPct   Float?                  @map("estimated_beps_improvement_pct")
+  estimatedImplementationMonths Int?                    @map("estimated_implementation_months")
+  confidenceBand                RetrofitConfidenceBand  @default(MEDIUM) @map("confidence_band")
+  sourceMetadata                Json                    @default("{}") @map("source_metadata")
+  createdAt                     DateTime                @default(now()) @map("created_at")
+  updatedAt                     DateTime                @updatedAt @map("updated_at")
+
+  organization            Organization             @relation(fields: [organizationId], references: [id])
+  building                Building                 @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  sourceArtifact          SourceArtifact?          @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  financingCaseCandidates FinancingCaseCandidate[]
+
+  @@index([organizationId, buildingId, status, updatedAt(sort: Desc)])
+  @@index([organizationId, projectType, updatedAt(sort: Desc)])
+  @@map("retrofit_candidates")
+}
+
+model FinancingCase {
+  id                                String              @id @default(cuid())
+  organizationId                    String              @map("organization_id")
+  buildingId                        String              @map("building_id")
+  name                              String
+  description                       String?             @db.Text
+  caseType                          FinancingCaseType   @default(SINGLE_CANDIDATE) @map("case_type")
+  status                            FinancingCaseStatus @default(DRAFT)
+  complianceCycle                   ComplianceCycle?    @map("compliance_cycle")
+  targetFilingYear                  Int?                @map("target_filing_year")
+  estimatedCapex                    Float               @default(0) @map("estimated_capex")
+  estimatedAnnualSavingsKbtu        Float?              @map("estimated_annual_savings_kbtu")
+  estimatedAnnualSavingsUsd         Float?              @map("estimated_annual_savings_usd")
+  estimatedAvoidedPenalty           Float?              @map("estimated_avoided_penalty")
+  estimatedComplianceImprovementPct Float?              @map("estimated_compliance_improvement_pct")
+  casePayload                       Json                @default("{}") @map("case_payload")
+  createdByType                     ActorType           @map("created_by_type")
+  createdById                       String?             @map("created_by_id")
+  createdAt                         DateTime            @default(now()) @map("created_at")
+  updatedAt                         DateTime            @updatedAt @map("updated_at")
+
+  organization Organization             @relation(fields: [organizationId], references: [id])
+  building     Building                 @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  candidates   FinancingCaseCandidate[]
+  packets      FinancingPacket[]
+
+  @@index([organizationId, buildingId, status, updatedAt(sort: Desc)])
+  @@map("financing_cases")
+}
+
+model FinancingCaseCandidate {
+  id                  String   @id @default(cuid())
+  organizationId      String   @map("organization_id")
+  buildingId          String   @map("building_id")
+  financingCaseId     String   @map("financing_case_id")
+  retrofitCandidateId String   @map("retrofit_candidate_id")
+  sortOrder           Int      @default(0) @map("sort_order")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  organization      Organization      @relation(fields: [organizationId], references: [id])
+  building          Building          @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  financingCase     FinancingCase     @relation(fields: [financingCaseId], references: [id], onDelete: Cascade)
+  retrofitCandidate RetrofitCandidate @relation(fields: [retrofitCandidateId], references: [id], onDelete: Cascade)
+
+  @@unique([financingCaseId, retrofitCandidateId])
+  @@index([organizationId, buildingId, financingCaseId, sortOrder])
+  @@map("financing_case_candidates")
+}
+
+model FinancingPacket {
+  id               String                @id @default(cuid())
+  organizationId   String                @map("organization_id")
+  buildingId       String                @map("building_id")
+  financingCaseId  String                @map("financing_case_id")
+  complianceCycle  ComplianceCycle?      @map("compliance_cycle")
+  targetFilingYear Int?                  @map("target_filing_year")
+  version          Int
+  status           FinancingPacketStatus @default(DRAFT)
+  packetHash       String                @map("packet_hash")
+  packetPayload    Json                  @default("{}") @map("packet_payload")
+  generatedAt      DateTime              @default(now()) @map("generated_at")
+  staleMarkedAt    DateTime?             @map("stale_marked_at")
+  finalizedAt      DateTime?             @map("finalized_at")
+  finalizedByType  ActorType?            @map("finalized_by_type")
+  finalizedById    String?               @map("finalized_by_id")
+  createdByType    ActorType             @map("created_by_type")
+  createdById      String?               @map("created_by_id")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+  building      Building      @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  financingCase FinancingCase @relation(fields: [financingCaseId], references: [id], onDelete: Cascade)
+
+  @@unique([financingCaseId, version])
+  @@index([organizationId, buildingId, generatedAt(sort: Desc)])
+  @@index([financingCaseId, generatedAt(sort: Desc)])
+  @@map("financing_packets")
 }

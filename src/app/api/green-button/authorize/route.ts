@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma, getTenantClient } from "@/server/lib/db";
 import {
   buildAuthorizationUrl,
   generateState,
 } from "@/server/integrations/green-button";
+import {
+  TenantAccessError,
+  requireTenantContextFromSession,
+} from "@/server/lib/tenant-access";
 
 function getGreenButtonConfig() {
   const clientId = process.env["GREEN_BUTTON_CLIENT_ID"];
@@ -38,9 +40,15 @@ function getGreenButtonConfig() {
  * Initiates Green Button OAuth flow by redirecting to the utility's authorization page.
  */
 export async function GET(req: NextRequest) {
-  const { userId, orgId } = await auth();
-  if (!userId || !orgId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let tenant;
+  try {
+    tenant = await requireTenantContextFromSession();
+  } catch (error) {
+    if (error instanceof TenantAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    throw error;
   }
 
   const buildingId = req.nextUrl.searchParams.get("buildingId");
@@ -59,19 +67,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Verify building belongs to this org
-  const org = await prisma.organization.findUnique({
-    where: { clerkOrgId: orgId },
-  });
-  if (!org) {
-    return NextResponse.json(
-      { error: "Organization not found" },
-      { status: 404 },
-    );
-  }
-
-  const tenantDb = getTenantClient(org.id);
-  const building = await tenantDb.building.findUnique({
+  const building = await tenant.tenantDb.building.findUnique({
     where: { id: buildingId },
   });
   if (!building) {
@@ -86,7 +82,7 @@ export async function GET(req: NextRequest) {
   const state = `${csrfToken}:${buildingId}`;
 
   // Update building status to PENDING_AUTH
-  await tenantDb.building.update({
+  await tenant.tenantDb.building.update({
     where: { id: buildingId },
     data: { greenButtonStatus: "PENDING_AUTH" },
   });

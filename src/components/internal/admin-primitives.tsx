@@ -1,0 +1,161 @@
+"use client";
+
+import type { ReactNode } from "react";
+
+export function LoadingState() {
+  return (
+    <div className="overflow-hidden">
+      <div className="loading-bar h-0.5 w-1/3 bg-gray-300" />
+    </div>
+  );
+}
+
+export function ErrorState({
+  message,
+  detail,
+  action,
+}: {
+  message: string;
+  detail?: string | null;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      <p className="font-medium">{message}</p>
+      {detail ? <p className="mt-1 text-xs text-red-700">{detail}</p> : null}
+      {action ? <div className="mt-3">{action}</div> : null}
+    </div>
+  );
+}
+
+export function EmptyState({
+  message,
+  action,
+}: {
+  message: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-500">
+      <p>{message}</p>
+      {action ? <div className="mt-3">{action}</div> : null}
+    </div>
+  );
+}
+
+export function Panel({
+  title,
+  subtitle,
+  actions,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-base font-medium text-gray-900">{title}</h3>
+          {subtitle ? <p className="mt-1 text-xs text-gray-500">{subtitle}</p> : null}
+        </div>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function MetricGrid({
+  items,
+}: {
+  items: Array<{
+    label: string;
+    value: ReactNode;
+    tone?: "default" | "danger" | "warning" | "success";
+  }>;
+}) {
+  const tones = {
+    default: "text-gray-900",
+    danger: "text-red-700",
+    warning: "text-amber-700",
+    success: "text-green-700",
+  } as const;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3"
+        >
+          <p className="text-xs text-gray-500">{item.label}</p>
+          <p className={`mt-1 text-lg font-semibold ${tones[item.tone ?? "default"]}`}>
+            {item.value}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function formatMoney(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) {
+    return "—";
+  }
+
+  return `$${value.toLocaleString()}`;
+}
+
+export function formatNumber(value: number | null | undefined, digits = 2) {
+  if (value == null || Number.isNaN(value)) {
+    return "—";
+  }
+
+  return value.toFixed(digits);
+}
+
+export function formatPercent(value: number | null | undefined, digits = 1) {
+  if (value == null || Number.isNaN(value)) {
+    return "—";
+  }
+
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+export function formatDate(value: string | Date | null | undefined) {
+  if (!value) {
+    return "—";
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function downloadTextFile(params: {
+  fileName: string;
+  content: string;
+  contentType: string;
+}) {
+  const blob = new Blob([params.content], { type: params.contentType });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = params.fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
