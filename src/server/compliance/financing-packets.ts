@@ -1,9 +1,13 @@
-import crypto from "node:crypto";
 import type {
   ActorType,
   Prisma,
 } from "@/generated/prisma";
 import { prisma } from "@/server/lib/db";
+import {
+  hashDeterministicJson,
+  slugifyFileSegment,
+  stringifyDeterministicJson,
+} from "@/server/lib/deterministic-json";
 import {
   type RetrofitCandidateRanking,
   rankRetrofitCandidatesForBuilding,
@@ -59,53 +63,8 @@ function round(value: number, digits = 2) {
   return Math.round(value * factor) / factor;
 }
 
-function stableStringify(value: unknown): string {
-  if (typeof value === "bigint") {
-    return `{"$bigint":${JSON.stringify(value.toString())}}`;
-  }
-
-  if (value instanceof Date) {
-    return JSON.stringify(value.toISOString());
-  }
-
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
-  }
-
-  if (typeof (value as { toJSON?: () => unknown }).toJSON === "function") {
-    return stableStringify((value as { toJSON: () => unknown }).toJSON());
-  }
-
-  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
-  return `{${entries
-    .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
-    .join(",")}}`;
-}
-
-function stringifyDeterministicJson(value: unknown) {
-  return JSON.stringify(JSON.parse(stableStringify(value)) as unknown, null, 2);
-}
-
-function hashPayload(value: unknown) {
-  return crypto.createHash("sha256").update(stableStringify(value)).digest("hex");
-}
-
 function toJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
-}
-
-function slugifySegment(value: string | null | undefined) {
-  return (value ?? "packet")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "packet";
 }
 
 function dedupeStrings(values: string[]) {
@@ -502,7 +461,7 @@ export function assembleFinancingPacketPayload(input: {
 
   return {
     packetPayload,
-    packetHash: hashPayload({ packetPayload, upstreamFingerprint }),
+    packetHash: hashDeterministicJson({ packetPayload, upstreamFingerprint }),
   };
 }
 
@@ -982,8 +941,8 @@ export async function exportFinancingPacket(params: {
 
   const payload = toRecord(packet.packetPayload);
   const baseFileName = [
-    slugifySegment(packet.financingCase.name),
-    slugifySegment(packet.complianceCycle ?? "financing"),
+    slugifyFileSegment(packet.financingCase.name),
+    slugifyFileSegment(packet.complianceCycle ?? "financing"),
     packet.targetFilingYear ?? "packet",
     `packet-v${packet.version}`,
   ].join("_");

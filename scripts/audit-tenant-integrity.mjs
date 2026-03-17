@@ -60,6 +60,30 @@ const CHECKS = [
     `,
   },
   {
+    name: "audit_logs_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM audit_logs al
+      LEFT JOIN buildings b
+        ON b.id = al.building_id
+       AND b.organization_id = al.organization_id
+      WHERE al.building_id IS NOT NULL
+        AND b.id IS NULL
+    `,
+  },
+  {
+    name: "jobs_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM jobs j
+      LEFT JOIN buildings b
+        ON b.id = j.building_id
+       AND b.organization_id = j.organization_id
+      WHERE j.building_id IS NOT NULL
+        AND b.id IS NULL
+    `,
+  },
+  {
     name: "drift_alerts_building_org_mismatch",
     query: `
       SELECT COUNT(*)::int AS violating_rows
@@ -117,6 +141,39 @@ const CHECKS = [
     `,
   },
   {
+    name: "benchmark_request_items_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM benchmark_request_items bri
+      LEFT JOIN buildings b
+        ON b.id = bri.building_id
+       AND b.organization_id = bri.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "benchmark_packets_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM benchmark_packets bp
+      LEFT JOIN buildings b
+        ON b.id = bp.building_id
+       AND b.organization_id = bp.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "verification_item_results_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM verification_item_results vir
+      LEFT JOIN buildings b
+        ON b.id = vir.building_id
+       AND b.organization_id = vir.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
     name: "filing_records_building_org_mismatch",
     query: `
       SELECT COUNT(*)::int AS violating_rows
@@ -147,6 +204,32 @@ const CHECKS = [
         ON b.id = fp.building_id
        AND b.organization_id = fp.organization_id
       WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "beps_request_items_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM beps_request_items bri
+      LEFT JOIN buildings b
+        ON b.id = bri.building_id
+       AND b.organization_id = bri.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "beps_request_items_filing_record_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM beps_request_items bri
+      LEFT JOIN filing_records fr
+        ON fr.id = bri.filing_record_id
+      WHERE bri.filing_record_id IS NOT NULL
+        AND (
+          fr.id IS NULL
+          OR fr.organization_id <> bri.organization_id
+          OR fr.building_id <> bri.building_id
+        )
     `,
   },
   {
@@ -300,6 +383,19 @@ const CHECKS = [
       LEFT JOIN organization_memberships om
         ON om.user_id = u.id
       WHERE om.id IS NULL
+    `,
+  },
+  {
+    name: "benchmark_packets_submission_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM benchmark_packets bp
+      LEFT JOIN benchmark_submissions bs
+        ON bs.id = bp.benchmark_submission_id
+      WHERE bs.id IS NULL
+         OR bs.building_id <> bp.building_id
+         OR bs.organization_id <> bp.organization_id
+         OR bs.reporting_year <> bp.reporting_year
     `,
   },
 ];

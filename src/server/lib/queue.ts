@@ -1,12 +1,15 @@
 import { Queue, Worker, type Processor, type JobsOptions } from "bullmq";
+import { env } from "./config";
 
 function getConnectionOpts() {
-  const url = process.env["REDIS_URL"] || "redis://localhost:6379";
-  const parsed = new URL(url);
+  const parsed = new URL(env.REDIS_URL);
   return {
     host: parsed.hostname,
     port: Number(parsed.port) || 6379,
+    username: parsed.username || undefined,
     password: parsed.password || undefined,
+    db: parsed.pathname ? Number(parsed.pathname.replace("/", "")) || 0 : 0,
+    tls: parsed.protocol === "rediss:" ? {} : undefined,
     maxRetriesPerRequest: null as null,
   };
 }

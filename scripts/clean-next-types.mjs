@@ -4,6 +4,7 @@ import path from "node:path";
 const repoRoot = process.cwd();
 const generatedRoot = path.join(repoRoot, ".next", "types", "app");
 const sourceRoot = path.join(repoRoot, "src", "app");
+const tsBuildInfoFile = path.join(repoRoot, "tsconfig.tsbuildinfo");
 
 async function walk(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -74,6 +75,7 @@ async function main() {
   }
 
   await removeEmptyDirs(generatedRoot).catch(() => undefined);
+  await fs.unlink(tsBuildInfoFile).catch(() => undefined);
 }
 
 main().catch((error) => {

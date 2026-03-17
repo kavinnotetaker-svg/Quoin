@@ -4,6 +4,7 @@ import { PropertyService } from "./property";
 import { MeterService } from "./meter";
 import { MetricsService } from "./metrics";
 import { ConsumptionService } from "./consumption";
+import { getEspmClientConfig } from "@/server/lib/config";
 
 export class ESPM {
   public readonly property: PropertyService;
@@ -22,17 +23,7 @@ export class ESPM {
 
 /** Factory for creating ESPM client from env vars */
 export function createESPMClient(): ESPM {
-  const baseUrl =
-    process.env["ESPM_BASE_URL"] ||
-    "https://portfoliomanager.energystar.gov/ws";
-  const username = process.env["ESPM_USERNAME"];
-  const password = process.env["ESPM_PASSWORD"];
-
-  if (!username || !password) {
-    throw new Error("ESPM_USERNAME and ESPM_PASSWORD must be set");
-  }
-
-  return new ESPM({ baseUrl, username, password });
+  return new ESPM(getEspmClientConfig());
 }
 
 export { ESPMClient } from "./client";

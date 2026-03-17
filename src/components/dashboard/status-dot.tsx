@@ -1,20 +1,22 @@
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  COMPLIANT: { color: "#16a34a", label: "Compliant" },
-  AT_RISK: { color: "#ca8a04", label: "At Risk" },
-  NON_COMPLIANT: { color: "#dc2626", label: "Non-Compliant" },
-  PENDING_DATA: { color: "#9ca3af", label: "Pending" },
-  EXEMPT: { color: "#9ca3af", label: "Exempt" },
-};
+import { getComplianceStatusDisplay } from "@/components/internal/status-helpers";
 
 export function StatusDot({ status }: { status: string }) {
-  const c = STATUS_CONFIG[status] ?? { color: "#9ca3af", label: status };
+  const config = getComplianceStatusDisplay(status);
+  const color =
+    config.tone === "success"
+      ? "#16a34a"
+      : config.tone === "warning"
+        ? "#ca8a04"
+        : config.tone === "danger"
+          ? "#dc2626"
+          : "#9ca3af";
   return (
     <span className="inline-flex items-center gap-1.5 text-[13px] text-gray-700">
       <span
         className="h-1.5 w-1.5 rounded-full"
-        style={{ backgroundColor: c.color }}
+        style={{ backgroundColor: color }}
       />
-      {c.label}
+      {config.label}
     </span>
   );
 }

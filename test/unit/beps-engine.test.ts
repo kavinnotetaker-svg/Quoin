@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { calculateAlternativeComplianceAmount } from "@/server/compliance/beps/alternative-compliance";
 import { evaluateBepsApplicability } from "@/server/compliance/beps/applicability";
 import {
-  BEPS_FACTOR_SET_KEYS,
   getBepsFactorSetKeyForCycle,
 } from "@/server/compliance/beps/config";
 import { evaluateBepsData } from "@/server/compliance/beps/beps-evaluator";
@@ -376,8 +375,8 @@ describe("BEPS engine exact formulas", () => {
   });
 
   it("exposes governed factor-set keys for configured cycles", () => {
-    expect(BEPS_FACTOR_SET_KEYS.CYCLE_1).toBe("DC_BEPS_CYCLE_1_FACTORS_V1");
-    expect(BEPS_FACTOR_SET_KEYS.CYCLE_2).toBe("DC_BEPS_CYCLE_2_FACTORS_V1");
+    expect(getBepsFactorSetKeyForCycle("CYCLE_1")).toBe("DC_BEPS_CYCLE_1_FACTORS_V1");
+    expect(getBepsFactorSetKeyForCycle("CYCLE_2")).toBe("DC_BEPS_CYCLE_2_FACTORS_V1");
     expect(getBepsFactorSetKeyForCycle("CYCLE_2")).toBe("DC_BEPS_CYCLE_2_FACTORS_V1");
   });
 

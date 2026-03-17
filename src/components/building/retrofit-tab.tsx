@@ -47,6 +47,8 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
       setEstimatedImplementationMonths("");
       utils.retrofit.listCandidates.invalidate({ buildingId, limit: 50 });
       utils.retrofit.rankBuilding.invalidate({ buildingId, limit: 50 });
+      utils.building.get.invalidate({ id: buildingId });
+      utils.building.portfolioWorkflow.invalidate({ limit: 25 });
     },
   });
 
@@ -59,44 +61,47 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
     return <ErrorState message="Retrofit ranking is unavailable." detail={error?.message} />;
   }
 
+  const inputClass = "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors";
+  const labelClass = "mb-1.5 block text-[13px] font-medium text-zinc-700";
+
   return (
     <div className="space-y-6">
-      <Panel title="Create Retrofit Candidate" subtitle="Manual/internal candidate creation for deterministic retrofit ranking.">
-        <div className="grid gap-4 xl:grid-cols-3">
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">Project type</span>
-            <select value={projectType} onChange={(event) => setProjectType(event.target.value as (typeof PROJECT_TYPES)[number])} className="w-full rounded border border-gray-300 px-3 py-2">
+      <Panel title="Retrofit planning" subtitle="Create and compare retrofit options so Quoin can rank the next practical project for this building.">
+        <div className="grid gap-5 xl:grid-cols-3">
+          <label className="block text-sm">
+            <span className={labelClass}>Project type</span>
+            <select value={projectType} onChange={(event) => setProjectType(event.target.value as (typeof PROJECT_TYPES)[number])} className={inputClass}>
               {PROJECT_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type}>{type.replace(/_/g, " ").toLowerCase()}</option>
               ))}
             </select>
           </label>
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">Name</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <label className="block text-sm">
+            <span className={labelClass}>Name</span>
+            <input value={name} onChange={(event) => setName(event.target.value)} className={inputClass} placeholder="e.g., LED Upgrade" />
           </label>
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">Capex</span>
-            <input value={estimatedCapex} onChange={(event) => setEstimatedCapex(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <label className="block text-sm">
+            <span className={labelClass}>Capex</span>
+            <input value={estimatedCapex} onChange={(event) => setEstimatedCapex(event.target.value)} className={inputClass} placeholder="0.00" />
           </label>
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">Annual savings (USD)</span>
-            <input value={estimatedAnnualSavingsUsd} onChange={(event) => setEstimatedAnnualSavingsUsd(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <label className="block text-sm">
+            <span className={labelClass}>Annual savings (USD)</span>
+            <input value={estimatedAnnualSavingsUsd} onChange={(event) => setEstimatedAnnualSavingsUsd(event.target.value)} className={inputClass} placeholder="0.00" />
           </label>
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">Annual savings (kBtu)</span>
-            <input value={estimatedAnnualSavingsKbtu} onChange={(event) => setEstimatedAnnualSavingsKbtu(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <label className="block text-sm">
+            <span className={labelClass}>Annual savings (kBtu)</span>
+            <input value={estimatedAnnualSavingsKbtu} onChange={(event) => setEstimatedAnnualSavingsKbtu(event.target.value)} className={inputClass} placeholder="0" />
           </label>
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">BEPS improvement (%)</span>
-            <input value={estimatedBepsImprovementPct} onChange={(event) => setEstimatedBepsImprovementPct(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <label className="block text-sm">
+            <span className={labelClass}>BEPS improvement (%)</span>
+            <input value={estimatedBepsImprovementPct} onChange={(event) => setEstimatedBepsImprovementPct(event.target.value)} className={inputClass} placeholder="0" />
           </label>
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">Implementation months</span>
-            <input value={estimatedImplementationMonths} onChange={(event) => setEstimatedImplementationMonths(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <label className="block text-sm">
+            <span className={labelClass}>Implementation months</span>
+            <input value={estimatedImplementationMonths} onChange={(event) => setEstimatedImplementationMonths(event.target.value)} className={inputClass} placeholder="0" />
           </label>
         </div>
-        <div className="mt-4">
+        <div className="mt-6 pt-5 border-t border-zinc-100 flex justify-end">
           <button
             onClick={() =>
               createCandidate.mutate({
@@ -112,29 +117,31 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
               })
             }
             disabled={createCandidate.isPending}
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-md bg-zinc-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50"
           >
-            {createCandidate.isPending ? "Saving..." : "Save Candidate"}
+            {createCandidate.isPending ? "Saving..." : "Save retrofit candidate"}
           </button>
         </div>
       </Panel>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel title="Candidate Registry" subtitle="Canonical retrofit candidates for this building.">
+        <Panel title="Candidate list" subtitle="Current retrofit ideas available for ranking on this building.">
           {!candidates.data || candidates.data.length === 0 ? (
             <EmptyState message="No retrofit candidates exist for this building yet." />
           ) : (
             <div className="space-y-3">
               {candidates.data.map((candidate) => (
-                <div key={candidate.id} className="rounded border border-gray-200 px-3 py-3">
-                  <div className="font-medium text-gray-900">{candidate.name}</div>
-                  <div className="mt-1 text-xs text-gray-500">
-                    {candidate.projectType} • {candidate.status} • {candidate.confidenceBand}
+                <div key={candidate.id} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+                  <div className="font-semibold text-[15px] tracking-tight text-zinc-900">{candidate.name}</div>
+                  <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.projectType}</span>
+                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.status}</span>
+                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.confidenceBand}</span>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-600">
-                    <span>Capex {formatMoney(candidate.estimatedCapex)}</span>
-                    <span>Savings {formatMoney(candidate.estimatedAnnualSavingsUsd)}</span>
-                    <span>BEPS {formatNumber(candidate.estimatedBepsImprovementPct)}%</span>
+                  <div className="mt-4 grid gap-3 text-[13px] text-zinc-600 font-medium sm:grid-cols-3">
+                    <div>Capex: <span className="text-zinc-900">{formatMoney(candidate.estimatedCapex)}</span></div>
+                    <div>Savings: <span className="text-zinc-900">{formatMoney(candidate.estimatedAnnualSavingsUsd)}</span></div>
+                    <div>BEPS: <span className="text-zinc-900">{formatNumber(candidate.estimatedBepsImprovementPct)}%</span></div>
                   </div>
                 </div>
               ))}
@@ -142,30 +149,32 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
           )}
         </Panel>
 
-        <Panel title="Ranking Output" subtitle="Deterministic retrofit ranking by avoided penalty, savings, timing, and confidence.">
+        <Panel title="Recommended order" subtitle="Deterministic ranking based on avoided penalty, savings, timing, and confidence.">
           {!rankings.data || rankings.data.length === 0 ? (
             <EmptyState message="No retrofit rankings are available yet." />
           ) : (
             <div className="space-y-3">
               {rankings.data.map((ranking) => (
-                <div key={ranking.candidateId} className="rounded border border-gray-200 px-3 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-medium text-gray-900">{ranking.name}</div>
-                    <div className="text-xs text-gray-500">{ranking.priorityBand}</div>
+                <div key={ranking.candidateId} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="font-semibold text-[15px] tracking-tight text-zinc-900">{ranking.name}</div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md shadow-sm">{ranking.priorityBand}</div>
                   </div>
-                  <div className="mt-2 grid gap-2 text-xs text-gray-600 sm:grid-cols-2">
-                    <div>Priority score {ranking.priorityScore}</div>
-                    <div>Avoided penalty {formatMoney(ranking.estimatedAvoidedPenalty)}</div>
-                    <div>Net cost {formatMoney(ranking.netProjectCost)}</div>
-                    <div>Payback {ranking.paybackProxyYears ?? "—"} years</div>
+                  <div className="mt-4 grid gap-3 text-[13px] text-zinc-600 font-medium sm:grid-cols-2">
+                    <div>Priority score: <span className="text-zinc-900">{ranking.priorityScore}</span></div>
+                    <div>Avoided penalty: <span className="text-zinc-900">{formatMoney(ranking.estimatedAvoidedPenalty)}</span></div>
+                    <div>Net cost: <span className="text-zinc-900">{formatMoney(ranking.netProjectCost)}</span></div>
+                    <div>Payback: <span className="text-zinc-900">{ranking.paybackProxyYears ?? "—"} years</span></div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {ranking.reasonCodes.map((reasonCode) => (
-                      <span key={reasonCode} className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700">
-                        {reasonCode}
-                      </span>
-                    ))}
-                  </div>
+                  {ranking.reasonCodes.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-zinc-100 flex flex-wrap gap-2">
+                      {ranking.reasonCodes.map((reasonCode) => (
+                        <span key={reasonCode} className="rounded-md bg-zinc-50 border border-zinc-200 shadow-sm px-2 py-1 text-[11px] font-semibold text-zinc-600">
+                          {reasonCode}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

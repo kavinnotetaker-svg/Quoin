@@ -11,6 +11,8 @@ import type { ESPM } from "@/server/integrations/espm";
 import type { UploadResult, NormalizedReading, MeterType } from "./types";
 import { prisma } from "@/server/lib/db";
 import { getLatestComplianceSnapshot } from "@/server/lib/compliance-snapshots";
+import { NotFoundError } from "@/server/lib/errors";
+import { createLogger } from "@/server/lib/logger";
 import {
   BOOTSTRAP_FACTOR_SET_KEY,
   BOOTSTRAP_RULE_PACKAGE_KEYS,
@@ -241,6 +243,11 @@ export async function runIngestionPipeline(
   input: IngestionPipelineInput,
 ): Promise<IngestionPipelineResult> {
   const startTime = Date.now();
+  const logger = createLogger({
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    procedure: "dataIngestion.pipeline",
+  });
   const errors: string[] = [];
   let pipelineRunId: string | null = null;
   let espmSyncResult: ESPMSyncResult | null = null;
@@ -251,7 +258,7 @@ export async function runIngestionPipeline(
       where: { id: input.buildingId },
     });
     if (!building) {
-      throw new Error(`Building ${input.buildingId} not found`);
+      throw new NotFoundError(`Building ${input.buildingId} not found`);
     }
 
     // Load last 12 months of readings
@@ -293,16 +300,7 @@ export async function runIngestionPipeline(
     let energyStarScore: number | null = null;
     let weatherNormalizedSiteEui: number | null = null;
     let weatherNormalizedSourceEui: number | null = null;
-    let effectiveEspmId = building.espmPropertyId;
-
-    if (!effectiveEspmId && input.espmClient) {
-      // Auto-assign a mock property ID for testing the pipeline if none exists
-      effectiveEspmId = Math.floor(Math.random() * 900000 + 100000).toString();
-      await input.tenantDb.building.update({
-        where: { id: building.id },
-        data: { espmPropertyId: effectiveEspmId },
-      });
-    }
+    const effectiveEspmId = building.espmPropertyId;
 
     if (input.espmClient && effectiveEspmId) {
       const newReadings = await input.tenantDb.energyReading.findMany({
@@ -314,7 +312,7 @@ export async function runIngestionPipeline(
 
       espmSyncResult = await syncWithESPM(input.espmClient, {
         espmPropertyId: Number(effectiveEspmId),
-        espmMeterId: Number(effectiveEspmId), // TODO: separate meter ID field
+        espmMeterId: null,
         readings: newReadings.map((r: { periodStart: Date; periodEnd: Date; consumption: number; unit: string }) => ({
           periodStart: r.periodStart,
           periodEnd: r.periodEnd,
@@ -339,6 +337,10 @@ export async function runIngestionPipeline(
       if (espmSyncResult.metricsError) {
         errors.push(`ESPM metrics pull failed: ${espmSyncResult.metricsError} `);
       }
+    } else if (input.espmClient && !effectiveEspmId) {
+      errors.push(
+        "ESPM sync skipped: building is not linked to a Portfolio Manager property.",
+      );
     }
 
     // Compute data quality
@@ -356,13 +358,17 @@ export async function runIngestionPipeline(
     if (energyStarScore == null) {
       const prevSnapshot = await getLatestComplianceSnapshot(prisma, {
         buildingId: input.buildingId,
+        organizationId: input.organizationId,
         where: {
           energyStarScore: { not: null },
         },
       });
       if (prevSnapshot?.energyStarScore != null) {
         energyStarScore = prevSnapshot.energyStarScore;
-        console.log(`[Pipeline] Carried forward previous Energy Star score: ${energyStarScore}`);
+        logger.info("Carried forward previous ENERGY STAR score", {
+          snapshotId: prevSnapshot.id,
+          energyStarScore,
+        });
       }
     }
 

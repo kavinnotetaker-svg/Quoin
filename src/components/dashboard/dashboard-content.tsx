@@ -1,19 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { trpc } from "@/lib/trpc";
 import { PageHeader } from "@/components/layout/page-header";
 import { KPIRow } from "./kpi-row";
 import { BuildingTable } from "./building-table";
-import { BuildingMap } from "./building-map";
 import { PortfolioInsights } from "./portfolio-insights";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const BuildingMap = dynamic(
+  () => import("./building-map").then((mod) => mod.BuildingMap),
+  {
+    ssr: false,
+    loading: () => (
+      <Skeleton className="h-[600px] w-full rounded-xl border border-zinc-200" />
+    ),
+  },
+);
 
 const STATUS_FILTERS = [
   { label: "All", value: undefined },
   { label: "Compliant", value: "COMPLIANT" },
-  { label: "At Risk", value: "AT_RISK" },
-  { label: "Non-Compliant", value: "NON_COMPLIANT" },
-  { label: "Pending", value: "PENDING_DATA" },
+  { label: "At risk", value: "AT_RISK" },
+  { label: "Non-compliant", value: "NON_COMPLIANT" },
+  { label: "Needs data", value: "PENDING_DATA" },
 ] as const;
 
 export function DashboardContent() {
@@ -28,8 +39,58 @@ export function DashboardContent() {
 
   if (stats.isLoading || buildings.isLoading) {
     return (
-      <div className="overflow-hidden">
-        <div className="loading-bar h-0.5 w-1/3 bg-gray-300" />
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="flex items-center justify-between pt-2">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-md" />
+            <Skeleton className="h-4 w-96 rounded-md" />
+          </div>
+          <Skeleton className="hidden h-10 w-32 rounded-lg sm:block" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
+            >
+              <Skeleton className="h-4 w-28 rounded-md" />
+              <Skeleton className="mt-4 h-8 w-24 rounded-md" />
+              <Skeleton className="mt-3 h-3 w-32 rounded-md" />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Skeleton className="h-10 w-full rounded-lg sm:w-[400px]" />
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-32 rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-lg sm:w-64" />
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+          <div className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-full rounded-md" />
+            </div>
+          </div>
+          <div className="divide-y divide-zinc-100">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between px-6 py-4"
+              >
+                <Skeleton className="h-4 w-48 rounded-md" />
+                <Skeleton className="h-4 w-24 rounded-md" />
+                <Skeleton className="h-4 w-16 rounded-md" />
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-4 w-20 rounded-md" />
+                <Skeleton className="h-4 w-20 rounded-md" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -41,14 +102,17 @@ export function DashboardContent() {
 
     if (code === "FORBIDDEN" || msg?.includes("No organization")) {
       return (
-        <div className="py-12 text-center">
-          <p className="text-sm font-medium text-gray-900">No organization selected</p>
-          <p className="mt-1 text-sm text-gray-500">
-            Create or select an organization to view your portfolio.
+        <div className="flex min-h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white p-12 text-center shadow-sm">
+          <p className="text-lg font-semibold text-zinc-900">
+            No organization selected
+          </p>
+          <p className="mt-2 max-w-sm text-sm text-zinc-500">
+            You need to create or select an organization to view your portfolio
+            and workflow data.
           </p>
           <a
             href="/onboarding"
-            className="mt-4 inline-block rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="mt-6 rounded-md bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow transition-colors hover:bg-zinc-800"
           >
             Get started
           </a>
@@ -58,36 +122,41 @@ export function DashboardContent() {
 
     if (code === "NOT_FOUND" || msg?.includes("Organization not found")) {
       return (
-        <div className="py-12 text-center">
-          <p className="text-sm font-medium text-gray-900">Organization syncing</p>
-          <p className="mt-1 text-sm text-gray-500">
-            Your organization is being set up. This usually takes a few seconds.
+        <div className="flex min-h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white p-12 text-center shadow-sm">
+          <p className="text-lg font-semibold text-zinc-900">
+            Organization syncing
+          </p>
+          <p className="mt-2 max-w-sm text-sm text-zinc-500">
+            Your organization is still being set up. This usually takes only a
+            few seconds.
           </p>
           <button
             onClick={() => {
               stats.refetch();
               buildings.refetch();
             }}
-            className="mt-4 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="mt-6 rounded-md border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50"
           >
-            Retry
+            Refresh
           </button>
         </div>
       );
     }
 
     return (
-      <div className="py-12 text-center">
-        <p className="text-sm text-gray-500">Something went wrong.</p>
-        <p className="mt-1 text-xs text-gray-400">{msg}</p>
+      <div className="flex min-h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white p-12 text-center shadow-sm">
+        <p className="text-lg font-semibold text-zinc-900">
+          Portfolio data could not load
+        </p>
+        <p className="mt-2 max-w-sm text-sm text-zinc-500">{msg}</p>
         <button
           onClick={() => {
             stats.refetch();
             buildings.refetch();
           }}
-          className="mt-4 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="mt-6 rounded-md border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50"
         >
-          Retry
+          Try again
         </button>
       </div>
     );
@@ -97,118 +166,124 @@ export function DashboardContent() {
   const b = buildings.data!;
 
   const scoredCount = s.compliant + s.atRisk + s.nonCompliant;
-
-  // Client-side status filter
   const filtered = statusFilter
     ? b.buildings.filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (bld: any) =>
-          bld.latestSnapshot?.complianceStatus === statusFilter ||
-          (!bld.latestSnapshot && statusFilter === "PENDING_DATA"),
+        (building) =>
+          building.latestSnapshot?.complianceStatus === statusFilter ||
+          (!building.latestSnapshot && statusFilter === "PENDING_DATA"),
       )
     : b.buildings;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Portfolio Overview" />
+    <div className="space-y-8">
+      <PageHeader
+        title="Portfolio Overview"
+        subtitle="Review which buildings need consultant attention first, then drill into the building workflow."
+      />
 
       <KPIRow
         items={[
           {
-            label: "Buildings",
+            label: "Buildings in portfolio",
             value: s.totalBuildings,
             subtitle:
               s.nonCompliant > 0
-                ? `${s.nonCompliant} non-compliant`
-                : undefined,
-            subtitleColor: s.nonCompliant > 0 ? "#dc2626" : undefined,
+                ? `${s.nonCompliant} need immediate BEPS follow-up`
+                : "No buildings currently non-compliant",
+            subtitleColor:
+              s.nonCompliant > 0 ? "rgb(220, 38, 38)" : undefined,
           },
           {
-            label: "Penalty Exposure",
+            label: "Estimated penalty exposure",
             value: `$${s.totalPenaltyExposure.toLocaleString()}`,
+            subtitle: "From the latest compliance snapshot for each building",
           },
           {
-            label: "Avg Score",
-            value: s.averageScore || "—",
+            label: "Average latest score",
+            value: s.averageScore || "Not available",
             subtitle:
               scoredCount > 0
-                ? `across ${scoredCount} scored`
-                : undefined,
+                ? `Across ${scoredCount} scored buildings`
+                : "No score data yet",
           },
           {
-            label: "Pending Data",
+            label: "Buildings needing fresh data",
             value: s.pendingData,
             subtitle:
-              s.pendingData > 0 ? "need fresh data" : "all up to date",
+              s.pendingData > 0
+                ? "Refresh data before relying on status"
+                : "All buildings have recent data",
           },
         ]}
       />
 
-      <hr className="border-gray-200" />
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-4 text-[13px]">
-          {STATUS_FILTERS.map((f) => (
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-1.5 rounded-lg bg-zinc-100/80 p-1 text-[13px] font-medium text-zinc-600">
+          {STATUS_FILTERS.map((filter) => (
             <button
-              key={f.label}
-              onClick={() => setStatusFilter(f.value)}
-              className={`border-b-2 pb-0.5 ${
-                statusFilter === f.value
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+              key={filter.label}
+              onClick={() => setStatusFilter(filter.value)}
+              className={`rounded-md px-3 py-1.5 transition-all duration-200 ${
+                statusFilter === filter.value
+                  ? "bg-white text-zinc-950 shadow-sm ring-1 ring-zinc-200/50"
+                  : "hover:bg-zinc-200/50 hover:text-zinc-900"
               }`}
             >
-              {f.label}
+              {filter.label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 text-xs text-gray-500">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center rounded-lg bg-zinc-100/80 p-1 text-[13px] font-medium text-zinc-600">
             <button
               onClick={() => setView("table")}
-              className={
+              className={`rounded-md px-3 py-1.5 transition-all duration-200 ${
                 view === "table"
-                  ? "border-b border-gray-900 pb-0.5 text-gray-900"
-                  : ""
-              }
+                  ? "bg-white text-zinc-950 shadow-sm ring-1 ring-zinc-200/50"
+                  : "hover:bg-zinc-200/50 hover:text-zinc-900"
+              }`}
             >
               Table
             </button>
             <button
               onClick={() => setView("map")}
-              className={
+              className={`rounded-md px-3 py-1.5 transition-all duration-200 ${
                 view === "map"
-                  ? "border-b border-gray-900 pb-0.5 text-gray-900"
-                  : ""
-              }
+                  ? "bg-white text-zinc-950 shadow-sm ring-1 ring-zinc-200/50"
+                  : "hover:bg-zinc-200/50 hover:text-zinc-900"
+              }`}
             >
               Map
             </button>
           </div>
-          <input
-            type="text"
-            placeholder="Search buildings..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="rounded border border-gray-200 px-2.5 py-1.5 text-[13px] text-gray-900 placeholder-gray-400 outline-none focus:border-gray-400 sm:w-56"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by building name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="peer w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[13px] text-zinc-900 placeholder:text-zinc-400 transition-all focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 sm:w-64"
+            />
+          </div>
         </div>
       </div>
 
-      {view === "table" ? (
-        <BuildingTable buildings={filtered} />
-      ) : (
-        <BuildingMap buildings={filtered} />
-      )}
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+        {view === "table" ? (
+          <BuildingTable buildings={filtered} />
+        ) : (
+          <BuildingMap buildings={filtered} />
+        )}
+      </div>
 
       {b.pagination.totalPages > 1 && (
-        <p className="text-xs text-gray-400">
+        <p className="text-center text-xs font-medium text-zinc-500">
           Page {b.pagination.page} of {b.pagination.totalPages} (
           {b.pagination.total} total)
         </p>
       )}
 
-      <hr className="border-gray-200" />
+      <hr className="my-8 border-zinc-200" />
 
       <PortfolioInsights
         buildings={b.buildings.map((building) => ({

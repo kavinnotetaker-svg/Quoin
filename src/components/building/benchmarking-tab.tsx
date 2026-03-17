@@ -10,9 +10,25 @@ import {
   Panel,
   formatDate,
 } from "@/components/internal/admin-primitives";
+import {
+  StatusBadge,
+  getReadinessStatusDisplay,
+  getSyncStatusDisplay,
+  getVerificationStatusDisplay,
+} from "@/components/internal/status-helpers";
 
 function defaultReportingYear() {
   return new Date().getUTCFullYear() - 1;
+}
+
+function formatSyncStatus(status: string | null | undefined) {
+  return getSyncStatusDisplay(status).label;
+}
+
+function formatStepLabel(step: unknown) {
+  return typeof step === "string" && step.trim()
+    ? step.replaceAll("_", " ").toLowerCase()
+    : "Not available";
 }
 
 export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
@@ -31,7 +47,14 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
     { buildingId, reportingYear },
     { retry: false },
   );
-  const submissions = trpc.benchmarking.listSubmissions.useQuery({ buildingId, limit: 10 });
+  const submissions = trpc.benchmarking.listSubmissions.useQuery({
+    buildingId,
+    limit: 10,
+  });
+  const verificationChecklist = trpc.benchmarking.getVerificationChecklist.useQuery(
+    { buildingId, reportingYear },
+    { retry: false },
+  );
 
   const syncMutation = trpc.benchmarking.syncPortfolioManager.useMutation({
     onSuccess: () => {
@@ -39,17 +62,51 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
       utils.benchmarking.getQaFindings.invalidate({ buildingId });
       utils.benchmarking.listSubmissions.invalidate({ buildingId, limit: 10 });
       utils.benchmarking.getReadiness.invalidate({ buildingId, reportingYear });
+      utils.benchmarking.getVerificationChecklist.invalidate({
+        buildingId,
+        reportingYear,
+      });
       utils.building.get.invalidate({ id: buildingId });
       utils.building.list.invalidate();
+      utils.building.portfolioWorkflow.invalidate({ limit: 25 });
       utils.building.complianceHistory.invalidate({ buildingId, limit: 20 });
       utils.report.getComplianceReport.invalidate({ buildingId });
     },
   });
 
+  const pushMutation =
+    trpc.benchmarking.pushLocalEnergyToPortfolioManager.useMutation({
+      onSuccess: () => {
+        utils.benchmarking.getPortfolioManagerSyncStatus.invalidate({
+          buildingId,
+        });
+        utils.benchmarking.getQaFindings.invalidate({ buildingId });
+        utils.benchmarking.listSubmissions.invalidate({
+          buildingId,
+          limit: 10,
+        });
+        utils.benchmarking.getReadiness.invalidate({ buildingId, reportingYear });
+        utils.benchmarking.getVerificationChecklist.invalidate({
+          buildingId,
+          reportingYear,
+        });
+        utils.building.get.invalidate({ id: buildingId });
+        utils.building.list.invalidate();
+        utils.building.portfolioWorkflow.invalidate({ limit: 25 });
+        utils.building.energyReadings.invalidate({ buildingId, months: 24 });
+        utils.building.complianceHistory.invalidate({ buildingId, limit: 20 });
+        utils.report.getComplianceReport.invalidate({ buildingId });
+      },
+    });
+
   const evaluateMutation = trpc.benchmarking.evaluateReadiness.useMutation({
     onSuccess: () => {
       utils.benchmarking.getReadiness.invalidate({ buildingId, reportingYear });
       utils.benchmarking.listSubmissions.invalidate({ buildingId, limit: 10 });
+      utils.benchmarking.getVerificationChecklist.invalidate({
+        buildingId,
+        reportingYear,
+      });
       utils.report.getComplianceReport.invalidate({ buildingId });
     },
   });
@@ -59,12 +116,20 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
   }
 
   if (submissions.error) {
-    return <ErrorState message="Benchmarking workflow is unavailable." detail={submissions.error.message} />;
+    return (
+      <ErrorState
+        message="Benchmarking workflow is unavailable."
+        detail={submissions.error.message}
+      />
+    );
   }
 
   const syncData = syncStatus.error ? null : syncStatus.data;
   const qaPayload =
-    qaFindings.error || !qaFindings.data || typeof qaFindings.data !== "object" || Array.isArray(qaFindings.data)
+    qaFindings.error ||
+    !qaFindings.data ||
+    typeof qaFindings.data !== "object" ||
+    Array.isArray(qaFindings.data)
       ? null
       : (qaFindings.data as Record<string, unknown>);
   const readinessPayload =
@@ -74,68 +139,211 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
       ? (readiness.data.submissionPayload as Record<string, unknown>)
       : null;
   const findings = Array.isArray(qaPayload?.findings) ? qaPayload.findings : [];
+  const syncDiagnostics = syncData?.diagnostics ?? null;
+  const syncWarnings = Array.isArray(syncDiagnostics?.warnings)
+    ? syncDiagnostics.warnings.map((warning) => String(warning))
+    : [];
+  const verificationItems = verificationChecklist.data?.items ?? [];
+  const verificationSummary = verificationChecklist.data?.summary ?? null;
+
+  const btnClass =
+    "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50";
+  const qualityStatus = getReadinessStatusDisplay(
+    String(qaPayload?.status ?? "NOT_AVAILABLE"),
+  );
 
   return (
     <div className="space-y-6">
       <Panel
-        title="Portfolio Manager Sync"
-        subtitle="Refresh PM property, meter, consumption, and metrics data, then rerun benchmarking autopilot."
+        title="Benchmarking readiness"
+        subtitle="Confirm the data connection, review blockers, and refresh the governed readiness result for the selected reporting year."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <input
               type="number"
               value={reportingYear}
               onChange={(event) => setReportingYear(Number(event.target.value))}
-              className="w-28 rounded border border-gray-300 px-2 py-1.5 text-sm"
+              className="w-28 rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] font-medium text-zinc-900 shadow-sm transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
             <button
               onClick={() => syncMutation.mutate({ buildingId, reportingYear })}
               disabled={syncMutation.isPending}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className={btnClass}
             >
-              {syncMutation.isPending ? "Syncing..." : "Sync PM"}
+              {syncMutation.isPending ? "Syncing..." : "Refresh PM Data"}
+            </button>
+            <button
+              onClick={() => pushMutation.mutate({ buildingId, reportingYear })}
+              disabled={pushMutation.isPending}
+              className={btnClass}
+            >
+              {pushMutation.isPending ? "Pushing..." : "Push Local Data"}
             </button>
             <button
               onClick={() => evaluateMutation.mutate({ buildingId, reportingYear })}
               disabled={evaluateMutation.isPending}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className={btnClass}
             >
-              {evaluateMutation.isPending ? "Evaluating..." : "Evaluate Readiness"}
+              {evaluateMutation.isPending
+                ? "Rechecking..."
+                : "Recheck Benchmarking"}
             </button>
           </div>
         }
       >
         <MetricGrid
           items={[
-            { label: "Sync Status", value: syncData?.status ?? "NOT_STARTED" },
-            { label: "Last Attempt", value: formatDate(syncData?.lastAttemptedSyncAt) },
-            { label: "Last Success", value: formatDate(syncData?.lastSuccessfulSyncAt) },
-            { label: "QA Status", value: String(qaPayload?.status ?? "NOT_AVAILABLE") },
+            {
+              label: "Portfolio Manager sync",
+              value: formatSyncStatus(syncData?.status),
+            },
+            {
+              label: "Last sync attempt",
+              value: formatDate(syncData?.lastAttemptedSyncAt),
+            },
+            {
+              label: "Last successful sync",
+              value: formatDate(syncData?.lastSuccessfulSyncAt),
+            },
+            {
+              label: "Failed phase",
+              value: formatStepLabel(syncDiagnostics?.failedStep),
+            },
+            {
+              label: "Quality checks",
+              value: qualityStatus.label,
+            },
           ]}
         />
+
         {syncStatus.error && syncStatus.error.data?.code !== "NOT_FOUND" ? (
-          <ErrorState message="Sync status failed to load." detail={syncStatus.error.message} />
+          <ErrorState
+            message="Sync status failed to load."
+            detail={syncStatus.error.message}
+          />
+        ) : null}
+
+        {syncDiagnostics?.message ? (
+          <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-4 text-sm text-zinc-700 shadow-sm">
+            <div className="font-semibold tracking-tight text-zinc-900">
+              Latest sync message
+            </div>
+            <div className="mt-2 text-[13px] leading-relaxed text-zinc-600">
+              {String(syncDiagnostics.message)}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-zinc-500">
+              <span>Phase: {formatStepLabel(syncDiagnostics.failedStep)}</span>
+              <span>
+                Retryable: {syncDiagnostics.retryable === true ? "Yes" : "No"}
+              </span>
+              <span>
+                Imported: {String(syncDiagnostics.readingsCreated ?? 0)} new /{" "}
+                {String(syncDiagnostics.readingsUpdated ?? 0)} updated /{" "}
+                {String(syncDiagnostics.readingsSkipped ?? 0)} skipped
+              </span>
+            </div>
+            {syncWarnings.length > 0 ? (
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-amber-700">
+                {syncWarnings.slice(0, 4).map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {pushMutation.error ? (
+          <ErrorState
+            message="Local Portfolio Manager push failed."
+            detail={pushMutation.error.message}
+          />
+        ) : null}
+
+        {pushMutation.data ? (
+          <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-4 text-sm text-zinc-700 shadow-sm">
+            <div className="font-semibold tracking-tight text-zinc-900">
+              Latest push summary
+            </div>
+            <div className="mt-2 text-[13px] leading-relaxed text-zinc-600">
+              Pushed{" "}
+              <strong className="font-semibold text-zinc-900">
+                {pushMutation.data.totals.readingsPushed}
+              </strong>{" "}
+              of {pushMutation.data.totals.readingsPrepared} local electric/gas
+              readings to property{" "}
+              <span className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-xs">
+                {pushMutation.data.propertyId}
+              </span>
+              .
+            </div>
+            <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">
+              Created{" "}
+              <strong className="font-semibold text-zinc-900">
+                {pushMutation.data.metersCreated}
+              </strong>{" "}
+              new PM meter(s); updated{" "}
+              <strong className="font-semibold text-zinc-900">
+                {pushMutation.data.totals.readingsUpdated}
+              </strong>{" "}
+              existing PM reading(s); skipped{" "}
+              {pushMutation.data.totals.readingsSkippedExisting} row(s) already
+              matching PM.
+            </div>
+            <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">
+              PM refresh result:{" "}
+              <strong className="font-semibold text-zinc-900">
+                {formatSyncStatus(pushMutation.data.syncState.status)}
+              </strong>
+            </div>
+            {pushMutation.data.warnings.length > 0 ? (
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-amber-700">
+                {pushMutation.data.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         ) : null}
       </Panel>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel title="QA Findings" subtitle="Deterministic PM sync QA checks for linkage, sharing, coverage, and overlap.">
+        <Panel
+          title="What is blocking submission"
+          subtitle="Deterministic checks for PM linkage, sharing, required evidence, coverage, and overlapping bills."
+        >
           {findings.length === 0 ? (
-            <EmptyState message="No QA findings are available for this building yet." />
+            <EmptyState message="No blocking checks have been generated for this building yet." />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {findings.map((finding, index) => {
                 const record =
-                  finding && typeof finding === "object" && !Array.isArray(finding)
+                  finding &&
+                  typeof finding === "object" &&
+                  !Array.isArray(finding)
                     ? (finding as Record<string, unknown>)
                     : {};
+
                 return (
-                  <div key={`${String(record.code ?? "finding")}-${index}`} className="rounded border border-gray-200 px-3 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-medium text-gray-900">{String(record.code ?? "Finding")}</div>
-                      <div className="text-xs text-gray-500">{String(record.status ?? "—")}</div>
+                  <div
+                    key={`${String(record.code ?? "finding")}-${index}`}
+                    className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 font-semibold tracking-tight text-zinc-900">
+                        {String(record.code ?? "Finding")}
+                      </div>
+                      <StatusBadge
+                        label={String(record.status ?? "Not available")}
+                        tone={
+                          String(record.status) === "BLOCKED"
+                            ? "danger"
+                            : "warning"
+                        }
+                      />
                     </div>
-                    <p className="mt-1 text-sm text-gray-700">{String(record.message ?? "—")}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                      {String(record.message ?? "No detail available.")}
+                    </p>
                   </div>
                 );
               })}
@@ -143,44 +351,175 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
           )}
         </Panel>
 
-        <Panel title="Readiness" subtitle="Canonical annual benchmarking submission state for the selected reporting year.">
+        <Panel
+          title="Current submission state"
+          subtitle="Current governed benchmarking position for the selected reporting year."
+        >
           {readiness.error && readiness.error.data?.code !== "NOT_FOUND" ? (
-            <ErrorState message="Readiness state failed to load." detail={readiness.error.message} />
+            <ErrorState
+              message="Readiness state failed to load."
+              detail={readiness.error.message}
+            />
           ) : readiness.error?.data?.code === "NOT_FOUND" || !readiness.data ? (
             <EmptyState message="No benchmark submission exists yet for the selected reporting year." />
           ) : (
-            <div className="space-y-3 text-sm text-gray-700">
-              <div className="rounded border border-gray-200 px-3 py-3">
-                <div className="font-medium text-gray-900">Reporting year {readiness.data.reportingYear}</div>
-                <div className="mt-1 text-xs text-gray-500">
-                  Status {readiness.data.status} • Compliance run {readiness.data.complianceRunId ?? "—"}
+            <div className="space-y-4 text-sm text-zinc-700">
+              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <div className="text-lg font-semibold tracking-tight text-zinc-900">
+                  Reporting Year {readiness.data.reportingYear}
                 </div>
+                <div className="mt-2">
+                  <StatusBadge
+                    label={getReadinessStatusDisplay(readiness.data.status).label}
+                    tone={getReadinessStatusDisplay(readiness.data.status).tone}
+                  />
+                </div>
+                <p className="mt-3 text-[13px] text-zinc-600">
+                  {readiness.data.status === "READY"
+                    ? "The current record supports annual benchmarking submission."
+                    : "The building still has blocking issues or missing requirements before submission."}
+                </p>
+                {readiness.data.complianceRunId ? (
+                  <div className="mt-3 text-[13px] font-medium text-zinc-500">
+                    Compliance run ID:{" "}
+                    <span className="ml-1 font-mono text-xs text-zinc-900">
+                      {readiness.data.complianceRunId}
+                    </span>
+                  </div>
+                ) : null}
               </div>
-              <details className="rounded border border-gray-200 px-3 py-3">
-                <summary className="cursor-pointer text-sm font-medium text-gray-900">
-                  Readiness payload
+              <details className="group rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-3 shadow-sm transition-all outline-none">
+                <summary className="cursor-pointer font-semibold tracking-tight text-zinc-900 outline-none">
+                  Technical workflow record
                 </summary>
-                <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-gray-600">
-                  {JSON.stringify(readinessPayload ?? {}, null, 2)}
-                </pre>
+                <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-zinc-100 bg-white p-3">
+                  <pre className="font-mono text-xs text-zinc-600">
+                    {JSON.stringify(readinessPayload ?? {}, null, 2)}
+                  </pre>
+                </div>
               </details>
             </div>
           )}
         </Panel>
       </div>
 
-      <Panel title="Benchmark Submissions" subtitle="Recent governed annual benchmarking submissions for this building.">
+      <Panel
+        title="Verification checklist"
+        subtitle="Deterministic verification checks derived from building records, Portfolio Manager linkage, annual coverage, metrics, and linked evidence."
+      >
+        {verificationChecklist.error &&
+        verificationChecklist.error.data?.code !== "NOT_FOUND" ? (
+          <ErrorState
+            message="Verification checklist failed to load."
+            detail={verificationChecklist.error.message}
+          />
+        ) : verificationItems.length === 0 ? (
+          <EmptyState message="No verification results have been computed for this reporting year yet. Refresh benchmarking to generate them." />
+        ) : (
+          <div className="space-y-4">
+            {verificationSummary ? (
+              <MetricGrid
+                items={[
+                  {
+                    label: "Passed",
+                    value: String(verificationSummary.passedCount),
+                  },
+                  {
+                    label: "Failed",
+                    value: String(verificationSummary.failedCount),
+                  },
+                  {
+                    label: "Needs review",
+                    value: String(verificationSummary.needsReviewCount),
+                  },
+                ]}
+              />
+            ) : null}
+
+            <div className="space-y-4">
+              {verificationItems.map((item) => {
+                const statusDisplay = getVerificationStatusDisplay(item.status);
+
+                return (
+                  <div
+                    key={item.key}
+                    className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="text-[15px] font-semibold tracking-tight text-zinc-900">
+                          {item.category
+                            .toLowerCase()
+                            .split("_")
+                            .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+                            .join(" ")}
+                        </div>
+                        <div className="text-[12px] uppercase tracking-wide text-zinc-400">
+                          {item.key}
+                        </div>
+                      </div>
+                      <StatusBadge
+                        label={statusDisplay.label}
+                        tone={statusDisplay.tone}
+                      />
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-zinc-600">
+                      {item.explanation}
+                    </p>
+                    <div className="mt-3 text-[12px] text-zinc-500">
+                      {item.evidenceLinks.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {item.evidenceLinks.map((link) => (
+                            <span
+                              key={link.id}
+                              className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1"
+                            >
+                              {link.artifactKind === "EVIDENCE" ? "Evidence" : "Source"}:{" "}
+                              {link.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span>No linked evidence artifacts for this check.</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </Panel>
+
+      <Panel
+        title="Recent benchmark submissions"
+        subtitle="Recent governed annual benchmarking records for this building."
+      >
         {!submissions.data || submissions.data.length === 0 ? (
           <EmptyState message="No benchmark submissions exist for this building yet." />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {submissions.data.map((submission) => (
-              <div key={submission.id} className="rounded border border-gray-200 px-3 py-3">
-                <div className="font-medium text-gray-900">Reporting year {submission.reportingYear}</div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {submission.status} • {submission.ruleVersion.rulePackage.key}
+              <div
+                key={submission.id}
+                className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[15px] font-semibold text-zinc-900">
+                    Reporting Year {submission.reportingYear}
+                  </div>
+                  <StatusBadge
+                    label={getReadinessStatusDisplay(submission.status).label}
+                    tone={getReadinessStatusDisplay(submission.status).tone}
+                  />
                 </div>
-                <div className="mt-1 text-xs text-gray-600">
+                <div className="mt-3 text-[13px] font-medium text-zinc-600">
+                  Rule package:{" "}
+                  <span className="rounded border border-zinc-100 bg-zinc-50 px-1 py-0.5 font-mono text-xs text-zinc-500">
+                    {submission.ruleVersion.rulePackage.key}
+                  </span>
+                </div>
+                <div className="mt-2 text-[13px] font-medium text-zinc-500">
                   Created {formatDate(submission.createdAt)}
                 </div>
               </div>

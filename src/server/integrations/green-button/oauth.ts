@@ -1,4 +1,8 @@
 import crypto from "crypto";
+import {
+  createNonRetryableIntegrationError,
+  createRetryableIntegrationError,
+} from "@/server/lib/errors";
 import type { GreenButtonConfig, GreenButtonTokens } from "./types";
 
 /**
@@ -31,22 +35,60 @@ export async function exchangeCodeForTokens(
     `${config.clientId}:${config.clientSecret}`,
   ).toString("base64");
 
-  const response = await fetch(config.tokenEndpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${basicAuth}`,
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: config.redirectUri,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(config.tokenEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: config.redirectUri,
+      }),
+    });
+  } catch (error) {
+    throw createRetryableIntegrationError(
+      "GREEN_BUTTON",
+      "Green Button token exchange failed.",
+      {
+        httpStatus: 503,
+        details: {
+          operation: "token_exchange",
+        },
+        cause: error,
+      },
+    );
+  }
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Token exchange failed (${response.status}): ${text}`);
+    const details = {
+      operation: "token_exchange",
+      statusCode: response.status,
+      responseBody: text,
+    };
+    if (response.status >= 500 || response.status === 429) {
+      throw createRetryableIntegrationError(
+        "GREEN_BUTTON",
+        "Green Button token exchange failed.",
+        {
+          httpStatus: response.status,
+          details,
+        },
+      );
+    }
+
+    throw createNonRetryableIntegrationError(
+      "GREEN_BUTTON",
+      "Green Button token exchange failed.",
+      {
+        httpStatus: response.status,
+        details,
+      },
+    );
   }
 
   const data = (await response.json()) as Record<string, unknown>;
@@ -65,21 +107,59 @@ export async function refreshAccessToken(
     `${config.clientId}:${config.clientSecret}`,
   ).toString("base64");
 
-  const response = await fetch(config.tokenEndpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${basicAuth}`,
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(config.tokenEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+    });
+  } catch (error) {
+    throw createRetryableIntegrationError(
+      "GREEN_BUTTON",
+      "Green Button token refresh failed.",
+      {
+        httpStatus: 503,
+        details: {
+          operation: "token_refresh",
+        },
+        cause: error,
+      },
+    );
+  }
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Token refresh failed (${response.status}): ${text}`);
+    const details = {
+      operation: "token_refresh",
+      statusCode: response.status,
+      responseBody: text,
+    };
+    if (response.status >= 500 || response.status === 429) {
+      throw createRetryableIntegrationError(
+        "GREEN_BUTTON",
+        "Green Button token refresh failed.",
+        {
+          httpStatus: response.status,
+          details,
+        },
+      );
+    }
+
+    throw createNonRetryableIntegrationError(
+      "GREEN_BUTTON",
+      "Green Button token refresh failed.",
+      {
+        httpStatus: response.status,
+        details,
+      },
+    );
   }
 
   const data = (await response.json()) as Record<string, unknown>;

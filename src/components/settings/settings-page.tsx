@@ -10,6 +10,11 @@ import {
   Panel,
   formatDate,
 } from "@/components/internal/admin-primitives";
+import {
+  StatusBadge,
+  getReadinessStatusDisplay,
+  getSyncStatusDisplay,
+} from "@/components/internal/status-helpers";
 
 export function SettingsPage() {
   const onboarding = trpc.building.onboardingStatus.useQuery();
@@ -39,7 +44,10 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" />
+      <PageHeader
+        title="Settings"
+        subtitle="Reference governance state, integration health, and organization setup without leaving the main workflow."
+      />
 
       {onboarding.data ? (
         <MetricGrid
@@ -110,8 +118,8 @@ export function SettingsPage() {
       </div>
 
       <Panel
-        title="Portfolio Manager Autopilot Status"
-        subtitle="Current PM sync and readiness state across the portfolio."
+        title="Portfolio Manager autopilot"
+        subtitle="Current sync and annual benchmarking state across the portfolio."
       >
         {!readiness.data || readiness.data.length === 0 ? (
           <EmptyState message="No Portfolio Manager readiness state exists yet." />
@@ -122,9 +130,9 @@ export function SettingsPage() {
                 <tr className="border-b border-gray-200 text-xs text-gray-500">
                   <th className="pb-2 pr-4 font-normal">Building</th>
                   <th className="pb-2 pr-4 font-normal">Reporting Year</th>
-                  <th className="pb-2 pr-4 font-normal">Sync</th>
-                  <th className="pb-2 pr-4 font-normal">Readiness</th>
-                  <th className="pb-2 font-normal">Submission</th>
+                  <th className="pb-2 pr-4 font-normal">PM sync</th>
+                  <th className="pb-2 pr-4 font-normal">Benchmarking</th>
+                  <th className="pb-2 font-normal">Submission record</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,15 +140,40 @@ export function SettingsPage() {
                   <tr key={entry.building.id} className="border-b border-gray-100 last:border-0">
                     <td className="py-2 pr-4 font-medium text-gray-900">{entry.building.name}</td>
                     <td className="py-2 pr-4 text-gray-700">{entry.reportingYear}</td>
-                    <td className="py-2 pr-4 text-gray-700">{entry.syncState?.status ?? "NOT_STARTED"}</td>
                     <td className="py-2 pr-4 text-gray-700">
-                      {entry.readiness &&
-                      typeof entry.readiness === "object" &&
-                      !Array.isArray(entry.readiness)
-                        ? String((entry.readiness as Record<string, unknown>).status ?? "PENDING")
-                        : "PENDING"}
+                      <div>
+                        <StatusBadge
+                          label={getSyncStatusDisplay(entry.syncState?.status ?? "NOT_STARTED").label}
+                          tone={getSyncStatusDisplay(entry.syncState?.status ?? "NOT_STARTED").tone}
+                        />
+                      </div>
+                      {entry.syncState?.diagnostics?.failedStep ? (
+                        <div className="text-xs text-gray-500">
+                          Phase {String(entry.syncState.diagnostics.failedStep).toLowerCase()}
+                        </div>
+                      ) : null}
                     </td>
-                    <td className="py-2 text-gray-700">{entry.benchmarkSubmission?.status ?? "NONE"}</td>
+                    <td className="py-2 pr-4 text-gray-700">
+                      <StatusBadge
+                        label={getReadinessStatusDisplay(
+                          entry.readiness &&
+                            typeof entry.readiness === "object" &&
+                            !Array.isArray(entry.readiness)
+                            ? String((entry.readiness as Record<string, unknown>).status ?? "PENDING")
+                            : "PENDING",
+                        ).label}
+                        tone={getReadinessStatusDisplay(
+                          entry.readiness &&
+                            typeof entry.readiness === "object" &&
+                            !Array.isArray(entry.readiness)
+                            ? String((entry.readiness as Record<string, unknown>).status ?? "PENDING")
+                            : "PENDING",
+                        ).tone}
+                      />
+                    </td>
+                    <td className="py-2 text-gray-700">
+                      {entry.benchmarkSubmission?.status ?? "Not started"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

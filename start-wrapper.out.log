@@ -1,0 +1,11 @@
+
+> quoin@0.1.0 start
+> node scripts/start-server.mjs
+
+[dotenv@17.3.1] injecting env (14) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Network:      http://0.0.0.0:3000
+
+ ✓ Starting...
+ ✓ Ready in 169ms

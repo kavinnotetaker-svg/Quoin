@@ -62,9 +62,44 @@ describe("BEPS filing packets", () => {
         configJson: {
           cycle: "CYCLE_1",
           filingYear: 2026,
+          applicability: {
+            minGrossSquareFeetPrivate: 50000,
+            minGrossSquareFeetDistrict: 10000,
+            ownershipClassFallback: "PRIVATE",
+            coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
+            recentConstructionExemptionYears: 5,
+            cycleStartYear: 2021,
+            cycleEndYear: 2026,
+          },
           pathwayRouting: {
             prescriptiveAlwaysEligible: true,
             supportedPathways: ["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE"],
+          },
+          performance: {
+            scoreEligibleMetric: "ADJUSTED_SITE_EUI_AVERAGE",
+            nonScoreEligibleMetric: "WEATHER_NORMALIZED_SITE_EUI_AVERAGE",
+            requiredReductionFraction: 0.2,
+          },
+          standardTarget: {
+            defaultMaxGap: 15,
+            maxGapByPropertyType: {
+              OFFICE: 15,
+              MULTIFAMILY: 15,
+              MIXED_USE: 15,
+              OTHER: 15,
+            },
+            scoreEligibleMetric: "ENERGY_STAR_SCORE",
+            nonScoreEligibleMetric: "WEATHER_NORMALIZED_SOURCE_EUI",
+          },
+          prescriptive: {
+            defaultPointsNeeded: 25,
+            pointsNeededByPropertyType: {
+              OFFICE: 25,
+              MULTIFAMILY: 25,
+              MIXED_USE: 25,
+              OTHER: 25,
+            },
+            complianceBasis: "APPROVED_MEASURES_AND_MILESTONES",
           },
         },
       },
@@ -78,9 +113,44 @@ describe("BEPS filing packets", () => {
         configJson: {
           cycle: "CYCLE_1",
           filingYear: 2026,
+          applicability: {
+            minGrossSquareFeetPrivate: 50000,
+            minGrossSquareFeetDistrict: 10000,
+            ownershipClassFallback: "PRIVATE",
+            coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
+            recentConstructionExemptionYears: 5,
+            cycleStartYear: 2021,
+            cycleEndYear: 2026,
+          },
           pathwayRouting: {
             prescriptiveAlwaysEligible: true,
             supportedPathways: ["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE"],
+          },
+          performance: {
+            scoreEligibleMetric: "ADJUSTED_SITE_EUI_AVERAGE",
+            nonScoreEligibleMetric: "WEATHER_NORMALIZED_SITE_EUI_AVERAGE",
+            requiredReductionFraction: 0.2,
+          },
+          standardTarget: {
+            defaultMaxGap: 15,
+            maxGapByPropertyType: {
+              OFFICE: 15,
+              MULTIFAMILY: 15,
+              MIXED_USE: 15,
+              OTHER: 15,
+            },
+            scoreEligibleMetric: "ENERGY_STAR_SCORE",
+            nonScoreEligibleMetric: "WEATHER_NORMALIZED_SOURCE_EUI",
+          },
+          prescriptive: {
+            defaultPointsNeeded: 25,
+            pointsNeededByPropertyType: {
+              OFFICE: 25,
+              MULTIFAMILY: 25,
+              MIXED_USE: 25,
+              OTHER: 25,
+            },
+            complianceBasis: "APPROVED_MEASURES_AND_MILESTONES",
           },
         },
       },
@@ -544,7 +614,7 @@ describe("BEPS filing packets", () => {
     expect(governance["rulePackageKey"]).toBe("DC_BEPS_CYCLE_1");
     expect(governance["factorSetKey"]).toBe(bepsFactorSetKey);
     expect(markdownExport.contentType).toBe("text/markdown");
-    expect(markdownExport.content).toContain("# BEPS Filing Packet");
+    expect(markdownExport.content).toContain("# Completed Actions Packet");
     expect(markdownExport.content).toContain("## Compliance Result");
   });
 

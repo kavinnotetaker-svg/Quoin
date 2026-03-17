@@ -1,12 +1,18 @@
 import type { ComplianceCycle } from "@/generated/prisma/client";
 import { prisma } from "@/server/lib/db";
 import {
-  ComplianceProvenanceError,
   getActiveRuleVersionByPackageId,
 } from "../provenance";
-import { normalizeBepsFactorConfig, normalizeBepsRuleConfig } from "./config";
+import {
+  assertSupportedBepsCycle,
+  BepsConfigurationError,
+  normalizeBepsFactorConfig,
+  normalizeBepsRuleConfig,
+} from "./config";
 
 export async function getBepsCycleRegistry(cycle: ComplianceCycle) {
+  assertSupportedBepsCycle(cycle);
+
   const registry = await prisma.bepsCycleRegistry.findUnique({
     where: {
       complianceCycle: cycle,
@@ -18,7 +24,10 @@ export async function getBepsCycleRegistry(cycle: ComplianceCycle) {
   });
 
   if (!registry) {
-    throw new ComplianceProvenanceError(`No BEPS cycle registry entry found for ${cycle}`);
+    throw new BepsConfigurationError(
+      `No governed BEPS cycle registry entry found for ${cycle}`,
+      cycle === "CYCLE_3" ? "UNSUPPORTED_CYCLE" : undefined,
+    );
   }
 
   return registry;
@@ -35,13 +44,13 @@ export async function getActiveBepsCycleContext(
     (cycleStartEffectiveAt > new Date() ? cycleStartEffectiveAt : new Date());
 
   if (registry.factorSetVersion.status !== "ACTIVE") {
-    throw new ComplianceProvenanceError(
+    throw new BepsConfigurationError(
       `Factor set version ${registry.factorSetVersionId} is not active for ${cycle}`,
     );
   }
 
   if (registry.factorSetVersion.effectiveFrom > resolvedEffectiveAt) {
-    throw new ComplianceProvenanceError(
+    throw new BepsConfigurationError(
       `Factor set version ${registry.factorSetVersionId} is not effective for ${cycle}`,
     );
   }
@@ -50,7 +59,7 @@ export async function getActiveBepsCycleContext(
     registry.factorSetVersion.effectiveTo &&
     registry.factorSetVersion.effectiveTo < resolvedEffectiveAt
   ) {
-    throw new ComplianceProvenanceError(
+    throw new BepsConfigurationError(
       `Factor set version ${registry.factorSetVersionId} expired before ${cycle}`,
     );
   }

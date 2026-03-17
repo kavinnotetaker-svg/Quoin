@@ -1,11 +1,12 @@
 "use client";
 
+import React from "react";
 import type { ReactNode } from "react";
 
 export function LoadingState() {
   return (
-    <div className="overflow-hidden">
-      <div className="loading-bar h-0.5 w-1/3 bg-gray-300" />
+    <div className="overflow-hidden rounded-md">
+      <div className="loading-bar h-1 w-1/3 bg-zinc-300" />
     </div>
   );
 }
@@ -20,10 +21,10 @@ export function ErrorState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-      <p className="font-medium">{message}</p>
-      {detail ? <p className="mt-1 text-xs text-red-700">{detail}</p> : null}
-      {action ? <div className="mt-3">{action}</div> : null}
+    <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800 shadow-sm">
+      <p className="font-semibold">{message}</p>
+      {detail ? <p className="mt-1 text-[13px] text-red-700">{detail}</p> : null}
+      {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
 }
@@ -36,9 +37,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-500">
-      <p>{message}</p>
-      {action ? <div className="mt-3">{action}</div> : null}
+    <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 p-8 text-center text-sm text-zinc-500">
+      <p className="font-medium">{message}</p>
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   );
 }
@@ -55,13 +56,13 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-base font-medium text-gray-900">{title}</h3>
-          {subtitle ? <p className="mt-1 text-xs text-gray-500">{subtitle}</p> : null}
+          <h3 className="text-lg font-semibold tracking-tight text-zinc-900">{title}</h3>
+          {subtitle ? <p className="mt-1 text-[13px] text-zinc-500">{subtitle}</p> : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
       {children}
     </section>
@@ -78,21 +79,21 @@ export function MetricGrid({
   }>;
 }) {
   const tones = {
-    default: "text-gray-900",
+    default: "text-zinc-900",
     danger: "text-red-700",
     warning: "text-amber-700",
-    success: "text-green-700",
+    success: "text-emerald-700",
   } as const;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3"
+          className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:border-zinc-300"
         >
-          <p className="text-xs text-gray-500">{item.label}</p>
-          <p className={`mt-1 text-lg font-semibold ${tones[item.tone ?? "default"]}`}>
+          <p className="text-[13px] font-medium text-zinc-500">{item.label}</p>
+          <p className={`mt-2 text-2xl font-semibold tracking-tight ${tones[item.tone ?? "default"]}`}>
             {item.value}
           </p>
         </div>
@@ -144,12 +145,23 @@ export function formatDate(value: string | Date | null | undefined) {
   });
 }
 
-export function downloadTextFile(params: {
+export function downloadFile(params: {
   fileName: string;
   content: string;
   contentType: string;
+  encoding?: "utf-8" | "base64";
 }) {
-  const blob = new Blob([params.content], { type: params.contentType });
+  const blob =
+    params.encoding === "base64"
+      ? new Blob(
+          [
+            Uint8Array.from(atob(params.content), (character) =>
+              character.charCodeAt(0),
+            ),
+          ],
+          { type: params.contentType },
+        )
+      : new Blob([params.content], { type: params.contentType });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -158,4 +170,12 @@ export function downloadTextFile(params: {
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+}
+
+export function downloadTextFile(params: {
+  fileName: string;
+  content: string;
+  contentType: string;
+}) {
+  downloadFile({ ...params, encoding: "utf-8" });
 }

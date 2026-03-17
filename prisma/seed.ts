@@ -32,6 +32,42 @@ const DEMO_BUILDING_NAMES = [
   "M Street Boutique Hotel",
   "Ward 8 Services Annex",
 ] as const;
+const BENCHMARKING_APPLICABILITY_BANDS = [
+  {
+    ownershipType: "PRIVATE",
+    minimumGrossSquareFeet: 10000,
+    maximumGrossSquareFeet: 24999,
+    label: "PRIVATE_10K_TO_24_999",
+    verificationYears: [2027],
+    verificationCadenceYears: 6,
+    deadlineType: "MAY_1_FOLLOWING_YEAR",
+  },
+  {
+    ownershipType: "PRIVATE",
+    minimumGrossSquareFeet: 25000,
+    maximumGrossSquareFeet: 49999,
+    label: "PRIVATE_25K_TO_49_999",
+    verificationYears: [2024, 2027],
+    verificationCadenceYears: 6,
+    deadlineType: "MAY_1_FOLLOWING_YEAR",
+  },
+  {
+    ownershipType: "PRIVATE",
+    minimumGrossSquareFeet: 50000,
+    label: "PRIVATE_50K_PLUS",
+    verificationYears: [2024, 2027],
+    verificationCadenceYears: 6,
+    deadlineType: "MAY_1_FOLLOWING_YEAR",
+  },
+  {
+    ownershipType: "DISTRICT",
+    minimumGrossSquareFeet: 10000,
+    label: "DISTRICT_10K_PLUS",
+    deadlineType: "WITHIN_DAYS_OF_BENCHMARK_GENERATION",
+    deadlineDaysFromGeneration: 60,
+    manualSubmissionAllowedWhenNotBenchmarkable: true,
+  },
+] as const;
 const BEPS_STANDARDS_TABLE = [
   {
     cycle: "CYCLE_1",
@@ -78,24 +114,8 @@ const BEPS_STANDARDS_TABLE = [
     pathway: "TRAJECTORY",
     propertyType: "OFFICE",
     metricType: "ADJUSTED_SITE_EUI_AVERAGE",
-    year: 2027,
-    targetValue: 95,
-  },
-  {
-    cycle: "CYCLE_2",
-    pathway: "TRAJECTORY",
-    propertyType: "OFFICE",
-    metricType: "ADJUSTED_SITE_EUI_AVERAGE",
     year: 2028,
     targetValue: 85,
-  },
-  {
-    cycle: "CYCLE_2",
-    pathway: "TRAJECTORY",
-    propertyType: "MULTIFAMILY",
-    metricType: "ADJUSTED_SITE_EUI_AVERAGE",
-    year: 2027,
-    targetValue: 92,
   },
   {
     cycle: "CYCLE_2",
@@ -195,7 +215,7 @@ const BEPS_CYCLE_1_FACTORS = {
 const BEPS_CYCLE_2_FACTORS = {
   cycle: {
     filingYear: 2028,
-    cycleStartYear: 2027,
+    cycleStartYear: 2028,
     cycleEndYear: 2032,
     baselineYears: [2024, 2025],
     evaluationYears: [2028],
@@ -203,12 +223,12 @@ const BEPS_CYCLE_2_FACTORS = {
     complianceDeadline: "2028-12-31",
   },
   applicability: {
-    minGrossSquareFeetPrivate: 50000,
+    minGrossSquareFeetPrivate: 25000,
     minGrossSquareFeetDistrict: 10000,
     ownershipClassFallback: "PRIVATE",
     coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
     recentConstructionExemptionYears: 5,
-    cycleStartYear: 2027,
+    cycleStartYear: 2028,
     cycleEndYear: 2032,
     filingYear: 2028,
   },
@@ -254,7 +274,7 @@ const BEPS_CYCLE_2_FACTORS = {
   },
   trajectory: {
     metricBasis: "ADJUSTED_SITE_EUI_AVERAGE",
-    targetYears: [2027, 2028],
+    targetYears: [2028],
     finalTargetYear: 2028,
   },
   standardsTable: BEPS_STANDARDS_TABLE.filter((entry) => entry.cycle === "CYCLE_2"),
@@ -788,8 +808,6 @@ async function main(): Promise<void> {
           dqcEvidenceKind: "DQC_REPORT",
           dqcFreshnessDays: 30,
           verification: {
-            minimumGrossSquareFeet: 50000,
-            requiredReportingYears: [2025],
             evidenceKind: "VERIFICATION",
           },
           gfaCorrection: {
@@ -831,8 +849,6 @@ async function main(): Promise<void> {
           dqcEvidenceKind: "DQC_REPORT",
           dqcFreshnessDays: 30,
           verification: {
-            minimumGrossSquareFeet: 50000,
-            requiredReportingYears: [2025],
             evidenceKind: "VERIFICATION",
           },
           gfaCorrection: {
@@ -1050,7 +1066,7 @@ async function main(): Promise<void> {
     update: {
       sourceArtifactId: bepsStandardsUpdateSource.id,
       status: "ACTIVE",
-      effectiveFrom: new Date("2027-01-01T00:00:00.000Z"),
+      effectiveFrom: new Date("2028-01-01T00:00:00.000Z"),
       implementationKey: "beps/evaluator-v2",
       sourceMetadata: {
         seeded: true,
@@ -1075,7 +1091,7 @@ async function main(): Promise<void> {
         },
         trajectory: {
           metricBasis: "ADJUSTED_SITE_EUI_AVERAGE",
-          targetYears: [2027, 2028],
+          targetYears: [2028],
           finalTargetYear: 2028,
         },
       },
@@ -1085,7 +1101,7 @@ async function main(): Promise<void> {
       sourceArtifactId: bepsStandardsUpdateSource.id,
       version: "dc-cycle-2-bootstrap-v1",
       status: "ACTIVE",
-      effectiveFrom: new Date("2027-01-01T00:00:00.000Z"),
+      effectiveFrom: new Date("2028-01-01T00:00:00.000Z"),
       implementationKey: "beps/evaluator-v2",
       sourceMetadata: {
         seeded: true,
@@ -1110,7 +1126,7 @@ async function main(): Promise<void> {
         },
         trajectory: {
           metricBasis: "ADJUSTED_SITE_EUI_AVERAGE",
-          targetYears: [2027, 2028],
+          targetYears: [2028],
           finalTargetYear: 2028,
         },
       },
@@ -1143,6 +1159,7 @@ async function main(): Promise<void> {
         maxPenaltyCap: 7500000,
         benchmarking: {
           dqcFreshnessDays: 30,
+          applicabilityBands: BENCHMARKING_APPLICABILITY_BANDS,
         },
       },
     },
@@ -1167,6 +1184,7 @@ async function main(): Promise<void> {
         maxPenaltyCap: 7500000,
         benchmarking: {
           dqcFreshnessDays: 30,
+          applicabilityBands: BENCHMARKING_APPLICABILITY_BANDS,
         },
       },
     },
@@ -1291,7 +1309,7 @@ async function main(): Promise<void> {
     update: {
       sourceArtifactId: bepsStandardsUpdateSource.id,
       status: "ACTIVE",
-      effectiveFrom: new Date("2027-01-01T00:00:00.000Z"),
+      effectiveFrom: new Date("2028-01-01T00:00:00.000Z"),
       sourceMetadata: {
         seeded: true,
         bootstrap: true,
@@ -1308,7 +1326,7 @@ async function main(): Promise<void> {
       sourceArtifactId: bepsStandardsUpdateSource.id,
       version: "dc-cycle-2-factors-v1",
       status: "ACTIVE",
-      effectiveFrom: new Date("2027-01-01T00:00:00.000Z"),
+      effectiveFrom: new Date("2028-01-01T00:00:00.000Z"),
       sourceMetadata: {
         seeded: true,
         bootstrap: true,
@@ -1355,7 +1373,7 @@ async function main(): Promise<void> {
     },
     update: {
       complianceCycle: "CYCLE_2",
-      cycleStartYear: 2027,
+      cycleStartYear: 2028,
       cycleEndYear: 2032,
       baselineYearStart: 2024,
       baselineYearEnd: 2025,
@@ -1366,7 +1384,7 @@ async function main(): Promise<void> {
     create: {
       cycleId: "BEPS_CYCLE_2",
       complianceCycle: "CYCLE_2",
-      cycleStartYear: 2027,
+      cycleStartYear: 2028,
       cycleEndYear: 2032,
       baselineYearStart: 2024,
       baselineYearEnd: 2025,

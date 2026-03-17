@@ -20,6 +20,42 @@ function monthConsumptions() {
 describe("Portfolio Manager sync and benchmarking autopilot", () => {
   const scope = `${Date.now()}`;
   const freshDqcCheckedAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+  const benchmarkingApplicabilityBands = [
+    {
+      ownershipType: "PRIVATE" as const,
+      minimumGrossSquareFeet: 10000,
+      maximumGrossSquareFeet: 24999,
+      label: "PRIVATE_10K_TO_24_999",
+      verificationYears: [2027],
+      verificationCadenceYears: 6,
+      deadlineType: "MAY_1_FOLLOWING_YEAR" as const,
+    },
+    {
+      ownershipType: "PRIVATE" as const,
+      minimumGrossSquareFeet: 25000,
+      maximumGrossSquareFeet: 49999,
+      label: "PRIVATE_25K_TO_49_999",
+      verificationYears: [2024, 2027],
+      verificationCadenceYears: 6,
+      deadlineType: "MAY_1_FOLLOWING_YEAR" as const,
+    },
+    {
+      ownershipType: "PRIVATE" as const,
+      minimumGrossSquareFeet: 50000,
+      label: "PRIVATE_50K_PLUS",
+      verificationYears: [2024, 2027],
+      verificationCadenceYears: 6,
+      deadlineType: "MAY_1_FOLLOWING_YEAR" as const,
+    },
+    {
+      ownershipType: "DISTRICT" as const,
+      minimumGrossSquareFeet: 10000,
+      label: "DISTRICT_10K_PLUS",
+      deadlineType: "WITHIN_DAYS_OF_BENCHMARK_GENERATION" as const,
+      deadlineDaysFromGeneration: 60,
+      manualSubmissionAllowedWhenNotBenchmarkable: true,
+    },
+  ];
 
   let orgA: { id: string; clerkOrgId: string };
   let orgB: { id: string; clerkOrgId: string };
@@ -28,6 +64,7 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
   let buildingReady: { id: string };
   let buildingFailure: { id: string };
   let buildingQa: { id: string };
+  let buildingPush: { id: string };
 
   beforeAll(async () => {
     const sourceArtifact = await prisma.sourceArtifact.create({
@@ -126,6 +163,7 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
         factorsJson: {
           benchmarking: {
             dqcFreshnessDays: 30,
+            applicabilityBands: benchmarkingApplicabilityBands,
           },
         },
       },
@@ -138,6 +176,7 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
         factorsJson: {
           benchmarking: {
             dqcFreshnessDays: 30,
+            applicabilityBands: benchmarkingApplicabilityBands,
           },
         },
       },
@@ -256,6 +295,26 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
       select: { id: true },
     });
 
+    buildingPush = await prisma.building.create({
+      data: {
+        organizationId: orgA.id,
+        name: `PM Push Building ${scope}`,
+        address: "400 Push Ave NW, Washington, DC 20001",
+        latitude: 38.925,
+        longitude: -77.015,
+        grossSquareFeet: 28000,
+        propertyType: "OFFICE",
+        ownershipType: "PRIVATE",
+        yearBuilt: 2005,
+        bepsTargetScore: 71,
+        maxPenaltyExposure: 0,
+        doeeBuildingId: "RPUID-888888",
+        espmPropertyId: BigInt(444444),
+        espmShareStatus: "LINKED",
+      },
+      select: { id: true },
+    });
+
     await prisma.evidenceArtifact.create({
       data: {
         organizationId: orgA.id,
@@ -280,49 +339,49 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
     await prisma.portfolioManagerSyncState.deleteMany({
       where: {
         buildingId: {
-          in: [buildingReady.id, buildingFailure.id, buildingQa.id],
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
         },
       },
     });
     await prisma.evidenceArtifact.deleteMany({
       where: {
         buildingId: {
-          in: [buildingReady.id, buildingFailure.id, buildingQa.id],
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
         },
       },
     });
     await prisma.benchmarkSubmission.deleteMany({
       where: {
         buildingId: {
-          in: [buildingReady.id, buildingFailure.id, buildingQa.id],
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
         },
       },
     });
     await prisma.complianceRun.deleteMany({
       where: {
         buildingId: {
-          in: [buildingReady.id, buildingFailure.id, buildingQa.id],
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
         },
       },
     });
     await prisma.complianceSnapshot.deleteMany({
       where: {
         buildingId: {
-          in: [buildingReady.id, buildingFailure.id, buildingQa.id],
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
         },
       },
     });
     await prisma.energyReading.deleteMany({
       where: {
         buildingId: {
-          in: [buildingReady.id, buildingFailure.id, buildingQa.id],
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
         },
       },
     });
     await prisma.meter.deleteMany({
       where: {
         buildingId: {
-          in: [buildingReady.id, buildingFailure.id, buildingQa.id],
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
         },
       },
     });
@@ -343,7 +402,7 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
     await prisma.building.deleteMany({
       where: {
         id: {
-          in: [buildingReady.id, buildingFailure.id, buildingQa.id],
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
         },
       },
     });
@@ -379,37 +438,41 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
     const successClient = {
       property: {
         getProperty: async () => ({
-          property: {
-            "@_id": 111111,
-            name: "Ready Property",
-            primaryFunction: "Office",
-            grossFloorArea: { value: 40000 },
-            yearBuilt: 2001,
-            address: {
-              "@_address1": "100 Ready Ave NW",
-              "@_city": "Washington",
-              "@_state": "DC",
-              "@_postalCode": "20001",
+          property: [
+            {
+              "@_id": 111111,
+              name: "Ready Property",
+              primaryFunction: "Office",
+              grossFloorArea: { value: 40000 },
+              yearBuilt: 2001,
+              address: {
+                "@_address1": "100 Ready Ave NW",
+                "@_city": "Washington",
+                "@_state": "DC",
+                "@_postalCode": "20001",
+              },
             },
-          },
+          ],
         }),
       },
       meter: {
         listMeters: async () => ({
           response: {
             links: {
-              link: [{ "@_href": "/meter/2001" }],
+              link: [{ "@_id": 2001, "@_link": "/meter/2001" }],
             },
           },
         }),
         getMeter: async () => ({
-          meter: {
-            "@_id": 2001,
-            type: "Electric",
-            name: "Main Electric",
-            unitOfMeasure: "kWh",
-            inUse: true,
-          },
+          meter: [
+            {
+              "@_id": 2001,
+              type: "Electric",
+              name: "Main Electric",
+              unitOfMeasure: "kWh",
+              inUse: true,
+            },
+          ],
         }),
       },
       consumption: {
@@ -420,7 +483,7 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
         }),
       },
       metrics: {
-        getPropertyMetrics: async () => ({
+        getLatestAvailablePropertyMetrics: async () => ({
           propertyId: 111111,
           year: 2025,
           month: 12,
@@ -476,6 +539,98 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
     expect(snapshots.length).toBeGreaterThan(0);
   });
 
+  it("does not duplicate meters or ESPM readings on repeat sync", async () => {
+    const repeatClient = {
+      property: {
+        getProperty: async () => ({
+          property: [
+            {
+              "@_id": 111111,
+              name: "Ready Property",
+              primaryFunction: "Office",
+              grossFloorArea: { value: 40000 },
+              yearBuilt: 2001,
+            },
+          ],
+        }),
+      },
+      meter: {
+        listMeters: async () => ({
+          response: {
+            links: {
+              link: [{ "@_id": 2001, "@_link": "/meter/2001" }],
+            },
+          },
+        }),
+        getMeter: async () => ({
+          meter: [
+            {
+              "@_id": 2001,
+              type: "Electric",
+              name: "Main Electric",
+              unitOfMeasure: "kWh",
+              inUse: true,
+            },
+          ],
+        }),
+      },
+      consumption: {
+        getConsumptionData: async () => ({
+          meterData: {
+            meterConsumption: monthConsumptions(),
+          },
+        }),
+      },
+      metrics: {
+        getLatestAvailablePropertyMetrics: async () => ({
+          propertyId: 111111,
+          year: 2025,
+          month: 12,
+          score: 82,
+          siteTotal: 1200000,
+          sourceTotal: 3000000,
+          siteIntensity: 60,
+          sourceIntensity: 140,
+          weatherNormalizedSiteIntensity: 58,
+          weatherNormalizedSourceIntensity: 136,
+          directGHGEmissions: 0,
+          medianScore: 50,
+        }),
+        getReasonsForNoScore: async () => [],
+      },
+    };
+
+    const caller = createCaller({
+      clerkUserId: userA.clerkUserId,
+      clerkOrgId: orgA.clerkOrgId,
+      espmFactory: () => repeatClient,
+    });
+
+    const meterCountBefore = await prisma.meter.count({
+      where: { buildingId: buildingReady.id },
+    });
+    const readingCountBefore = await prisma.energyReading.count({
+      where: { buildingId: buildingReady.id, source: "ESPM_SYNC" },
+    });
+
+    const result = await caller.benchmarking.syncPortfolioManager({
+      buildingId: buildingReady.id,
+      reportingYear: 2025,
+    });
+
+    const meterCountAfter = await prisma.meter.count({
+      where: { buildingId: buildingReady.id },
+    });
+    const readingCountAfter = await prisma.energyReading.count({
+      where: { buildingId: buildingReady.id, source: "ESPM_SYNC" },
+    });
+
+    expect(result.syncState.status).toBe("SUCCEEDED");
+    expect(meterCountAfter).toBe(meterCountBefore);
+    expect(readingCountAfter).toBe(readingCountBefore);
+    expect(result.syncState.diagnostics?.readingsUpdated).toBeGreaterThanOrEqual(1);
+  });
+
   it("persists sync failure metadata when Portfolio Manager refresh fails", async () => {
     const failingClient = {
       property: {
@@ -491,7 +646,7 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
         getConsumptionData: async () => ({ meterData: { meterConsumption: [] } }),
       },
       metrics: {
-        getPropertyMetrics: async () => {
+        getLatestAvailablePropertyMetrics: async () => {
           throw new Error("metrics should not run");
         },
         getReasonsForNoScore: async () => [],
@@ -519,17 +674,118 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
     expect(errors[0]?.["step"]).toBe("property");
   });
 
+  it("marks malformed property payloads as non-retryable property failures", async () => {
+    const malformedClient = {
+      property: {
+        getProperty: async () => ({
+          response: {
+            ok: true,
+          },
+        }),
+      },
+      meter: {
+        listMeters: async () => ({ response: { links: { link: [] } } }),
+        getMeter: async () => ({ meter: {} }),
+      },
+      consumption: {
+        getConsumptionData: async () => ({ meterData: { meterConsumption: [] } }),
+      },
+      metrics: {
+        getLatestAvailablePropertyMetrics: async () => {
+          throw new Error("metrics should not run");
+        },
+        getReasonsForNoScore: async () => [],
+      },
+    };
+
+    const caller = createCaller({
+      clerkUserId: userA.clerkUserId,
+      clerkOrgId: orgA.clerkOrgId,
+      espmFactory: () => malformedClient,
+    });
+
+    const result = await caller.benchmarking.syncPortfolioManager({
+      buildingId: buildingFailure.id,
+      reportingYear: 2025,
+    });
+
+    expect(result.syncState.status).toBe("FAILED");
+    expect(result.syncState.diagnostics?.failedStep).toBe("property");
+    expect(result.syncState.diagnostics?.retryable).toBe(false);
+  });
+
+  it("surfaces malformed meter list payloads as partial sync diagnostics", async () => {
+    const meterFailureClient = {
+      property: {
+        getProperty: async () => ({
+          property: [
+            {
+              "@_id": 222222,
+              name: "Failure Property",
+              primaryFunction: "Office",
+              grossFloorArea: { value: 42000 },
+              yearBuilt: 2004,
+            },
+          ],
+        }),
+      },
+      meter: {
+        listMeters: async () => ({
+          bogus: true,
+        }),
+        getMeter: async () => ({ meter: {} }),
+      },
+      consumption: {
+        getConsumptionData: async () => ({ meterData: { meterConsumption: [] } }),
+      },
+      metrics: {
+        getLatestAvailablePropertyMetrics: async () => ({
+          propertyId: 222222,
+          year: 2025,
+          month: 12,
+          score: 68,
+          siteTotal: 1000000,
+          sourceTotal: 2100000,
+          siteIntensity: 72,
+          sourceIntensity: 151,
+          weatherNormalizedSiteIntensity: 70,
+          weatherNormalizedSourceIntensity: 148,
+          directGHGEmissions: 0,
+          medianScore: 50,
+        }),
+        getReasonsForNoScore: async () => [],
+      },
+    };
+
+    const caller = createCaller({
+      clerkUserId: userA.clerkUserId,
+      clerkOrgId: orgA.clerkOrgId,
+      espmFactory: () => meterFailureClient,
+    });
+
+    const result = await caller.benchmarking.syncPortfolioManager({
+      buildingId: buildingFailure.id,
+      reportingYear: 2025,
+    });
+
+    expect(result.syncState.status).toBe("PARTIAL");
+    expect(result.syncState.diagnostics?.failedStep).toBe("meters");
+    expect(result.syncState.diagnostics?.retryable).toBe(false);
+  });
+
   it("produces QA findings for missing PM sharing state, missing meters, and coverage gaps", async () => {
     const qaClient = {
       property: {
         getProperty: async () => ({
-          property: {
-            "@_id": 333333,
-            name: "QA Property",
-            primaryFunction: "Office",
-            grossFloorArea: { value: 35000 },
-            yearBuilt: 1998,
-          },
+          property: [
+            {
+              "@_id": 333333,
+              name: "QA Property",
+              primaryFunction: "Office",
+              grossFloorArea: { value: 35000 },
+              yearBuilt: 1998,
+            },
+          ],
         }),
       },
       meter: {
@@ -546,7 +802,7 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
         getConsumptionData: async () => ({ meterData: { meterConsumption: [] } }),
       },
       metrics: {
-        getPropertyMetrics: async () => ({
+        getLatestAvailablePropertyMetrics: async () => ({
           propertyId: 333333,
           year: 2025,
           month: 12,
@@ -590,35 +846,39 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
     expect(codes).toContain("MISSING_COVERAGE");
   });
 
-  it("lists portfolio readiness and enforces tenant isolation for PM sync state", async () => {
-    const successClient = {
+  it("preserves the last successful sync timestamp when metrics are partial", async () => {
+    const partialMetricsClient = {
       property: {
         getProperty: async () => ({
-          property: {
-            "@_id": 111111,
-            name: "Ready Property",
-            primaryFunction: "Office",
-            grossFloorArea: { value: 40000 },
-            yearBuilt: 2001,
-          },
+          property: [
+            {
+              "@_id": 111111,
+              name: "Ready Property",
+              primaryFunction: "Office",
+              grossFloorArea: { value: 40000 },
+              yearBuilt: 2001,
+            },
+          ],
         }),
       },
       meter: {
         listMeters: async () => ({
           response: {
             links: {
-              link: [{ "@_href": "/meter/2001" }],
+              link: [{ "@_id": 2001, "@_link": "/meter/2001" }],
             },
           },
         }),
         getMeter: async () => ({
-          meter: {
-            "@_id": 2001,
-            type: "Electric",
-            name: "Main Electric",
-            unitOfMeasure: "kWh",
-            inUse: true,
-          },
+          meter: [
+            {
+              "@_id": 2001,
+              type: "Electric",
+              name: "Main Electric",
+              unitOfMeasure: "kWh",
+              inUse: true,
+            },
+          ],
         }),
       },
       consumption: {
@@ -629,7 +889,91 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
         }),
       },
       metrics: {
-        getPropertyMetrics: async () => ({
+        getLatestAvailablePropertyMetrics: async () => ({
+          propertyId: 111111,
+          year: 2025,
+          month: 12,
+          score: 82,
+          siteTotal: 1200000,
+          sourceTotal: 3000000,
+          siteIntensity: null,
+          sourceIntensity: null,
+          weatherNormalizedSiteIntensity: null,
+          weatherNormalizedSourceIntensity: null,
+          directGHGEmissions: 0,
+          medianScore: 50,
+        }),
+        getReasonsForNoScore: async () => [],
+      },
+    };
+
+    const before = await prisma.portfolioManagerSyncState.findUnique({
+      where: { buildingId: buildingReady.id },
+      select: { lastSuccessfulSyncAt: true },
+    });
+
+    const caller = createCaller({
+      clerkUserId: userA.clerkUserId,
+      clerkOrgId: orgA.clerkOrgId,
+      espmFactory: () => partialMetricsClient,
+    });
+
+    const result = await caller.benchmarking.syncPortfolioManager({
+      buildingId: buildingReady.id,
+      reportingYear: 2025,
+    });
+
+    expect(result.syncState.status).toBe("PARTIAL");
+    expect(result.syncState.lastSuccessfulSyncAt?.toISOString()).toBe(
+      before?.lastSuccessfulSyncAt?.toISOString(),
+    );
+    expect(result.syncState.diagnostics?.failedStep).toBe("metrics");
+  });
+
+  it("lists portfolio readiness and enforces tenant isolation for PM sync state", async () => {
+    const successClient = {
+      property: {
+        getProperty: async () => ({
+          property: [
+            {
+              "@_id": 111111,
+              name: "Ready Property",
+              primaryFunction: "Office",
+              grossFloorArea: { value: 40000 },
+              yearBuilt: 2001,
+            },
+          ],
+        }),
+      },
+      meter: {
+        listMeters: async () => ({
+          response: {
+            links: {
+              link: [{ "@_id": 2001, "@_link": "/meter/2001" }],
+            },
+          },
+        }),
+        getMeter: async () => ({
+          meter: [
+            {
+              "@_id": 2001,
+              type: "Electric",
+              name: "Main Electric",
+              unitOfMeasure: "kWh",
+              inUse: true,
+            },
+          ],
+        }),
+      },
+      consumption: {
+        getConsumptionData: async () => ({
+          meterData: {
+            meterConsumption: monthConsumptions(),
+          },
+        }),
+      },
+      metrics: {
+        getLatestAvailablePropertyMetrics: async () => ({
           propertyId: 111111,
           year: 2025,
           month: 12,
@@ -679,5 +1023,266 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
         buildingId: buildingReady.id,
       }),
     ).rejects.toBeInstanceOf(TRPCError);
+  });
+
+  it("recovers cleanly after a failed sync retry without corrupting imported data", async () => {
+    const recoveryClient = {
+      property: {
+        getProperty: async () => ({
+          property: [
+            {
+              "@_id": 222222,
+              name: "Failure Property",
+              primaryFunction: "Office",
+              grossFloorArea: { value: 42000 },
+              yearBuilt: 2004,
+            },
+          ],
+        }),
+      },
+      meter: {
+        listMeters: async () => ({
+          response: {
+            links: {
+              link: [{ "@_id": 2201, "@_link": "/meter/2201" }],
+            },
+          },
+        }),
+        getMeter: async () => ({
+          meter: [
+            {
+              "@_id": 2201,
+              type: "Electric",
+              name: "Recovered Electric",
+              unitOfMeasure: "kWh",
+              inUse: true,
+            },
+          ],
+        }),
+      },
+      consumption: {
+        getConsumptionData: async () => ({
+          meterData: {
+            meterConsumption: monthConsumptions(),
+          },
+        }),
+      },
+      metrics: {
+        getLatestAvailablePropertyMetrics: async () => ({
+          propertyId: 222222,
+          year: 2025,
+          month: 12,
+          score: 74,
+          siteTotal: 1100000,
+          sourceTotal: 2300000,
+          siteIntensity: 65,
+          sourceIntensity: 138,
+          weatherNormalizedSiteIntensity: 63,
+          weatherNormalizedSourceIntensity: 134,
+          directGHGEmissions: 0,
+          medianScore: 50,
+        }),
+        getReasonsForNoScore: async () => [],
+      },
+    };
+
+    const caller = createCaller({
+      clerkUserId: userA.clerkUserId,
+      clerkOrgId: orgA.clerkOrgId,
+      espmFactory: () => recoveryClient,
+    });
+
+    const result = await caller.benchmarking.syncPortfolioManager({
+      buildingId: buildingFailure.id,
+      reportingYear: 2025,
+    });
+
+    const readingCount = await prisma.energyReading.count({
+      where: {
+        buildingId: buildingFailure.id,
+        source: "ESPM_SYNC",
+      },
+    });
+    const meterCount = await prisma.meter.count({
+      where: {
+        buildingId: buildingFailure.id,
+      },
+    });
+
+    expect(result.syncState.status).toBe("SUCCEEDED");
+    expect(readingCount).toBe(12);
+    expect(meterCount).toBe(1);
+  });
+
+  it("pushes local electric and gas readings to Portfolio Manager and refreshes readiness", async () => {
+    await prisma.energyReading.createMany({
+      data: [
+        {
+          buildingId: buildingPush.id,
+          organizationId: orgA.id,
+          source: "CSV_UPLOAD",
+          meterType: "ELECTRIC",
+          periodStart: new Date("2025-01-01T00:00:00.000Z"),
+          periodEnd: new Date("2025-01-31T00:00:00.000Z"),
+          consumption: 12000,
+          unit: "KWH",
+          consumptionKbtu: 12000 * 3.412,
+          cost: 1800,
+        },
+        {
+          buildingId: buildingPush.id,
+          organizationId: orgA.id,
+          source: "MANUAL",
+          meterType: "GAS",
+          periodStart: new Date("2025-01-01T00:00:00.000Z"),
+          periodEnd: new Date("2025-01-31T00:00:00.000Z"),
+          consumption: 240,
+          unit: "THERMS",
+          consumptionKbtu: 240 * 100,
+          cost: 320,
+        },
+      ],
+    });
+
+    const createdMeters: number[] = [];
+    const pushedEntries: Array<{ meterId: number; count: number }> = [];
+    const updatedEntries: Array<{ consumptionId: number; usage: number }> = [];
+
+    const pushClient = {
+      property: {
+        getProperty: async () => ({
+          property: [
+            {
+              "@_id": 444444,
+              name: "Push Property",
+              primaryFunction: "Office",
+              grossFloorArea: { value: 28000 },
+              yearBuilt: 2005,
+              address: {
+                "@_address1": "400 Push Ave NW",
+                "@_city": "Washington",
+                "@_state": "DC",
+                "@_postalCode": "20001",
+              },
+            },
+          ],
+        }),
+      },
+      meter: {
+        listMeters: async () => ({
+          response: {
+            links: {
+              link: createdMeters.map((meterId) => ({ "@_id": meterId, "@_link": `/meter/${meterId}` })),
+            },
+          },
+        }),
+        getMeter: async (meterId: number) => ({
+          meter: [
+            {
+              "@_id": meterId,
+              type: meterId === 5001 ? "Electric" : "Natural Gas",
+              name: meterId === 5001 ? "Quoin Electric Meter" : "Quoin Natural Gas Meter",
+              unitOfMeasure: meterId === 5001 ? "kWh" : "therms",
+              inUse: true,
+            },
+          ],
+        }),
+        createMeter: async (_propertyId: number, meter: { type: string }) => {
+          const meterId = meter.type === "Electric" ? 5001 : 5002;
+          if (!createdMeters.includes(meterId)) {
+            createdMeters.push(meterId);
+          }
+          return {
+            meter: [
+              {
+                "@_id": meterId,
+                type: meter.type,
+                name: meter.type === "Electric" ? "Quoin Electric Meter" : "Quoin Natural Gas Meter",
+                unitOfMeasure: meter.type === "Electric" ? "kWh" : "therms",
+                inUse: true,
+              },
+            ],
+          };
+        },
+      },
+      consumption: {
+        getConsumptionData: async (meterId: number) => ({
+          meterData: {
+            meterConsumption:
+              meterId === 5001
+                ? [
+                    {
+                      id: 9001,
+                      startDate: "2025-01-01",
+                      endDate: "2025-01-31",
+                      usage: 9999,
+                    },
+                  ]
+                : [],
+          },
+        }),
+        pushConsumptionData: async (meterId: number, entries: Array<{ startDate: string; endDate: string }>) => {
+          pushedEntries.push({ meterId, count: entries.length });
+          return { ok: true };
+        },
+        updateConsumptionData: async (
+          consumptionId: number,
+          entry: { usage: number },
+        ) => {
+          updatedEntries.push({ consumptionId, usage: entry.usage });
+          return { ok: true };
+        },
+      },
+      metrics: {
+        getLatestAvailablePropertyMetrics: async () => ({
+          propertyId: 444444,
+          year: 2025,
+          month: 12,
+          score: 73,
+          siteTotal: 900000,
+          sourceTotal: 1900000,
+          siteIntensity: 68,
+          sourceIntensity: 145,
+          weatherNormalizedSiteIntensity: 66,
+          weatherNormalizedSourceIntensity: 141,
+          directGHGEmissions: 0,
+          medianScore: 50,
+        }),
+        getReasonsForNoScore: async () => [],
+      },
+    };
+
+    const caller = createCaller({
+      clerkUserId: userA.clerkUserId,
+      clerkOrgId: orgA.clerkOrgId,
+      espmFactory: () => pushClient,
+    });
+
+    const result = await caller.benchmarking.pushLocalEnergyToPortfolioManager({
+      buildingId: buildingPush.id,
+      reportingYear: 2025,
+    });
+
+    expect(result.metersCreated).toBe(2);
+    expect(result.totals.readingsPrepared).toBe(2);
+    expect(result.totals.readingsPushed).toBe(1);
+    expect(result.totals.readingsUpdated).toBe(1);
+    expect(result.totals.readingsSkippedExisting).toBe(0);
+    expect(result.syncState.status).toBe("SUCCEEDED");
+    expect(createdMeters.sort()).toEqual([5001, 5002]);
+    expect(pushedEntries).toEqual([{ meterId: 5002, count: 1 }]);
+    expect(updatedEntries).toEqual([{ consumptionId: 9001, usage: 12000 }]);
+
+    const localMeters = await prisma.meter.findMany({
+      where: { buildingId: buildingPush.id },
+      orderBy: { meterType: "asc" },
+    });
+    expect(localMeters).toHaveLength(2);
+    expect(localMeters.map((meter) => meter.espmMeterId?.toString())).toEqual(["5001", "5002"]);
+
+    const syncState = await caller.benchmarking.getPortfolioManagerSyncStatus({
+      buildingId: buildingPush.id,
+    });
+    expect(syncState.status).toBe("SUCCEEDED");
   });
 });

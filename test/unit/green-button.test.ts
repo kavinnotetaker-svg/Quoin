@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
+import {
+  NonRetryableIntegrationError,
+  RetryableIntegrationError,
+} from "@/server/lib/errors";
 import {
   parseESPIXml,
   aggregateToMonthly,
@@ -11,7 +15,9 @@ import {
 } from "@/server/integrations/green-button/token-manager";
 import {
   buildAuthorizationUrl,
+  exchangeCodeForTokens,
   generateState,
+  refreshAccessToken,
   extractSubscriptionId,
 } from "@/server/integrations/green-button/oauth";
 
@@ -20,6 +26,11 @@ const fixturesDir = join(__dirname, "../fixtures/green-button");
 function loadFixture(name: string): string {
   return readFileSync(join(fixturesDir, name), "utf-8");
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 // ── ESPI Parser ─────────────────────────────────────────────────────────────
 
@@ -206,16 +217,16 @@ describe("Token Encryption", () => {
 // ── OAuth Helpers ───────────────────────────────────────────────────────────
 
 describe("OAuth Helpers", () => {
-  it("builds authorization URL with correct params", () => {
-    const config = {
-      clientId: "test-client-id",
-      clientSecret: "test-secret",
-      authorizationEndpoint: "https://utility.example.com/oauth/authorize",
-      tokenEndpoint: "https://utility.example.com/oauth/token",
-      redirectUri: "https://app.example.com/api/green-button/callback",
-      scope: "FB=4_5_15",
-    };
+  const config = {
+    clientId: "test-client-id",
+    clientSecret: "test-secret",
+    authorizationEndpoint: "https://utility.example.com/oauth/authorize",
+    tokenEndpoint: "https://utility.example.com/oauth/token",
+    redirectUri: "https://app.example.com/api/green-button/callback",
+    scope: "FB=4_5_15",
+  };
 
+  it("builds authorization URL with correct params", () => {
     const url = buildAuthorizationUrl(config, "csrf-state-123");
 
     expect(url).toContain("https://utility.example.com/oauth/authorize?");
@@ -249,5 +260,35 @@ describe("OAuth Helpers", () => {
   it("returns empty string for URI without Subscription", () => {
     expect(extractSubscriptionId("https://api.pepco.com/other")).toBe("");
     expect(extractSubscriptionId("")).toBe("");
+  });
+
+  it("classifies token exchange 400s as non-retryable integration errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("bad request", {
+          status: 400,
+        }),
+      ),
+    );
+
+    await expect(exchangeCodeForTokens(config, "bad-code")).rejects.toBeInstanceOf(
+      NonRetryableIntegrationError,
+    );
+  });
+
+  it("classifies token refresh 503s as retryable integration errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("service unavailable", {
+          status: 503,
+        }),
+      ),
+    );
+
+    await expect(refreshAccessToken(config, "refresh-token")).rejects.toBeInstanceOf(
+      RetryableIntegrationError,
+    );
   });
 });

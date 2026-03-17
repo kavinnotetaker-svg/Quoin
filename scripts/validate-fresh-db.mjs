@@ -56,6 +56,7 @@ async function querySeededCounts(connectionString) {
         (SELECT COUNT(*) FROM beps_cycle_registries) AS beps_cycles,
         (SELECT COUNT(*) FROM rule_packages WHERE key = 'DC_BEPS_CYCLE_1') AS beps_rule_packages,
         (SELECT COUNT(*) FROM rule_packages WHERE key = 'DC_BEPS_CYCLE_2') AS beps_cycle_2_rule_packages,
+        (SELECT COUNT(*) FROM rule_packages WHERE key = 'DC_BEPS_CYCLE_3') AS beps_cycle_3_rule_packages,
         (SELECT COUNT(*) FROM rule_versions rv
           INNER JOIN rule_packages rp ON rp.id = rv.rule_package_id
           WHERE rp.key = 'DC_BEPS_CYCLE_1' AND rv.status = 'ACTIVE') AS beps_active_rule_versions,
@@ -66,6 +67,83 @@ async function querySeededCounts(connectionString) {
           WHERE key = 'DC_BEPS_CYCLE_1_FACTORS_V1' AND status = 'ACTIVE') AS beps_active_factor_versions,
         (SELECT COUNT(*) FROM factor_set_versions
           WHERE key = 'DC_BEPS_CYCLE_2_FACTORS_V1' AND status = 'ACTIVE') AS beps_cycle_2_active_factor_versions,
+        (SELECT COUNT(*) FROM factor_set_versions
+          WHERE key = 'DC_BEPS_CYCLE_3_FACTORS_V1' AND status = 'ACTIVE') AS beps_cycle_3_active_factor_versions,
+        (SELECT COUNT(*) FROM beps_cycle_registries
+          WHERE compliance_cycle = 'CYCLE_3') AS beps_cycle_3_registry_rows,
+        (SELECT factors_json->'beps'->'applicability'->>'minGrossSquareFeetPrivate'
+          FROM factor_set_versions
+          WHERE key = 'DC_BEPS_CYCLE_2_FACTORS_V1' AND status = 'ACTIVE'
+          ORDER BY effective_from DESC, created_at DESC
+          LIMIT 1) AS beps_cycle_2_private_threshold,
+        (SELECT factors_json->'beps'->'cycle'->>'cycleStartYear'
+          FROM factor_set_versions
+          WHERE key = 'DC_BEPS_CYCLE_2_FACTORS_V1' AND status = 'ACTIVE'
+          ORDER BY effective_from DESC, created_at DESC
+          LIMIT 1) AS beps_cycle_2_start_year,
+        (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+            COALESCE(
+              (
+                SELECT factors_json->'beps'->'standardsTable'
+                FROM factor_set_versions
+                WHERE key = 'DC_BEPS_CYCLE_2_FACTORS_V1' AND status = 'ACTIVE'
+                ORDER BY effective_from DESC, created_at DESC
+                LIMIT 1
+              ),
+              '[]'::jsonb
+            )
+          ) entry
+          WHERE entry->>'pathway' = 'TRAJECTORY'
+            AND entry->>'year' = '2027') AS beps_cycle_2_trajectory_2027_rows,
+        (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+            COALESCE(
+              (
+                SELECT factors_json->'beps'->'standardsTable'
+                FROM factor_set_versions
+                WHERE key = 'DC_BEPS_CYCLE_2_FACTORS_V1' AND status = 'ACTIVE'
+                ORDER BY effective_from DESC, created_at DESC
+                LIMIT 1
+              ),
+              '[]'::jsonb
+            )
+          ) entry
+          WHERE entry->>'pathway' = 'TRAJECTORY'
+            AND entry->>'year' = '2028') AS beps_cycle_2_trajectory_2028_rows,
+        (SELECT COALESCE(jsonb_array_length(factors_json->'benchmarking'->'applicabilityBands'), 0)
+          FROM factor_set_versions
+          WHERE key = 'DC_CURRENT_STANDARDS' AND status = 'ACTIVE'
+          ORDER BY effective_from DESC, created_at DESC
+          LIMIT 1) AS benchmarking_applicability_bands,
+        (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+            COALESCE(
+              (
+                SELECT factors_json->'benchmarking'->'applicabilityBands'
+                FROM factor_set_versions
+                WHERE key = 'DC_CURRENT_STANDARDS' AND status = 'ACTIVE'
+                ORDER BY effective_from DESC, created_at DESC
+                LIMIT 1
+              ),
+              '[]'::jsonb
+            )
+          ) band
+          WHERE band->>'label' = 'PRIVATE_25K_TO_49_999') AS benchmarking_private_25k_band,
+        (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+            COALESCE(
+              (
+                SELECT factors_json->'benchmarking'->'applicabilityBands'
+                FROM factor_set_versions
+                WHERE key = 'DC_CURRENT_STANDARDS' AND status = 'ACTIVE'
+                ORDER BY effective_from DESC, created_at DESC
+                LIMIT 1
+              ),
+              '[]'::jsonb
+            )
+          ) band
+          WHERE band->>'label' = 'DISTRICT_10K_PLUS') AS benchmarking_district_band,
         (SELECT COUNT(*) FROM organizations) AS organizations,
         (SELECT COUNT(*) FROM users) AS users,
         (SELECT COUNT(*) FROM organization_memberships) AS memberships,
@@ -141,10 +219,20 @@ async function main() {
     if (
       Number(seededCounts.beps_rule_packages) !== 1 ||
       Number(seededCounts.beps_cycle_2_rule_packages) !== 1 ||
+      Number(seededCounts.beps_cycle_3_rule_packages) !== 0 ||
       Number(seededCounts.beps_active_rule_versions) < 1 ||
       Number(seededCounts.beps_cycle_2_active_rule_versions) < 1 ||
       Number(seededCounts.beps_active_factor_versions) < 1 ||
       Number(seededCounts.beps_cycle_2_active_factor_versions) < 1 ||
+      Number(seededCounts.beps_cycle_3_active_factor_versions) !== 0 ||
+      Number(seededCounts.beps_cycle_3_registry_rows) !== 0 ||
+      Number(seededCounts.beps_cycle_2_private_threshold) !== 25000 ||
+      Number(seededCounts.beps_cycle_2_start_year) !== 2028 ||
+      Number(seededCounts.beps_cycle_2_trajectory_2027_rows) !== 0 ||
+      Number(seededCounts.beps_cycle_2_trajectory_2028_rows) < 1 ||
+      Number(seededCounts.benchmarking_applicability_bands) < 4 ||
+      Number(seededCounts.benchmarking_private_25k_band) !== 1 ||
+      Number(seededCounts.benchmarking_district_band) !== 1 ||
       Number(seededCounts.beps_cycles) < 2 ||
       Number(seededCounts.beps_metric_inputs) < 1 ||
       Number(seededCounts.beps_prescriptive_items) < 1 ||

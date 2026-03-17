@@ -1,0 +1,179 @@
+
+> quoin@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 1644ms
+ ○ Compiling /src/middleware ...
+ ✓ Compiled /src/middleware in 1010ms (189 modules)
+ ○ Compiling /sign-in/[[...sign-in]] ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (192kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled /sign-in/[[...sign-in]] in 7.6s (1196 modules)
+ GET / 200 in 7972ms
+ GET /sign-in 200 in 8206ms
+ ○ Compiling /buildings ...
+ ✓ Compiled /buildings in 1023ms (1316 modules)
+ ✓ Compiled in 329ms (549 modules)
+ GET /buildings 200 in 1480ms
+ ✓ Compiled /api/trpc/[trpc] in 247ms (798 modules)
+ ✓ Compiled (1029 modules)
+ GET /favicon.ico 200 in 2089ms
+ POST /buildings 200 in 2086ms
+ POST /buildings 200 in 12ms
+ GET /api/trpc/building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%2C%22page%22%3A1%2C%22pageSize%22%3A25%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 200 in 2955ms
+ ○ Compiling /buildings/[id] ...
+ ✓ Compiled /buildings/[id] in 3.3s (2566 modules)
+ GET /buildings/cmmmqcvdu00149chsuuq6jq8d?_rsc=1l1kl 200 in 269ms
+ GET /api/trpc/building.get?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22id%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%7D%7D%7D 200 in 223ms
+ GET /api/trpc/building.energyReadings?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22months%22%3A24%7D%7D%7D 200 in 46ms
+ GET /buildings/cmmmqcvdu00149chsuuq6jq8d 200 in 640ms
+ GET /favicon.ico 200 in 21ms
+ POST /buildings/cmmmqcvdu00149chsuuq6jq8d 200 in 41ms
+ POST /buildings/cmmmqcvdu00149chsuuq6jq8d 200 in 29ms
+ GET /api/trpc/building.get?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22id%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%7D%7D%7D 200 in 107ms
+ GET /api/trpc/building.energyReadings?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22months%22%3A24%7D%7D%7D 200 in 47ms
+(node:5572) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use asycn/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ GET /api/trpc/benchmarking.getPortfolioManagerSyncStatus,benchmarking.getQaFindings,benchmarking.getReadiness,benchmarking.listSubmissions?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%7D%7D%2C%222%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22reportingYear%22%3A2025%7D%7D%2C%223%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A10%7D%7D%7D 200 in 123ms
+ ○ Compiling /reports ...
+ ✓ Compiled /reports in 712ms (2297 modules)
+ ✓ Compiled /api/trpc/[trpc] in 243ms (1500 modules)
+ GET /api/trpc/building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22pageSize%22%3A100%7D%7D%7D 200 in 678ms
+ GET /api/trpc/report.getComplianceReport,report.getExemptionReport?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%7D%7D%7D 200 in 80ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 3s (2620 modules)
+ GET /api/trpc/building.portfolioStats,building.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%2C%22v%22%3A1%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22search%22%3Anull%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22search%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%7D 200 in 302ms
+ GET /api/trpc/portfolioRisk.list,portfolioRisk.priorityActions,benchmarking.listPortfolioReadiness,operations.listPortfolioAnomalies,retrofit.rankPortfolio?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22limit%22%3A25%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%222%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%223%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%2C%224%22%3A%7B%22json%22%3A%7B%22limit%22%3A8%7D%7D%7D 200 in 143ms
+ ✓ Compiled in 314ms (1539 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 257ms
+ ✓ Compiled in 417ms (1539 modules)
+ GET /dashboard?_rsc=p0ba9 200 in 224ms
+ GET /api/trpc/capital.getAnalysis?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%7D%7D%7D 200 in 414ms
+ ✓ Compiled in 701ms (2620 modules)
+ GET /buildings/cmmmqcvdu00149chsuuq6jq8d?_rsc=1l1kl 200 in 195ms
+ ✓ Compiled in 701ms (2620 modules)
+ ✓ Compiled in 0ms (1539 modules)
+ ✓ Compiled in 1ms (1539 modules)
+ ✓ Compiled in 0ms (1539 modules)
+ GET /api/trpc/building.complianceHistory?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A20%7D%7D%7D 200 in 1329ms
+ GET /buildings/cmmmqcvdu00149chsuuq6jq8d?_rsc=1l1kl 200 in 1470ms
+ GET /api/trpc/drift.listAlerts,drift.alertSummary?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22status%22%3Anull%2C%22limit%22%3A50%7D%2C%22meta%22%3A%7B%22values%22%3A%7B%22status%22%3A%5B%22undefined%22%5D%7D%2C%22v%22%3A1%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%7D%7D%7D 200 in 190ms
+ GET /api/trpc/provenance.rulePackages,provenance.factorSetVersions,provenance.complianceRuns,provenance.benchmarkSubmissions,provenance.filingRecords?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22activeOnly%22%3Atrue%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22activeOnly%22%3Atrue%7D%7D%2C%222%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A20%7D%7D%2C%223%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A10%7D%7D%2C%224%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A10%7D%7D%7D 200 in 113ms
+ GET /api/trpc/operations.listBuildingAnomalies?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A50%7D%7D%7D 200 in 48ms
+ GET /api/trpc/retrofit.listCandidates,financing.listCases?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A100%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A50%7D%7D%7D 200 in 63ms
+ GET /api/trpc/retrofit.listCandidates,retrofit.rankBuilding?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A50%7D%7D%2C%221%22%3A%7B%22json%22%3A%7B%22buildingId%22%3A%22cmmmqcvdu00149chsuuq6jq8d%22%2C%22limit%22%3A50%7D%7D%7D 200 in 104ms
+ ○ Compiling / ...
+ ✓ Compiled / in 641ms (1311 modules)
+ ⨯ TypeError: Cannot read properties of undefined (reading 'call')
+    at Object.__webpack_require__ [as require] (C:\Quoin\.next\server\webpack-runtime.js:33:43)
+    at JSON.parse (<anonymous>)
+digest: "2697345889"
+TypeError: Cannot read properties of undefined (reading 'call')
+    at Object.__webpack_require__ [as require] (C:\Quoin\.next\server\webpack-runtime.js:33:43)
+    at require (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:40:20064)
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108376
+    at ea (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108583)
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:110813
+    at Object._fromJSON (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:111370)
+    at JSON.parse (<anonymous>)
+    at ec (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:109078)
+    at eo (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108123)
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115291
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115308
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115341
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115358
+    at t (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115581)
+ ⨯ TypeError: Cannot read properties of undefined (reading 'call')
+    at Object.__webpack_require__ [as require] (C:\Quoin\.next\server\webpack-runtime.js:33:43)
+    at require (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:40:20064)
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108376
+    at ea (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108583)
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:110813
+    at Object._fromJSON (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:111370)
+    at JSON.parse (<anonymous>)
+    at ec (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:109078)
+    at eo (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108123)
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115291
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115308
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115341
+    at C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115358
+    at t (C:\Quoin\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115581) {
+  page: '/'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 2.1s (2603 modules)
+ GET / 500 in 3658ms
+ ⨯ Failed to generate static paths for /buildings/[id]:
+Error: Cannot find module './vendor-chunks/@tanstack.js'
+Require stack:
+- C:\Quoin\.next\server\webpack-runtime.js
+- C:\Quoin\.next\server\app\(dashboard)\buildings\[id]\page.js
+- C:\Quoin\node_modules\next\dist\server\require.js
+- C:\Quoin\node_modules\next\dist\server\load-components.js
+- C:\Quoin\node_modules\next\dist\build\utils.js
+- C:\Quoin\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Quoin\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1448:15)
+    at C:\Quoin\node_modules\next\dist\server\require-hook.js:55:36
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1234:25)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1548:12)
+    at mod.require (C:\Quoin\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:152:16) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Quoin\\.next\\server\\webpack-runtime.js',
+    'C:\\Quoin\\.next\\server\\app\\(dashboard)\\buildings\\[id]\\page.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ]
+}
+ ⨯ Failed to generate static paths for /buildings/[id]:
+Error: Cannot find module './vendor-chunks/@tanstack.js'
+Require stack:
+- C:\Quoin\.next\server\webpack-runtime.js
+- C:\Quoin\.next\server\app\(dashboard)\buildings\[id]\page.js
+- C:\Quoin\node_modules\next\dist\server\require.js
+- C:\Quoin\node_modules\next\dist\server\load-components.js
+- C:\Quoin\node_modules\next\dist\build\utils.js
+- C:\Quoin\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Quoin\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1448:15)
+    at C:\Quoin\node_modules\next\dist\server\require-hook.js:55:36
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1234:25)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1548:12)
+    at mod.require (C:\Quoin\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:152:16) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Quoin\\.next\\server\\webpack-runtime.js',
+    'C:\\Quoin\\.next\\server\\app\\(dashboard)\\buildings\\[id]\\page.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Quoin\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ]
+}
+ ○ Compiling /_not-found ...
+ GET /buildings/cmmmqcvdu00149chsuuq6jq8d?_rsc=1l1kl 200 in 2033ms
+ GET /buildings/cmmmqcvdu00149chsuuq6jq8d?_rsc=1l1kl 200 in 975ms
+ ✓ Compiled /_not-found in 951ms (2606 modules)
+ GET /_next/static/css/app/layout.css?v=1773279722399 404 in 1151ms
+[?25h

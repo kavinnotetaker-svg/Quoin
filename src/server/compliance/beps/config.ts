@@ -20,10 +20,9 @@ function getNestedObject(value: Record<string, unknown>, key: string) {
     : {};
 }
 
-export const BEPS_FACTOR_SET_KEYS: Record<ComplianceCycle, string> = {
+const SUPPORTED_BEPS_FACTOR_SET_KEYS: Partial<Record<ComplianceCycle, string>> = {
   CYCLE_1: "DC_BEPS_CYCLE_1_FACTORS_V1",
   CYCLE_2: "DC_BEPS_CYCLE_2_FACTORS_V1",
-  CYCLE_3: "DC_BEPS_CYCLE_3_FACTORS_V1",
 };
 
 export class BepsConfigurationError extends Error {
@@ -33,6 +32,15 @@ export class BepsConfigurationError extends Error {
     super(message);
     this.name = "BepsConfigurationError";
     this.reasonCode = reasonCode;
+  }
+}
+
+export function assertSupportedBepsCycle(cycle: ComplianceCycle) {
+  if (cycle === "CYCLE_3") {
+    throw new BepsConfigurationError(
+      `Cycle ${cycle} is recognized in the product taxonomy but not yet supported by governed BEPS records`,
+      BEPS_REASON_CODES.unsupportedCycle,
+    );
   }
 }
 
@@ -167,7 +175,9 @@ function requireYearList(label: string, value: unknown, fallback?: unknown): num
 }
 
 export function getBepsFactorSetKeyForCycle(cycle: ComplianceCycle) {
-  const key = BEPS_FACTOR_SET_KEYS[cycle];
+  assertSupportedBepsCycle(cycle);
+
+  const key = SUPPORTED_BEPS_FACTOR_SET_KEYS[cycle];
   if (!key) {
     throw new BepsConfigurationError(
       `No governed BEPS factors are configured for cycle ${cycle}`,

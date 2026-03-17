@@ -17,6 +17,13 @@ export class ESPMAuthError extends ESPMError {
   }
 }
 
+export class ESPMAccessError extends ESPMError {
+  constructor(message: string, rawResponse?: string) {
+    super(message, 403, "ACCESS_DENIED", rawResponse);
+    this.name = "ESPMAccessError";
+  }
+}
+
 export class ESPMNotFoundError extends ESPMError {
   constructor(message: string, rawResponse?: string) {
     super(message, 404, "NOT_FOUND", rawResponse);

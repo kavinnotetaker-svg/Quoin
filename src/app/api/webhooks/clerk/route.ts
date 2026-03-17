@@ -1,7 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { prisma } from "@/server/lib/db";
+import { toHttpErrorResponseBody } from "@/server/lib/errors";
+import { createLogger } from "@/server/lib/logger";
 import {
   deleteOrganizationMembership,
   ensureUserRecord,
@@ -9,6 +12,7 @@ import {
   upsertOrganization,
   upsertOrganizationMembership,
 } from "@/server/lib/organization-membership";
+import { getClerkWebhookSecret } from "@/server/lib/config";
 
 interface ClerkOrganizationEvent {
   data: {
@@ -44,11 +48,12 @@ interface ClerkUserEvent {
 type WebhookEvent = ClerkOrganizationEvent | ClerkMembershipEvent | ClerkUserEvent;
 
 export async function POST(req: Request): Promise<NextResponse> {
-  const webhookSecret = process.env["CLERK_WEBHOOK_SECRET"];
-  if (!webhookSecret) {
-    console.error("CLERK_WEBHOOK_SECRET not set");
-    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
-  }
+  const requestId = randomUUID();
+  const logger = createLogger({
+    requestId,
+    procedure: "clerk.webhook",
+  });
+  const webhookSecret = getClerkWebhookSecret();
 
   const headerPayload = await headers();
   const svixId = headerPayload.get("svix-id");
@@ -56,7 +61,11 @@ export async function POST(req: Request): Promise<NextResponse> {
   const svixSignature = headerPayload.get("svix-signature");
 
   if (!svixId || !svixTimestamp || !svixSignature) {
-    return NextResponse.json({ error: "Missing svix headers" }, { status: 400 });
+    logger.warn("Clerk webhook request missing svix headers");
+    return NextResponse.json(
+      { error: "Missing svix headers", requestId },
+      { status: 400 },
+    );
   }
 
   const payload = await req.text();
@@ -70,12 +79,19 @@ export async function POST(req: Request): Promise<NextResponse> {
       "svix-signature": svixSignature,
     }) as WebhookEvent;
   } catch (error) {
-    console.error("Webhook verification failed:", error);
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    logger.warn("Clerk webhook verification failed", {
+      error,
+    });
+    return NextResponse.json(
+      { error: "Invalid signature", requestId },
+      { status: 400 },
+    );
   }
 
   const eventType = event.type;
-  console.log(`[Clerk Webhook] type=${eventType}`);
+  logger.info("Processing Clerk webhook event", {
+    eventType,
+  });
 
   try {
     switch (eventType) {
@@ -87,15 +103,18 @@ export async function POST(req: Request): Promise<NextResponse> {
           name: data.name,
           slug: data.slug,
         });
-        console.log(`[Clerk Webhook] Upserted organization: ${data.name}`);
+        logger.info("Upserted organization from Clerk webhook", {
+          clerkOrgId: data.id,
+          organizationName: data.name,
+        });
         break;
       }
 
       case "organization.deleted": {
         const { data } = event as ClerkOrganizationEvent;
-        console.warn(
-          `[Clerk Webhook] Organization deleted in Clerk: ${data.id} - data preserved locally`,
-        );
+        logger.warn("Clerk organization deleted; preserving local data", {
+          clerkOrgId: data.id,
+        });
         break;
       }
 
@@ -107,9 +126,9 @@ export async function POST(req: Request): Promise<NextResponse> {
           select: { id: true, slug: true },
         });
         if (!organization) {
-          console.warn(
-            `[Clerk Webhook] Org not found for membership event: ${data.organization.id}`,
-          );
+          logger.warn("Clerk membership event skipped because organization was not found", {
+            clerkOrgId: data.organization.id,
+          });
           break;
         }
 
@@ -120,9 +139,12 @@ export async function POST(req: Request): Promise<NextResponse> {
           clerkUserId,
           role: mapClerkRole(data.role),
         });
-        console.log(
-          `[Clerk Webhook] Membership upserted: user=${clerkUserId} org=${organization.slug} role=${data.role}`,
-        );
+        logger.info("Clerk membership upserted", {
+          organizationId: organization.id,
+          userId: clerkUserId,
+          clerkMembershipId: data.id,
+          role: data.role,
+        });
         break;
       }
 
@@ -133,9 +155,11 @@ export async function POST(req: Request): Promise<NextResponse> {
           clerkOrgId: data.organization.id,
           clerkUserId: data.public_user_data.user_id,
         });
-        console.warn(
-          `[Clerk Webhook] Membership deleted: user=${data.public_user_data.user_id} org=${data.organization.id}`,
-        );
+        logger.warn("Clerk membership deleted", {
+          userId: data.public_user_data.user_id,
+          clerkOrgId: data.organization.id,
+          clerkMembershipId: data.id,
+        });
         break;
       }
 
@@ -147,16 +171,24 @@ export async function POST(req: Request): Promise<NextResponse> {
           email: data.email_addresses[0]?.email_address,
           name: [data.first_name, data.last_name].filter(Boolean).join(" ") || "Unknown",
         });
-        console.log(`[Clerk Webhook] User upserted: ${data.id}`);
+        logger.info("Clerk user upserted", {
+          userId: data.id,
+        });
         break;
       }
 
       default:
-        console.log(`[Clerk Webhook] Unhandled event type: ${eventType}`);
+        logger.info("Unhandled Clerk webhook event type", {
+          eventType,
+        });
     }
   } catch (error) {
-    console.error(`[Clerk Webhook] Error processing ${eventType}:`, error);
-    return NextResponse.json({ error: "Processing failed" }, { status: 500 });
+    logger.error("Clerk webhook processing failed", {
+      eventType,
+      error,
+    });
+    const response = toHttpErrorResponseBody(error, requestId);
+    return NextResponse.json(response.body, { status: response.status });
   }
 
   return NextResponse.json({ received: true });

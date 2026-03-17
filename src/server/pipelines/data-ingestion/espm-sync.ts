@@ -1,9 +1,10 @@
 import type { ESPM } from "@/server/integrations/espm";
 import type { PropertyMetrics } from "@/server/integrations/espm/types";
+import { createLogger } from "@/server/lib/logger";
 
 export interface ESPMSyncInput {
   espmPropertyId: number;
-  espmMeterId: number;
+  espmMeterId?: number | null;
   readings: Array<{
     periodStart: Date;
     periodEnd: Date;
@@ -19,139 +20,214 @@ export interface ESPMSyncResult {
   metricsError?: string;
 }
 
+const ESPM_METER_CONFIG = {
+  ELECTRIC: {
+    type: "Electric",
+    unitOfMeasure: "kWh (thousand Watt-hours)",
+    defaultName: "Primary Electric Meter",
+  },
+  GAS: {
+    type: "Natural Gas",
+    unitOfMeasure: "therms",
+    defaultName: "Primary Natural Gas Meter",
+  },
+} as const;
+
 /**
  * Sync energy data with ESPM:
- * 1. Ensure a meter exists on the property (create one if not)
- * 2. Push consumption data to the meter
- * 3. Pull updated metrics (score, EUI) from the property
+ * 1. Ensure a real meter exists on the property
+ * 2. Push consumption data to that meter
+ * 3. Pull updated metrics from the property
  *
- * Each step is independent — a push failure doesn't prevent pulling metrics.
+ * Each step is independent. A push failure should not prevent metrics retrieval.
  */
 export async function syncWithESPM(
   espmClient: ESPM,
   input: ESPMSyncInput,
 ): Promise<ESPMSyncResult> {
   const result: ESPMSyncResult = { pushed: false, metrics: null };
+  const log = createLogger({
+    syncPhase: "legacy-espm-sync",
+    espmPropertyId: input.espmPropertyId,
+  });
 
-  // Step 1: Find or create a meter on this property
-  let meterId = input.espmMeterId;
+  let meterId = input.espmMeterId ?? null;
 
   if (input.readings.length > 0) {
     try {
-      // Try to list existing meters
-      const metersResponse = await espmClient.meter.listMeters(input.espmPropertyId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const meterList = metersResponse as any;
-      const links = meterList?.response?.links?.link;
+      const links = toArray(
+        toRecord(toRecord(toRecord(await espmClient.meter.listMeters(input.espmPropertyId)).response).links)
+          .link,
+      );
 
-      if (links && Array.isArray(links) && links.length > 0) {
-        // Use the first existing meter
-        const meterLink = links[0];
-        const meterIdMatch = String(meterLink?.["@_id"] || meterLink?.["@_href"] || "").match(/\/meter\/(\d+)/);
-        if (meterIdMatch) {
-          meterId = Number(meterIdMatch[1]);
-          console.log(`[ESPM Sync] Found existing meter: ${meterId}`);
-        }
-      } else if (links && !Array.isArray(links)) {
-        // Single meter returned as object
-        const meterIdMatch = String(links?.["@_id"] || links?.["@_href"] || "").match(/\/meter\/(\d+)/);
-        if (meterIdMatch) {
-          meterId = Number(meterIdMatch[1]);
-          console.log(`[ESPM Sync] Found existing meter: ${meterId}`);
+      if (meterId == null) {
+        for (const link of links) {
+          const parsedMeterId = extractMeterId(link);
+          if (parsedMeterId != null) {
+            meterId = parsedMeterId;
+            log.info("Resolved existing ESPM meter for legacy sync.", {
+              meterId,
+            });
+            break;
+          }
         }
       }
 
-      // If no meter found, create one
-      if (meterId === input.espmPropertyId) {
-        console.log(`[ESPM Sync] No meter found, creating electric meter on property ${input.espmPropertyId}...`);
+      if (meterId == null) {
         const firstReading = input.readings[0];
-        const createResult = await espmClient.meter.createMeter(input.espmPropertyId, {
-          type: "Electric",
-          name: "Primary Electric Meter",
-          unitOfMeasure: "kWh (thousand Watt-hours)",
-          metered: true,
-          firstBillDate: formatDate(firstReading.periodStart),
-          inUse: true,
+        const meterConfig = inferMeterConfig(firstReading?.nativeUnit ?? null);
+        log.info("Creating ESPM meter for legacy sync.", {
+          meterType: meterConfig.type,
+          unitOfMeasure: meterConfig.unitOfMeasure,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const createResponse = createResult as any;
-        // Try to parse the new meter ID from the response
-        const newId = createResponse?.response?.links?.link?.["@_id"]
-          || createResponse?.meterId
-          || createResponse?.id;
-        if (newId) {
-          meterId = Number(String(newId).replace(/\D/g, ""));
-          console.log(`[ESPM Sync] Created meter: ${meterId}`);
+
+        const createResponse = toRecord(
+          await espmClient.meter.createMeter(input.espmPropertyId, {
+            type: meterConfig.type,
+            name: meterConfig.defaultName,
+            unitOfMeasure: meterConfig.unitOfMeasure,
+            metered: true,
+            firstBillDate: formatDate(firstReading.periodStart),
+            inUse: true,
+          }),
+        );
+
+        meterId =
+          getNumber(createResponse.meterId) ??
+          getNumber(createResponse.id) ??
+          extractMeterId(toRecord(toRecord(toRecord(createResponse.response).links).link));
+
+        if (meterId != null) {
+          log.info("Created ESPM meter for legacy sync.", { meterId });
         } else {
-          // Try to extract from Location header or href
-          const href = createResponse?.response?.links?.link?.["@_href"] || "";
-          const hrefMatch = String(href).match(/\/meter\/(\d+)/);
-          if (hrefMatch) {
-            meterId = Number(hrefMatch[1]);
-            console.log(`[ESPM Sync] Created meter (from href): ${meterId}`);
-          } else {
-            console.warn(`[ESPM Sync] Could not parse meter ID from create response:`, JSON.stringify(createResponse));
-          }
+          log.warn(
+            "Meter creation succeeded but no meter ID could be parsed for legacy sync.",
+          );
         }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[ESPM Sync] Meter setup failed: ${msg}`);
-      // Continue — we'll try to push with whatever meter ID we have
+      log.warn("Legacy ESPM meter setup failed.", {
+        errorMessage: msg,
+        error: err instanceof Error ? err : undefined,
+      });
     }
 
-    // Step 2: Push consumption data to the meter
-    try {
-      const entries = input.readings.map((r) => ({
-        startDate: formatDate(r.periodStart),
-        endDate: formatDate(r.periodEnd),
-        usage: r.consumptionNative,
-      }));
+    if (meterId == null) {
+      result.pushError =
+        "ESPM meter setup did not produce a valid meter ID. Consumption push was skipped.";
+    } else {
+      try {
+        const entries = input.readings.map((reading) => ({
+          startDate: formatDate(reading.periodStart),
+          endDate: formatDate(reading.periodEnd),
+          usage: reading.consumptionNative,
+        }));
 
-      const chunks = chunkArray(entries, 120);
-      for (const chunk of chunks) {
-        await espmClient.consumption.pushConsumptionData(meterId, chunk);
+        const chunks = chunkArray(entries, 120);
+        for (const chunk of chunks) {
+          await espmClient.consumption.pushConsumptionData(meterId, chunk);
+        }
+        result.pushed = true;
+        log.info("Pushed legacy ESPM consumption data.", {
+          meterId,
+          readingCount: entries.length,
+          chunkCount: chunks.length,
+        });
+      } catch (err) {
+        result.pushError = err instanceof Error ? err.message : String(err);
+        log.error("Legacy ESPM consumption push failed.", {
+          meterId,
+          errorMessage: result.pushError,
+          error: err instanceof Error ? err : undefined,
+        });
       }
-      result.pushed = true;
-      console.log(`[ESPM Sync] Pushed ${entries.length} readings to meter ${meterId}`);
-    } catch (err) {
-      result.pushError = err instanceof Error ? err.message : String(err);
-      console.error(
-        `[ESPM Sync] Push failed for meter ${meterId}:`,
-        result.pushError,
-      );
     }
   }
 
-  // Step 3: Pull updated metrics from the property
   try {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    result.metrics = await espmClient.metrics.getPropertyMetrics(
+    result.metrics = await espmClient.metrics.getLatestAvailablePropertyMetrics(
       input.espmPropertyId,
-      year,
-      month,
+      now.getFullYear(),
+      now.getMonth() + 1,
     );
   } catch (err) {
     result.metricsError = err instanceof Error ? err.message : String(err);
-    console.error(
-      `[ESPM Sync] Metrics pull failed for property ${input.espmPropertyId}:`,
-      result.metricsError,
-    );
+    log.error("Legacy ESPM metrics pull failed.", {
+      errorMessage: result.metricsError,
+      error: err instanceof Error ? err : undefined,
+    });
   }
 
   return result;
 }
 
-function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0];
+function formatDate(value: Date) {
+  return value.toISOString().slice(0, 10);
 }
 
-function chunkArray<T>(arr: T[], size: number): T[][] {
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function toArray<T>(value: T | T[] | null | undefined): T[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  return value == null ? [] : [value];
+}
+
+function getNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function extractMeterId(raw: unknown): number | null {
+  const record = toRecord(raw);
+  const directId = getNumber(record["@_id"] ?? record.id);
+  if (directId != null) {
+    return directId;
+  }
+
+  const href =
+    typeof record["@_href"] === "string"
+      ? record["@_href"]
+      : typeof record.href === "string"
+        ? record.href
+        : null;
+  if (!href) {
+    return null;
+  }
+
+  const match = href.match(/\/meter\/(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+function inferMeterConfig(nativeUnit: string | null) {
+  const normalized = nativeUnit?.trim().toLowerCase() ?? "";
+  if (normalized.includes("therm") || normalized.includes("ccf")) {
+    return ESPM_METER_CONFIG.GAS;
+  }
+
+  return ESPM_METER_CONFIG.ELECTRIC;
+}
+
+function chunkArray<T>(entries: T[], size: number): T[][] {
   const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
+  for (let index = 0; index < entries.length; index += size) {
+    chunks.push(entries.slice(index, index + size));
   }
   return chunks;
 }

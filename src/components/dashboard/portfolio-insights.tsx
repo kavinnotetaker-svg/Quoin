@@ -17,10 +17,10 @@ interface BuildingRef {
 }
 
 function urgencyClasses(level: string) {
-  if (level === "CRITICAL") return "bg-red-100 text-red-800";
-  if (level === "HIGH") return "bg-orange-100 text-orange-800";
-  if (level === "MEDIUM") return "bg-amber-100 text-amber-800";
-  return "bg-gray-100 text-gray-700";
+  if (level === "CRITICAL") return "bg-red-50 text-red-700 ring-1 ring-red-600/20";
+  if (level === "HIGH") return "bg-orange-50 text-orange-700 ring-1 ring-orange-600/20";
+  if (level === "MEDIUM") return "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20";
+  return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-500/20";
 }
 
 export function PortfolioInsights({
@@ -29,25 +29,29 @@ export function PortfolioInsights({
   buildings: BuildingRef[];
 }) {
   const buildingNameById = new Map(buildings.map((building) => [building.id, building.name]));
+  const workflow = trpc.building.portfolioWorkflow.useQuery({ limit: 25 });
   const risk = trpc.portfolioRisk.list.useQuery({ limit: 25 });
   const actions = trpc.portfolioRisk.priorityActions.useQuery({ limit: 8 });
-  const readiness = trpc.benchmarking.listPortfolioReadiness.useQuery({ limit: 8 });
   const anomalies = trpc.operations.listPortfolioAnomalies.useQuery({ limit: 8 });
   const retrofit = trpc.retrofit.rankPortfolio.useQuery({ limit: 8 });
 
   if (
+    workflow.isLoading ||
     risk.isLoading ||
     actions.isLoading ||
-    readiness.isLoading ||
     anomalies.isLoading ||
     retrofit.isLoading
   ) {
     return <LoadingState />;
   }
 
-  if (risk.error || actions.error || readiness.error || anomalies.error || retrofit.error) {
+  if (workflow.error || risk.error || actions.error || anomalies.error || retrofit.error) {
     const error =
-      risk.error ?? actions.error ?? readiness.error ?? anomalies.error ?? retrofit.error;
+      workflow.error ??
+      risk.error ??
+      actions.error ??
+      anomalies.error ??
+      retrofit.error;
     return (
       <ErrorState
         message="Portfolio insights are unavailable right now."
@@ -57,19 +61,57 @@ export function PortfolioInsights({
   }
 
   const aggregate = risk.data?.aggregate;
+  const workflowAggregate = workflow.data?.aggregate;
 
   return (
     <div className="space-y-6">
       {aggregate ? (
         <MetricGrid
           items={[
-            { label: "Buildings Ready", value: aggregate.totals.buildingsReady, tone: "success" },
-            { label: "Buildings Blocked", value: aggregate.totals.buildingsBlocked, tone: "danger" },
-            { label: "High Risk Buildings", value: aggregate.totals.buildingsAtHighRisk, tone: "warning" },
+            { label: "Buildings ready to work", value: aggregate.totals.buildingsReady, tone: "success" },
+            { label: "Buildings blocked", value: aggregate.totals.buildingsBlocked, tone: "danger" },
+            { label: "High-risk buildings", value: aggregate.totals.buildingsAtHighRisk, tone: "warning" },
             {
-              label: "Estimated Exposure",
+              label: "Estimated exposure",
               value: formatMoney(aggregate.totals.totalEstimatedExposure),
               tone: "danger",
+            },
+          ]}
+        />
+      ) : null}
+
+      {workflowAggregate ? (
+        <MetricGrid
+          items={[
+            {
+              label: "Benchmarking blocked",
+              value: workflowAggregate.benchmarkingBlocked,
+              tone: workflowAggregate.benchmarkingBlocked > 0 ? "danger" : "default",
+            },
+            {
+              label: "BEPS needs review",
+              value: workflowAggregate.needsBepsEvaluation,
+              tone: workflowAggregate.needsBepsEvaluation > 0 ? "warning" : "default",
+            },
+            {
+              label: "Filing follow-up",
+              value: workflowAggregate.filingAttention,
+              tone: workflowAggregate.filingAttention > 0 ? "warning" : "default",
+            },
+            {
+              label: "Operational review",
+              value: workflowAggregate.operationalAttention,
+              tone: workflowAggregate.operationalAttention > 0 ? "warning" : "default",
+            },
+            {
+              label: "Retrofit planned",
+              value: workflowAggregate.retrofitReady,
+              tone: workflowAggregate.retrofitReady > 0 ? "success" : "default",
+            },
+            {
+              label: "Financing ready",
+              value: workflowAggregate.financingReady,
+              tone: workflowAggregate.financingReady > 0 ? "success" : "default",
             },
           ]}
         />
@@ -78,24 +120,24 @@ export function PortfolioInsights({
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel
           title="Priority Actions"
-          subtitle="Deterministic portfolio risk actions derived from governed records."
+          subtitle="Plain-language workflow actions derived from governed records and current building state."
         >
           {!actions.data || actions.data.length === 0 ? (
             <EmptyState message="No portfolio actions need immediate attention." />
           ) : (
             <div className="space-y-3">
               {actions.data.map((item) => (
-                <div key={`${item.buildingId}-${item.reasonCode}`} className="rounded-md border border-gray-200 p-3">
+                <div key={`${item.buildingId}-${item.reasonCode}`} className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-zinc-300">
                   <div className="flex items-center justify-between gap-3">
-                    <Link href={`/buildings/${item.buildingId}`} className="font-medium text-gray-900 hover:underline">
+                    <Link href={`/buildings/${item.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors">
                       {buildingNameById.get(item.buildingId) ?? item.buildingId}
                     </Link>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${urgencyClasses(item.urgencyLevel)}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${urgencyClasses(item.urgencyLevel)}`}>
                       {item.urgencyLevel}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-gray-700">{item.message}</p>
-                  <p className="mt-1 text-xs text-gray-500">{item.recommendedNextAction}</p>
+                  <p className="mt-2 text-sm text-zinc-700 font-medium">{item.message}</p>
+                  <p className="mt-1.5 text-xs text-zinc-500">{item.recommendedNextAction}</p>
                 </div>
               ))}
             </div>
@@ -103,38 +145,35 @@ export function PortfolioInsights({
         </Panel>
 
         <Panel
-          title="Benchmarking Readiness"
-          subtitle="Portfolio Manager sync and benchmarking autopilot status by building."
+          title="Workflow Backlog"
+          subtitle="Buildings blocked in the current workflow, with the next concrete step called out."
         >
-          {!readiness.data || readiness.data.length === 0 ? (
-            <EmptyState message="No benchmarking readiness records are available yet." />
+          {!workflow.data || workflow.data.items.length === 0 ? (
+            <EmptyState message="No workflow summaries are available yet." />
           ) : (
             <div className="space-y-3">
-              {readiness.data.map((entry) => {
-                const readinessStatus =
-                  entry.readiness &&
-                  typeof entry.readiness === "object" &&
-                  !Array.isArray(entry.readiness)
-                    ? String(
-                        (entry.readiness as Record<string, unknown>).status ??
-                          entry.syncState?.status ??
-                          "PENDING",
-                      )
-                    : String(entry.syncState?.status ?? "PENDING");
+              {workflow.data.items
+                .filter((entry) =>
+                  entry.stages.some((stage) => stage.status === "BLOCKED" || stage.status === "NEEDS_ATTENTION"),
+                )
+                .slice(0, 8)
+                .map((entry) => {
+                  const blockedStage = entry.stages.find(
+                    (stage) => stage.status === "BLOCKED" || stage.status === "NEEDS_ATTENTION",
+                  );
 
                 return (
-                  <div key={entry.building.id} className="rounded-md border border-gray-200 p-3">
+                  <div key={entry.buildingId} className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-zinc-300">
                     <div className="flex items-center justify-between gap-3">
-                      <Link href={`/buildings/${entry.building.id}`} className="font-medium text-gray-900 hover:underline">
-                        {entry.building.name}
+                      <Link href={`/buildings/${entry.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors">
+                        {entry.buildingName}
                       </Link>
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${readinessStatus === "READY" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-                        {readinessStatus}
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${blockedStage?.status === "BLOCKED" ? "bg-red-50 text-red-700 ring-1 ring-red-600/20" : "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"}`}>
+                        {blockedStage?.status?.replace("_", " ") ?? "NEEDS ATTENTION"}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Reporting year {entry.reportingYear} • PM sync {entry.syncState?.status ?? "NOT_STARTED"}
-                    </p>
+                    <p className="mt-2 text-sm text-zinc-700 font-medium">{blockedStage?.label ?? entry.nextAction.title}</p>
+                    <p className="mt-1 text-[13px] text-zinc-500">{entry.nextAction.reason}</p>
                   </div>
                 );
               })}
@@ -151,17 +190,17 @@ export function PortfolioInsights({
           ) : (
             <div className="space-y-3">
               {anomalies.data.map((anomaly) => (
-                <div key={anomaly.id} className="rounded-md border border-gray-200 p-3">
+                <div key={anomaly.id} className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-zinc-300">
                   <div className="flex items-center justify-between gap-3">
-                    <Link href={`/buildings/${anomaly.buildingId}`} className="font-medium text-gray-900 hover:underline">
+                    <Link href={`/buildings/${anomaly.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors">
                       {buildingNameById.get(anomaly.buildingId) ?? anomaly.buildingId}
                     </Link>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${urgencyClasses(anomaly.severity)}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${urgencyClasses(anomaly.severity)}`}>
                       {anomaly.severity}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-gray-700">{anomaly.title}</p>
-                  <p className="mt-1 text-xs text-gray-500">{anomaly.anomalyType}</p>
+                  <p className="mt-2 text-sm text-zinc-700 font-medium">{anomaly.title}</p>
+                  <p className="mt-1 text-[13px] text-zinc-500">{anomaly.anomalyType}</p>
                 </div>
               ))}
             </div>
@@ -177,22 +216,34 @@ export function PortfolioInsights({
           ) : (
             <div className="space-y-3">
               {retrofit.data.map((candidate) => (
-                <div key={candidate.candidateId} className="rounded-md border border-gray-200 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <Link href={`/buildings/${candidate.buildingId}`} className="font-medium text-gray-900 hover:underline">
-                      {candidate.name}
-                    </Link>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${urgencyClasses(candidate.priorityBand)}`}>
+                <div key={candidate.candidateId} className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-zinc-300">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <Link href={`/buildings/${candidate.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors line-clamp-1">
+                        {candidate.name}
+                      </Link>
+                      <p className="mt-1 max-w-[200px] truncate text-xs text-zinc-500">
+                        {buildingNameById.get(candidate.buildingId) ?? candidate.buildingId}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${urgencyClasses(candidate.priorityBand)}`}>
                       {candidate.priorityBand}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {buildingNameById.get(candidate.buildingId) ?? candidate.buildingId}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-600">
-                    <span>Priority {candidate.priorityScore}</span>
-                    <span>Avoided penalty {formatMoney(candidate.estimatedAvoidedPenalty)}</span>
-                    <span>Net cost {formatMoney(candidate.netProjectCost)}</span>
+                  
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs">
+                    <div className="flex flex-col">
+                      <span className="text-zinc-500 font-medium mb-0.5">Priority</span>
+                      <span className="text-zinc-900 font-semibold">{candidate.priorityScore}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-zinc-500 font-medium mb-0.5">Avoided penalty</span>
+                      <span className="text-emerald-700 font-semibold">{formatMoney(candidate.estimatedAvoidedPenalty)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-zinc-500 font-medium mb-0.5">Net cost</span>
+                      <span className="text-zinc-900 font-semibold">{formatMoney(candidate.netProjectCost)}</span>
+                    </div>
                   </div>
                 </div>
               ))}

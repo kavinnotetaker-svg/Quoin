@@ -53,7 +53,7 @@ describe("BEPS multi-cycle engine", () => {
           },
           trajectory: {
             metricBasis: "ADJUSTED_SITE_EUI_AVERAGE",
-            targetYears: [2027, 2028],
+            targetYears: [2028],
             finalTargetYear: 2028,
           },
         },
@@ -63,7 +63,7 @@ describe("BEPS multi-cycle engine", () => {
         sourceArtifactId: sourceArtifact.id,
         version: "test-cycle-2-v1",
         status: "ACTIVE",
-        effectiveFrom: new Date("2027-01-01T00:00:00.000Z"),
+        effectiveFrom: new Date("2028-01-01T00:00:00.000Z"),
         implementationKey: "beps/evaluator-v2",
         configJson: {
           cycle: "CYCLE_2",
@@ -75,7 +75,7 @@ describe("BEPS multi-cycle engine", () => {
           },
           trajectory: {
             metricBasis: "ADJUSTED_SITE_EUI_AVERAGE",
-            targetYears: [2027, 2028],
+            targetYears: [2028],
             finalTargetYear: 2028,
           },
         },
@@ -96,18 +96,18 @@ describe("BEPS multi-cycle engine", () => {
           beps: {
             cycle: {
               filingYear: 2028,
-              cycleStartYear: 2027,
+              cycleStartYear: 2028,
               cycleEndYear: 2032,
               baselineYears: [2024, 2025],
               evaluationYears: [2028],
             },
             applicability: {
-              minGrossSquareFeetPrivate: 50000,
+              minGrossSquareFeetPrivate: 25000,
               minGrossSquareFeetDistrict: 10000,
               ownershipClassFallback: "PRIVATE",
               coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
               recentConstructionExemptionYears: 5,
-              cycleStartYear: 2027,
+              cycleStartYear: 2028,
               cycleEndYear: 2032,
               filingYear: 2028,
             },
@@ -135,18 +135,10 @@ describe("BEPS multi-cycle engine", () => {
             },
             trajectory: {
               metricBasis: "ADJUSTED_SITE_EUI_AVERAGE",
-              targetYears: [2027, 2028],
+              targetYears: [2028],
               finalTargetYear: 2028,
             },
             standardsTable: [
-              {
-                cycle: "CYCLE_2",
-                pathway: "TRAJECTORY",
-                propertyType: "OFFICE",
-                metricType: "ADJUSTED_SITE_EUI_AVERAGE",
-                year: 2027,
-                targetValue: 95,
-              },
               {
                 cycle: "CYCLE_2",
                 pathway: "TRAJECTORY",
@@ -178,23 +170,23 @@ describe("BEPS multi-cycle engine", () => {
         sourceArtifactId: sourceArtifact.id,
         version: "test-cycle-2-v1",
         status: "ACTIVE",
-        effectiveFrom: new Date("2027-01-01T00:00:00.000Z"),
+        effectiveFrom: new Date("2028-01-01T00:00:00.000Z"),
         factorsJson: {
           beps: {
             cycle: {
               filingYear: 2028,
-              cycleStartYear: 2027,
+              cycleStartYear: 2028,
               cycleEndYear: 2032,
               baselineYears: [2024, 2025],
               evaluationYears: [2028],
             },
             applicability: {
-              minGrossSquareFeetPrivate: 50000,
+              minGrossSquareFeetPrivate: 25000,
               minGrossSquareFeetDistrict: 10000,
               ownershipClassFallback: "PRIVATE",
               coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
               recentConstructionExemptionYears: 5,
-              cycleStartYear: 2027,
+              cycleStartYear: 2028,
               cycleEndYear: 2032,
               filingYear: 2028,
             },
@@ -222,18 +214,10 @@ describe("BEPS multi-cycle engine", () => {
             },
             trajectory: {
               metricBasis: "ADJUSTED_SITE_EUI_AVERAGE",
-              targetYears: [2027, 2028],
+              targetYears: [2028],
               finalTargetYear: 2028,
             },
             standardsTable: [
-              {
-                cycle: "CYCLE_2",
-                pathway: "TRAJECTORY",
-                propertyType: "OFFICE",
-                metricType: "ADJUSTED_SITE_EUI_AVERAGE",
-                year: 2027,
-                targetValue: 95,
-              },
               {
                 cycle: "CYCLE_2",
                 pathway: "TRAJECTORY",
@@ -266,23 +250,23 @@ describe("BEPS multi-cycle engine", () => {
       where: {
         complianceCycle: "CYCLE_2",
       },
-      update: {
-        cycleId: "BEPS_CYCLE_2",
-        cycleStartYear: 2027,
-        cycleEndYear: 2032,
-        baselineYearStart: 2024,
-        baselineYearEnd: 2025,
+    update: {
+      cycleId: "BEPS_CYCLE_2",
+      cycleStartYear: 2028,
+      cycleEndYear: 2032,
+      baselineYearStart: 2024,
+      baselineYearEnd: 2025,
         evaluationYear: 2028,
         rulePackageId: cycle2RulePackage.id,
         factorSetVersionId: cycle2FactorSetVersion.id,
       },
       create: {
-        cycleId: "BEPS_CYCLE_2",
-        complianceCycle: "CYCLE_2",
-        cycleStartYear: 2027,
-        cycleEndYear: 2032,
-        baselineYearStart: 2024,
-        baselineYearEnd: 2025,
+      cycleId: "BEPS_CYCLE_2",
+      complianceCycle: "CYCLE_2",
+      cycleStartYear: 2028,
+      cycleEndYear: 2032,
+      baselineYearStart: 2024,
+      baselineYearEnd: 2025,
         evaluationYear: 2028,
         rulePackageId: cycle2RulePackage.id,
         factorSetVersionId: cycle2FactorSetVersion.id,
@@ -497,5 +481,129 @@ describe("BEPS multi-cycle engine", () => {
     expect(result.evaluation.selectedPathway).toBe("TRAJECTORY");
     expect(result.evaluation.pathwayResults.trajectory?.evaluationStatus).toBe("COMPLIANT");
     expect(result.filingRecord.complianceCycle).toBe("CYCLE_2");
+  });
+
+  it("applies cycle 2 to private buildings starting at 25k square feet through the router", async () => {
+    const caller = createCaller();
+
+    const smallerBuilding = await prisma.building.create({
+      data: {
+        organizationId: org.id,
+        name: `BEPS Cycle 2 30k Building ${scope}`,
+        address: "906 Test St NW, Washington, DC 20001",
+        latitude: 38.951,
+        longitude: -77.081,
+        grossSquareFeet: 30000,
+        propertyType: "OFFICE",
+        ownershipType: "PRIVATE",
+        isEnergyStarScoreEligible: true,
+        yearBuilt: 1992,
+        bepsTargetScore: 74,
+        complianceCycle: "CYCLE_2",
+        maxPenaltyExposure: 360000,
+      },
+      select: { id: true },
+    });
+
+    try {
+      await prisma.complianceSnapshot.createMany({
+        data: [
+          {
+            buildingId: smallerBuilding.id,
+            organizationId: org.id,
+            triggerType: "MANUAL",
+            snapshotDate: new Date("2024-06-30T00:00:00.000Z"),
+            energyStarScore: 60,
+            siteEui: 105,
+            sourceEui: 190,
+            weatherNormalizedSiteEui: 102,
+            weatherNormalizedSourceEui: 185,
+            complianceStatus: "AT_RISK",
+          },
+          {
+            buildingId: smallerBuilding.id,
+            organizationId: org.id,
+            triggerType: "MANUAL",
+            snapshotDate: new Date("2025-06-30T00:00:00.000Z"),
+            energyStarScore: 62,
+            siteEui: 95,
+            sourceEui: 180,
+            weatherNormalizedSiteEui: 93,
+            weatherNormalizedSourceEui: 175,
+            complianceStatus: "AT_RISK",
+          },
+          {
+            buildingId: smallerBuilding.id,
+            organizationId: org.id,
+            triggerType: "MANUAL",
+            snapshotDate: new Date("2028-06-30T00:00:00.000Z"),
+            energyStarScore: 76,
+            siteEui: 84,
+            sourceEui: 150,
+            weatherNormalizedSiteEui: 82,
+            weatherNormalizedSourceEui: 145,
+            complianceStatus: "COMPLIANT",
+          },
+        ],
+      });
+
+      const result = await caller.beps.evaluate({
+        buildingId: smallerBuilding.id,
+        cycle: "CYCLE_2",
+      });
+
+      expect(result.evaluation.applicability.applicable).toBe(true);
+      expect(result.evaluation.governedConfig.applicability.minGrossSquareFeetPrivate).toBe(25000);
+      expect(result.evaluation.governedConfig.applicability.cycleStartYear).toBe(2028);
+      expect(result.evaluation.governedConfig.trajectory.targetYears).toEqual([2028]);
+    } finally {
+      const smallerRunIds = (
+        await prisma.complianceRun.findMany({
+          where: { buildingId: smallerBuilding.id, organizationId: org.id },
+          select: { id: true },
+        })
+      ).map((run) => run.id);
+
+      await prisma.filingPacket.deleteMany({
+        where: { buildingId: smallerBuilding.id, organizationId: org.id },
+      });
+      await prisma.filingRecordEvent.deleteMany({
+        where: { buildingId: smallerBuilding.id, organizationId: org.id },
+      });
+      await prisma.evidenceArtifact.deleteMany({
+        where: { buildingId: smallerBuilding.id, organizationId: org.id },
+      });
+      await prisma.filingRecord.deleteMany({
+        where: { buildingId: smallerBuilding.id, organizationId: org.id },
+      });
+      await prisma.calculationManifest.deleteMany({
+        where: smallerRunIds.length > 0 ? { complianceRunId: { in: smallerRunIds } } : {},
+      });
+      await prisma.complianceRun.deleteMany({
+        where: { buildingId: smallerBuilding.id, organizationId: org.id },
+      });
+      await prisma.bepsMetricInput.deleteMany({
+        where: { buildingId: smallerBuilding.id, organizationId: org.id },
+      });
+      await prisma.complianceSnapshot.deleteMany({
+        where: { buildingId: smallerBuilding.id, organizationId: org.id },
+      });
+      await prisma.building.deleteMany({
+        where: { id: smallerBuilding.id, organizationId: org.id },
+      });
+    }
+  });
+
+  it("keeps cycle 3 explicitly unsupported through the router", async () => {
+    const caller = createCaller();
+
+    await expect(
+      caller.beps.evaluate({
+        buildingId: building.id,
+        cycle: "CYCLE_3",
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("not yet supported by governed BEPS records"),
+    });
   });
 });

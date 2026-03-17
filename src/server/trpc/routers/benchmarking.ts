@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { NotFoundError } from "@/server/lib/errors";
 import { router, tenantProcedure } from "../init";
 import { createESPMClient } from "@/server/integrations/espm";
 import {
@@ -11,6 +12,18 @@ import {
   listPortfolioBenchmarkReadiness,
   syncPortfolioManagerForBuilding,
 } from "@/server/compliance/portfolio-manager-sync";
+import { pushLocalEnergyToPortfolioManager } from "@/server/compliance/portfolio-manager-push";
+import {
+  exportBenchmarkPacket,
+  finalizeBenchmarkPacket,
+  generateBenchmarkPacket,
+  getBenchmarkPacketManifest,
+  getLatestBenchmarkPacket,
+  listBenchmarkPackets,
+  listBenchmarkRequestItems,
+  upsertBenchmarkRequestItem,
+} from "@/server/compliance/benchmark-packets";
+import { listVerificationResults } from "@/server/compliance/verification-engine";
 
 const benchmarkSubmissionStatusSchema = z.enum([
   "DRAFT",
@@ -37,6 +50,27 @@ const evidenceArtifactDraftSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+const benchmarkRequestCategorySchema = z.enum([
+  "DC_REAL_PROPERTY_ID",
+  "GROSS_FLOOR_AREA_SUPPORT",
+  "AREA_ANALYSIS_DRAWINGS",
+  "PROPERTY_USE_DETAILS_SUPPORT",
+  "METER_ROSTER_SUPPORT",
+  "UTILITY_BILLS",
+  "PORTFOLIO_MANAGER_ACCESS",
+  "DATA_QUALITY_CHECKER_SUPPORT",
+  "THIRD_PARTY_VERIFICATION_SUPPORT",
+  "OTHER_BENCHMARKING_SUPPORT",
+]);
+
+const benchmarkRequestStatusSchema = z.enum([
+  "NOT_REQUESTED",
+  "REQUESTED",
+  "RECEIVED",
+  "VERIFIED",
+  "BLOCKED",
+]);
+
 async function ensureTenantBuilding(
   tenantDb: {
     building: {
@@ -50,10 +84,7 @@ async function ensureTenantBuilding(
   });
 
   if (!building) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Building not found",
-    });
+    throw new NotFoundError("Building not found");
   }
 }
 
@@ -70,6 +101,28 @@ export const benchmarkingRouter = router({
       const espmClient = ctx.espmFactory ? ctx.espmFactory() : createESPMClient();
 
       return syncPortfolioManagerForBuilding({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+        espmClient,
+        producedByType: "USER",
+        producedById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
+    }),
+
+  pushLocalEnergyToPortfolioManager: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      const espmClient = ctx.espmFactory ? ctx.espmFactory() : createESPMClient();
+
+      return pushLocalEnergyToPortfolioManager({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         reportingYear: input.reportingYear,
@@ -304,6 +357,185 @@ export const benchmarkingRouter = router({
           ...(input.submissionPayload ?? {}),
         },
         evidenceArtifacts: input.evidenceArtifacts,
+      });
+    }),
+
+  listRequestItems: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return listBenchmarkRequestItems({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+      });
+    }),
+
+  getVerificationChecklist: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return listVerificationResults({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+      });
+    }),
+
+  upsertRequestItem: tenantProcedure
+    .input(
+      z.object({
+        requestItemId: z.string().optional(),
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100).nullable().optional(),
+        category: benchmarkRequestCategorySchema,
+        title: z.string().min(1).max(200),
+        status: benchmarkRequestStatusSchema.optional(),
+        isRequired: z.boolean().optional(),
+        dueDate: z.string().datetime().nullable().optional(),
+        assignedTo: z.string().max(200).nullable().optional(),
+        requestedFrom: z.string().max(200).nullable().optional(),
+        notes: z.string().max(5000).nullable().optional(),
+        sourceArtifactId: z.string().nullable().optional(),
+        evidenceArtifactId: z.string().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return upsertBenchmarkRequestItem({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        requestItemId: input.requestItemId,
+        reportingYear: input.reportingYear ?? undefined,
+        category: input.category,
+        title: input.title,
+        status: input.status,
+        isRequired: input.isRequired,
+        dueDate:
+          input.dueDate === undefined
+            ? undefined
+            : input.dueDate === null
+              ? null
+              : new Date(input.dueDate),
+        assignedTo: input.assignedTo,
+        requestedFrom: input.requestedFrom,
+        notes: input.notes,
+        sourceArtifactId: input.sourceArtifactId,
+        evidenceArtifactId: input.evidenceArtifactId,
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
+      });
+    }),
+
+  generateBenchmarkPacket: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return generateBenchmarkPacket({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
+      });
+    }),
+
+  getLatestBenchmarkPacket: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return getLatestBenchmarkPacket({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+      });
+    }),
+
+  listBenchmarkPackets: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        limit: z.number().int().min(1).max(50).default(10),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return listBenchmarkPackets({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        limit: input.limit,
+      });
+    }),
+
+  getBenchmarkPacketManifest: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return getBenchmarkPacketManifest({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+      });
+    }),
+
+  finalizeBenchmarkPacket: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return finalizeBenchmarkPacket({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
+      });
+    }),
+
+  exportBenchmarkPacket: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100),
+        format: z.enum(["JSON", "MARKDOWN", "PDF"]),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return exportBenchmarkPacket({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+        format: input.format,
       });
     }),
 });

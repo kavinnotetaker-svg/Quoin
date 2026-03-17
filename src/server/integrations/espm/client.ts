@@ -1,8 +1,10 @@
 import pThrottle from "p-throttle";
+import { createLogger } from "@/server/lib/logger";
 import { espmParser } from "./xml-config";
 import {
-  ESPMError,
+  ESPMAccessError,
   ESPMAuthError,
+  ESPMError,
   ESPMNotFoundError,
   ESPMRateLimitError,
   ESPMValidationError,
@@ -19,6 +21,9 @@ export interface ESPMClientConfig {
 export class ESPMClient {
   private readonly config: Required<ESPMClientConfig>;
   private readonly authHeader: string;
+  private readonly logger = createLogger({
+    integration: "ENERGY_STAR_PORTFOLIO_MANAGER",
+  });
   private readonly throttledFetch: (
     ...args: Parameters<typeof fetch>
   ) => ReturnType<typeof fetch>;
@@ -95,9 +100,13 @@ export class ESPMClient {
         const responseText = await response.text();
         const durationMs = Date.now() - startTime;
 
-        console.log(
-          `[ESPM] ${method} ${path} → ${response.status} (${durationMs}ms, attempt ${attempt + 1})`,
-        );
+        this.logger.info("ESPM request completed", {
+          method,
+          path,
+          statusCode: response.status,
+          durationMs,
+          attempt: attempt + 1,
+        });
 
         if (!response.ok) {
           const error = this.mapError(response.status, responseText);
@@ -109,7 +118,13 @@ export class ESPMClient {
             const delay =
               Math.min(1000 * Math.pow(2, attempt), 30_000) +
               Math.random() * 1000;
-            console.log(`[ESPM] Retrying in ${Math.round(delay)}ms...`);
+            this.logger.warn("Retrying ESPM request after service failure", {
+              method,
+              path,
+              statusCode: response.status,
+              delayMs: Math.round(delay),
+              attempt: attempt + 1,
+            });
             await new Promise((r) => setTimeout(r, delay));
             continue;
           }
@@ -124,9 +139,13 @@ export class ESPMClient {
           const delay =
             Math.min(1000 * Math.pow(2, attempt), 30_000) +
             Math.random() * 1000;
-          console.log(
-            `[ESPM] Network error, retrying in ${Math.round(delay)}ms: ${err}`,
-          );
+          this.logger.warn("Retrying ESPM request after network error", {
+            method,
+            path,
+            delayMs: Math.round(delay),
+            attempt: attempt + 1,
+            error: err,
+          });
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
@@ -141,6 +160,11 @@ export class ESPMClient {
     switch (status) {
       case 401:
         return new ESPMAuthError("Invalid ESPM credentials", responseText);
+      case 403:
+        return new ESPMAccessError(
+          "Portfolio Manager denied access to this resource",
+          responseText,
+        );
       case 404:
         return new ESPMNotFoundError("ESPM resource not found", responseText);
       case 429:

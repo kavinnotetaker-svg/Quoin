@@ -9,42 +9,48 @@ interface WizardShellProps {
 
 export function WizardShell({ currentStep, children }: WizardShellProps) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Progress bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-2 sm:px-0">
         {STEP_LABELS.map((label, i) => {
           const step = i + 1;
           const isCompleted = step < currentStep;
           const isCurrent = step === currentStep;
 
           return (
-            <div key={label} className="flex items-center">
+            <div key={label} className="flex flex-1 items-center last:flex-none">
               <div className="flex flex-col items-center">
                 <div
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold transition-all duration-300 ${
                     isCompleted
-                      ? "bg-gray-200 text-gray-600"
+                      ? "bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm"
                       : isCurrent
-                        ? "bg-gray-900 text-white"
-                        : "border border-gray-300 text-gray-400"
+                        ? "bg-zinc-900 text-white shadow-md ring-4 ring-zinc-900/10 scale-110"
+                        : "border border-zinc-200 bg-white text-zinc-400"
                   }`}
                 >
-                  {isCompleted ? "✓" : step}
+                  {isCompleted ? (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : step}
                 </div>
                 <span
-                  className={`mt-1 text-[10px] ${
-                    isCurrent ? "text-gray-900" : "text-gray-400"
+                  className={`mt-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 ${
+                    isCurrent ? "text-zinc-900" : isCompleted ? "text-emerald-700" : "text-zinc-400"
                   }`}
                 >
                   {label}
                 </span>
               </div>
               {i < STEP_LABELS.length - 1 && (
-                <div
-                  className={`mx-2 h-px w-8 sm:w-12 ${
-                    step < currentStep ? "bg-gray-300" : "bg-gray-200"
-                  }`}
-                />
+                <div className="flex-1 mx-2 sm:mx-4 flex items-center mb-6">
+                  <div
+                    className={`h-px w-full transition-colors duration-500 ${
+                      step < currentStep ? "bg-emerald-200" : "bg-zinc-200"
+                    }`}
+                  />
+                </div>
               )}
             </div>
           );
@@ -52,7 +58,9 @@ export function WizardShell({ currentStep, children }: WizardShellProps) {
       </div>
 
       {/* Step content */}
-      {children}
+      <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 sm:p-10 shadow-sm">
+        {children}
+      </div>
     </div>
   );
 }

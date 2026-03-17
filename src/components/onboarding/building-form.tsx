@@ -83,11 +83,15 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
     });
   }
 
+  const inputClass = "mt-1.5 block w-full rounded-lg border border-zinc-300 px-4 py-3 text-[15px] text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-shadow";
+  const labelClass = "block text-[13px] font-semibold tracking-wide text-zinc-700";
+  const errorClass = "mt-1.5 text-xs font-medium text-red-600";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {/* Name */}
       <div>
-        <label htmlFor="bld-name" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="bld-name" className={labelClass}>
           Building name
         </label>
         <input
@@ -96,14 +100,14 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g., 1600 K Street NW"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          className={inputClass}
         />
-        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+        {errors.name && <p className={errorClass}>{errors.name}</p>}
       </div>
 
       {/* Address */}
       <div>
-        <label htmlFor="bld-address" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="bld-address" className={labelClass}>
           Street address
         </label>
         <input
@@ -112,15 +116,15 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="e.g., 1600 K Street NW, Washington, DC 20006"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          className={inputClass}
         />
-        {errors.address && <p className="mt-1 text-xs text-red-600">{errors.address}</p>}
+        {errors.address && <p className={errorClass}>{errors.address}</p>}
       </div>
 
       {/* Lat / Lng */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="bld-lat" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="bld-lat" className={labelClass}>
             Latitude
           </label>
           <input
@@ -130,12 +134,12 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
             value={lat}
             onChange={(e) => setLat(e.target.value)}
             placeholder="38.9072"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+            className={inputClass}
           />
-          {errors.lat && <p className="mt-1 text-xs text-red-600">{errors.lat}</p>}
+          {errors.lat && <p className={errorClass}>{errors.lat}</p>}
         </div>
         <div>
-          <label htmlFor="bld-lng" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="bld-lng" className={labelClass}>
             Longitude
           </label>
           <input
@@ -145,22 +149,22 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
             value={lng}
             onChange={(e) => setLng(e.target.value)}
             placeholder="-77.0369"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+            className={inputClass}
           />
-          {errors.lng && <p className="mt-1 text-xs text-red-600">{errors.lng}</p>}
+          {errors.lng && <p className={errorClass}>{errors.lng}</p>}
         </div>
       </div>
 
       {/* Property type */}
       <div>
-        <label htmlFor="bld-type" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="bld-type" className={labelClass}>
           Property type
         </label>
         <select
           id="bld-type"
           value={propertyType}
           onChange={(e) => setPropertyType(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          className={inputClass}
         >
           {Object.entries(PROPERTY_TYPE_LABELS).map(([k, v]) => (
             <option key={k} value={k}>
@@ -172,7 +176,7 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
 
       {/* GSF */}
       <div>
-        <label htmlFor="bld-sqft" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="bld-sqft" className={labelClass}>
           Gross square footage
         </label>
         <input
@@ -182,15 +186,15 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
           value={sqft}
           onChange={(e) => setSqft(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="e.g., 150000"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          className={inputClass}
         />
-        {errors.sqft && <p className="mt-1 text-xs text-red-600">{errors.sqft}</p>}
+        {errors.sqft && <p className={errorClass}>{errors.sqft}</p>}
       </div>
 
       {/* Year built */}
       <div>
-        <label htmlFor="bld-year" className="block text-sm font-medium text-gray-700">
-          Year built <span className="text-gray-400">(optional)</span>
+        <label htmlFor="bld-year" className={labelClass}>
+          Year built <span className="text-zinc-400 font-medium">(optional)</span>
         </label>
         <input
           id="bld-year"
@@ -199,15 +203,15 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
           value={yearBuilt}
           onChange={(e) => setYearBuilt(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="e.g., 1985"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          className={inputClass}
         />
-        {errors.yearBuilt && <p className="mt-1 text-xs text-red-600">{errors.yearBuilt}</p>}
+        {errors.yearBuilt && <p className={errorClass}>{errors.yearBuilt}</p>}
       </div>
 
       {/* ESPM Property ID (optional) */}
       <div>
-        <label htmlFor="bld-espm" className="block text-sm font-medium text-gray-700">
-          ESPM Property ID <span className="text-gray-400">(optional)</span>
+        <label htmlFor="bld-espm" className={labelClass}>
+          ESPM Property ID <span className="text-zinc-400 font-medium">(optional)</span>
         </label>
         <input
           id="bld-espm"
@@ -216,20 +220,20 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
           value={espmPropertyId}
           onChange={(e) => setEspmPropertyId(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="e.g., 88762425"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          className={inputClass}
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-zinc-500 leading-relaxed font-medium">
           Find this in your ENERGY STAR Portfolio Manager account under property details.
         </p>
       </div>
 
       {/* Target score (auto-populated, read-only) */}
-      <div className="rounded-md bg-gray-50 p-3">
-        <p className="text-sm text-gray-700">
-          <span className="font-medium">BEPS Cycle 1 target score:</span>{" "}
-          <span className="font-semibold text-gray-900">{targetScore}</span>
+      <div className="rounded-lg bg-zinc-50/80 p-4 border border-zinc-200">
+        <p className="text-[13px] text-zinc-600">
+          <span className="font-semibold text-zinc-900">BEPS Cycle 1 target score:</span>{" "}
+          <span className="font-bold text-zinc-900">{targetScore}</span>
         </p>
-        <p className="mt-0.5 text-xs text-gray-500">
+        <p className="mt-1 text-xs font-medium text-zinc-500">
           Based on DC BEPS regulations for {PROPERTY_TYPE_LABELS[propertyType] ?? propertyType} properties.
         </p>
       </div>
@@ -237,7 +241,7 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="w-full rounded-lg bg-zinc-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-zinc-800 transition-all disabled:opacity-50 active:scale-[0.98] mt-2"
       >
         {loading ? "Adding…" : "Add building"}
       </button>

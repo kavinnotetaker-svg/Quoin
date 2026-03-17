@@ -38,6 +38,26 @@ export class ConsumptionService {
     return this.client.post(`/meter/${meterId}/consumptionData`, xml);
   }
 
+  /** Update one existing meter consumption record */
+  async updateConsumptionData(
+    consumptionDataId: number,
+    entry: ConsumptionDataEntry,
+  ): Promise<unknown> {
+    const xml = espmBuilder.build({
+      meterConsumption: {
+        startDate: entry.startDate,
+        endDate: entry.endDate,
+        usage: entry.usage,
+        ...(entry.cost !== undefined ? { cost: entry.cost } : {}),
+        ...(entry.estimatedValue !== undefined
+          ? { estimatedValue: entry.estimatedValue }
+          : {}),
+      },
+    }) as string;
+
+    return this.client.put(`/consumptionData/${consumptionDataId}`, xml);
+  }
+
   /** Get consumption data for a meter (paginated, 120 per page) */
   async getConsumptionData(
     meterId: number,

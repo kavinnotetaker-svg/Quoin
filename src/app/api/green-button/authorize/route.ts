@@ -1,45 +1,26 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
   buildAuthorizationUrl,
   generateState,
 } from "@/server/integrations/green-button";
+import { createLogger } from "@/server/lib/logger";
 import {
   TenantAccessError,
   requireTenantContextFromSession,
 } from "@/server/lib/tenant-access";
-
-function getGreenButtonConfig() {
-  const clientId = process.env["GREEN_BUTTON_CLIENT_ID"];
-  const clientSecret = process.env["GREEN_BUTTON_CLIENT_SECRET"];
-  const authEndpoint = process.env["GREEN_BUTTON_AUTH_ENDPOINT"];
-  const tokenEndpoint = process.env["GREEN_BUTTON_TOKEN_ENDPOINT"];
-  const redirectUri = process.env["GREEN_BUTTON_REDIRECT_URI"];
-
-  if (
-    !clientId ||
-    !clientSecret ||
-    !authEndpoint ||
-    !tokenEndpoint ||
-    !redirectUri
-  ) {
-    return null;
-  }
-
-  return {
-    clientId,
-    clientSecret,
-    authorizationEndpoint: authEndpoint,
-    tokenEndpoint,
-    redirectUri,
-    scope: process.env["GREEN_BUTTON_SCOPE"] ?? "FB=4_5_15;IntervalDuration=900;BlockDuration=monthly;HistoryLength=13",
-  };
-}
+import { getOptionalGreenButtonConfig } from "@/server/lib/config";
 
 /**
  * GET /api/green-button/authorize?buildingId=xxx
  * Initiates Green Button OAuth flow by redirecting to the utility's authorization page.
  */
 export async function GET(req: NextRequest) {
+  const requestId = randomUUID();
+  const logger = createLogger({
+    requestId,
+    procedure: "greenButton.authorize",
+  });
   let tenant;
   try {
     tenant = await requireTenantContextFromSession();
@@ -53,16 +34,20 @@ export async function GET(req: NextRequest) {
 
   const buildingId = req.nextUrl.searchParams.get("buildingId");
   if (!buildingId) {
+    logger.warn("Green Button authorization requested without buildingId");
     return NextResponse.json(
-      { error: "buildingId is required" },
+      { error: "buildingId is required", requestId },
       { status: 400 },
     );
   }
 
-  const config = getGreenButtonConfig();
+  const config = getOptionalGreenButtonConfig();
   if (!config) {
+    logger.warn("Green Button authorization attempted without configuration", {
+      buildingId,
+    });
     return NextResponse.json(
-      { error: "Green Button is not configured" },
+      { error: "Green Button is not configured", requestId },
       { status: 503 },
     );
   }
@@ -71,8 +56,11 @@ export async function GET(req: NextRequest) {
     where: { id: buildingId },
   });
   if (!building) {
+    logger.warn("Green Button authorization requested for missing building", {
+      buildingId,
+    });
     return NextResponse.json(
-      { error: "Building not found" },
+      { error: "Building not found", requestId },
       { status: 404 },
     );
   }
@@ -88,6 +76,9 @@ export async function GET(req: NextRequest) {
   });
 
   const authUrl = buildAuthorizationUrl(config, state);
+  logger.info("Redirecting to Green Button authorization endpoint", {
+    buildingId,
+  });
 
   return NextResponse.redirect(authUrl);
 }

@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { BepsDeliveryPanel } from "./beps-delivery-panel";
 import {
   EmptyState,
   ErrorState,
   LoadingState,
   MetricGrid,
   Panel,
-  downloadTextFile,
+  downloadFile,
   formatDate,
   formatMoney,
   formatNumber,
@@ -42,7 +43,11 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
   const inputState = trpc.beps.inputState.useQuery({ buildingId, cycle }, { retry: false });
   const latestRun = trpc.beps.latestRun.useQuery({ buildingId, cycle }, { retry: false });
   const outcomes = trpc.beps.listOutcomes.useQuery({ buildingId, limit: 10 });
-  const packets = trpc.beps.listPackets.useQuery({ buildingId, limit: 10 });
+  const packets = trpc.beps.listPackets.useQuery({
+    buildingId,
+    packetType: "COMPLETED_ACTIONS",
+    limit: 10,
+  });
 
   useEffect(() => {
     const metricInput = inputState.data?.canonicalInputState.metricInput;
@@ -67,9 +72,14 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
       utils.beps.inputState.invalidate({ buildingId, cycle }),
       utils.beps.latestRun.invalidate({ buildingId, cycle }),
       utils.beps.listOutcomes.invalidate({ buildingId, limit: 10 }),
-      utils.beps.listPackets.invalidate({ buildingId, limit: 10 }),
+      utils.beps.listPackets.invalidate({
+        buildingId,
+        packetType: "COMPLETED_ACTIONS",
+        limit: 10,
+      }),
       utils.building.get.invalidate({ id: buildingId }),
       utils.building.list.invalidate(),
+      utils.building.portfolioWorkflow.invalidate({ limit: 25 }),
       utils.building.complianceHistory.invalidate({ buildingId, limit: 20 }),
       utils.report.getComplianceReport.invalidate({ buildingId }),
     ]);
@@ -129,68 +139,73 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
   const latestPacket = packets.data?.[0] ?? null;
   const latestFiling = latestRun.error?.data?.code === "NOT_FOUND" ? null : latestRun.data;
 
+  const btnClass = "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors disabled:opacity-50";
+  const inputClass = "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors";
+  const labelSpanClass = "mb-1.5 block text-[11px] font-semibold tracking-wider text-zinc-500 uppercase";
+
   return (
     <div className="space-y-6">
       <Panel
-        title="BEPS Evaluation"
-        subtitle="Evaluate BEPS, refresh canonical metrics, and manage governed filing packets."
+        title="BEPS review and filing"
+        subtitle="Refresh governed inputs, run the active cycle evaluation, and prepare the filing packet when the result is ready."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={cycle}
               onChange={(event) => setCycle(event.target.value as (typeof CYCLES)[number])}
-              className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] font-medium text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors"
             >
               {CYCLES.map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>{value.replace("_", " ")}</option>
               ))}
             </select>
             <button
               onClick={() => refreshMetrics.mutate({ buildingId, cycle })}
               disabled={refreshMetrics.isPending}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className={btnClass}
             >
-              Refresh Metrics
+              Refresh BEPS Inputs
             </button>
             <button
               onClick={() => evaluate.mutate({ buildingId, cycle })}
               disabled={evaluate.isPending}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className={btnClass}
             >
-              Evaluate BEPS
+              Run BEPS Evaluation
             </button>
             {latestFiling ? (
               <>
                 <button
                   onClick={() => generatePacket.mutate({ buildingId, filingRecordId: latestFiling.id })}
                   disabled={generatePacket.isPending}
-                  className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className={btnClass}
                 >
-                  Generate Packet
+                  Generate Filing Packet
                 </button>
                 <button
                   onClick={() => finalizePacket.mutate({ buildingId, filingRecordId: latestFiling.id })}
                   disabled={finalizePacket.isPending}
-                  className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className={btnClass}
                 >
-                  Finalize Packet
+                  Finalize Filing Packet
                 </button>
                 <button
                   onClick={async () => {
                     const exportResult = await utils.beps.exportPacket.fetch({
                       buildingId,
                       filingRecordId: latestFiling.id,
-                      format: "JSON",
+                      format: "PDF",
                     });
-                    downloadTextFile({
+                    downloadFile({
                       fileName: exportResult.fileName,
                       content: exportResult.content,
                       contentType: exportResult.contentType,
+                      encoding: exportResult.encoding,
                     });
                   }}
-                  className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className={btnClass}
                 >
-                  Export JSON
+                  Export Filing PDF
                 </button>
               </>
             ) : null}
@@ -199,7 +214,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
       >
         <MetricGrid
           items={[
-            { label: "Cycle", value: cycle },
+            { label: "Cycle", value: cycle.replace("_", " ") },
             { label: "Filing Year", value: inputState.data?.filingYear ?? "—" },
             { label: "Ownership", value: inputState.data?.building?.ownershipType ?? "—" },
             { label: "Score Eligible", value: inputState.data?.building?.isEnergyStarScoreEligible == null ? "—" : inputState.data?.building?.isEnergyStarScoreEligible ? "Yes" : "No" },
@@ -209,33 +224,33 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel title="Canonical Metric Input" subtitle="Current persisted BEPS metric inputs and manual admin upsert surface.">
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Baseline adjusted site EUI</span>
-              <input value={baselineAdjustedSiteEui} onChange={(event) => setBaselineAdjustedSiteEui(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm">
+              <span className={labelSpanClass}>Baseline adjusted site EUI</span>
+              <input value={baselineAdjustedSiteEui} onChange={(event) => setBaselineAdjustedSiteEui(event.target.value)} className={inputClass} />
             </label>
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Evaluation adjusted site EUI</span>
-              <input value={evaluationAdjustedSiteEui} onChange={(event) => setEvaluationAdjustedSiteEui(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+            <label className="text-sm">
+              <span className={labelSpanClass}>Evaluation adjusted site EUI</span>
+              <input value={evaluationAdjustedSiteEui} onChange={(event) => setEvaluationAdjustedSiteEui(event.target.value)} className={inputClass} />
             </label>
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Baseline WN source EUI</span>
-              <input value={baselineWeatherNormalizedSourceEui} onChange={(event) => setBaselineWeatherNormalizedSourceEui(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+            <label className="text-sm">
+              <span className={labelSpanClass}>Baseline WN source EUI</span>
+              <input value={baselineWeatherNormalizedSourceEui} onChange={(event) => setBaselineWeatherNormalizedSourceEui(event.target.value)} className={inputClass} />
             </label>
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Evaluation WN source EUI</span>
-              <input value={evaluationWeatherNormalizedSourceEui} onChange={(event) => setEvaluationWeatherNormalizedSourceEui(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+            <label className="text-sm">
+              <span className={labelSpanClass}>Evaluation WN source EUI</span>
+              <input value={evaluationWeatherNormalizedSourceEui} onChange={(event) => setEvaluationWeatherNormalizedSourceEui(event.target.value)} className={inputClass} />
             </label>
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Baseline ENERGY STAR score</span>
-              <input value={baselineEnergyStarScore} onChange={(event) => setBaselineEnergyStarScore(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+            <label className="text-sm">
+              <span className={labelSpanClass}>Baseline score</span>
+              <input value={baselineEnergyStarScore} onChange={(event) => setBaselineEnergyStarScore(event.target.value)} className={inputClass} />
             </label>
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Evaluation ENERGY STAR score</span>
-              <input value={evaluationEnergyStarScore} onChange={(event) => setEvaluationEnergyStarScore(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+            <label className="text-sm">
+              <span className={labelSpanClass}>Evaluation score</span>
+              <input value={evaluationEnergyStarScore} onChange={(event) => setEvaluationEnergyStarScore(event.target.value)} className={inputClass} />
             </label>
           </div>
-          <div className="mt-4">
+          <div className="mt-5">
             <button
               onClick={() =>
                 upsertMetricInput.mutate({
@@ -250,7 +265,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                 })
               }
               disabled={upsertMetricInput.isPending}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-[13px] font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 transition-colors disabled:opacity-50"
             >
               {upsertMetricInput.isPending ? "Saving..." : "Save Canonical Metrics"}
             </button>
@@ -261,7 +276,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
           {!latestFiling ? (
             <EmptyState message="No governed BEPS filing exists for this cycle yet." />
           ) : (
-            <div className="space-y-3 text-sm text-gray-700">
+            <div className="space-y-4 text-sm text-zinc-700">
               <MetricGrid
                 items={[
                   { label: "Filing Status", value: latestFiling.status },
@@ -276,11 +291,13 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                   },
                 ]}
               />
-              <details className="rounded border border-gray-200 px-3 py-3">
-                <summary className="cursor-pointer font-medium text-gray-900">Filing payload</summary>
-                <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-gray-600">
-                  {JSON.stringify(latestFiling.filingPayload, null, 2)}
-                </pre>
+              <details className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-3 shadow-sm transition-all group">
+                <summary className="cursor-pointer font-semibold tracking-tight text-zinc-900 outline-none">Filing payload</summary>
+                <div className="mt-3 bg-white border border-zinc-100 rounded-md p-3 max-h-48 overflow-y-auto">
+                    <pre className="text-xs text-zinc-600 font-mono">
+                    {JSON.stringify(latestFiling.filingPayload, null, 2)}
+                    </pre>
+                </div>
               </details>
             </div>
           )}
@@ -289,21 +306,21 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel title="Prescriptive Progress" subtitle="Manual admin surface for canonical prescriptive milestones.">
-          <div className="grid gap-3 md:grid-cols-3">
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Name</span>
-              <input value={prescriptiveName} onChange={(event) => setPrescriptiveName(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="text-sm">
+              <span className={labelSpanClass}>Name</span>
+              <input value={prescriptiveName} onChange={(event) => setPrescriptiveName(event.target.value)} className={inputClass} />
             </label>
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Points possible</span>
-              <input value={prescriptivePointsPossible} onChange={(event) => setPrescriptivePointsPossible(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+            <label className="text-sm">
+              <span className={labelSpanClass}>Points possible</span>
+              <input value={prescriptivePointsPossible} onChange={(event) => setPrescriptivePointsPossible(event.target.value)} className={inputClass} />
             </label>
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Points earned</span>
-              <input value={prescriptivePointsEarned} onChange={(event) => setPrescriptivePointsEarned(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+            <label className="text-sm">
+              <span className={labelSpanClass}>Points earned</span>
+              <input value={prescriptivePointsEarned} onChange={(event) => setPrescriptivePointsEarned(event.target.value)} className={inputClass} />
             </label>
           </div>
-          <div className="mt-4">
+          <div className="mt-5">
             <button
               onClick={() =>
                 upsertPrescriptiveItem.mutate({
@@ -317,33 +334,33 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                 })
               }
               disabled={upsertPrescriptiveItem.isPending}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-[13px] font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 transition-colors disabled:opacity-50"
             >
               {upsertPrescriptiveItem.isPending ? "Saving..." : "Save Prescriptive Item"}
             </button>
           </div>
-          <div className="mt-4 space-y-2">
+          <div className="mt-5 space-y-3">
             {canonical?.prescriptiveItems?.length ? canonical.prescriptiveItems.map((item) => (
-              <div key={item.id} className="rounded border border-gray-200 px-3 py-2 text-sm">
-                <div className="font-medium text-gray-900">{item.name}</div>
-                <div className="text-xs text-gray-500">{item.status}</div>
+              <div key={item.id} className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-3 text-sm shadow-sm flex flex-col items-start gap-1">
+                <div className="font-semibold text-zinc-900 tracking-tight">{item.name}</div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{item.status}</div>
               </div>
             )) : <EmptyState message="No canonical prescriptive items exist yet." />}
           </div>
         </Panel>
 
         <Panel title="Alternative Compliance Agreement" subtitle="Canonical ACP/agreement record for the selected cycle.">
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Agreement identifier</span>
-              <input value={agreementIdentifier} onChange={(event) => setAgreementIdentifier(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm">
+              <span className={labelSpanClass}>Agreement identifier</span>
+              <input value={agreementIdentifier} onChange={(event) => setAgreementIdentifier(event.target.value)} className={inputClass} />
             </label>
-            <label className="text-sm text-gray-700">
-              <span className="mb-1 block text-xs text-gray-500">Multiplier</span>
-              <input value={agreementMultiplier} onChange={(event) => setAgreementMultiplier(event.target.value)} className="w-full rounded border border-gray-300 px-3 py-2" />
+            <label className="text-sm">
+              <span className={labelSpanClass}>Multiplier</span>
+              <input value={agreementMultiplier} onChange={(event) => setAgreementMultiplier(event.target.value)} className={inputClass} />
             </label>
           </div>
-          <div className="mt-4">
+          <div className="mt-5">
             <button
               onClick={() =>
                 upsertAgreement.mutate({
@@ -357,50 +374,71 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                 })
               }
               disabled={upsertAgreement.isPending}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-[13px] font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 transition-colors disabled:opacity-50"
             >
               {upsertAgreement.isPending ? "Saving..." : "Save ACP Agreement"}
             </button>
           </div>
           {canonical?.alternativeComplianceAgreement ? (
-            <div className="mt-4 rounded border border-gray-200 px-3 py-3 text-sm text-gray-700">
-              <div className="font-medium text-gray-900">
-                {canonical.alternativeComplianceAgreement.agreementIdentifier}
+            <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-4 text-sm text-zinc-700 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-2 opacity-10">
+                <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
               </div>
-              <div className="mt-1 text-xs text-gray-500">
-                {canonical.alternativeComplianceAgreement.status} • {canonical.alternativeComplianceAgreement.pathway}
-              </div>
-              <div className="mt-1 text-xs text-gray-600">
-                Multiplier {formatNumber(canonical.alternativeComplianceAgreement.multiplier, 2)}
+              <div className="relative z-10">
+                <div className="font-semibold text-lg tracking-tight text-zinc-900">
+                    {canonical.alternativeComplianceAgreement.agreementIdentifier}
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{canonical.alternativeComplianceAgreement.status}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{canonical.alternativeComplianceAgreement.pathway}</span>
+                </div>
+                <div className="mt-3 text-[13px] font-medium text-zinc-500">
+                    Multiplier: <span className="text-zinc-900">{formatNumber(canonical.alternativeComplianceAgreement.multiplier, 2)}</span>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="mt-4">
+            <div className="mt-5">
               <EmptyState message="No canonical alternative compliance agreement exists yet." />
             </div>
           )}
         </Panel>
       </div>
 
+      {latestFiling ? (
+        <BepsDeliveryPanel
+          buildingId={buildingId}
+          filingRecordId={latestFiling.id}
+          filingYear={latestFiling.filingYear}
+          cycle={cycle}
+        />
+      ) : null}
+
       <Panel title="Recent Outcomes" subtitle="Recent governed BEPS filing outcomes for this building.">
         {!outcomes.data || outcomes.data.length === 0 ? (
           <EmptyState message="No BEPS filing outcomes are available yet." />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {outcomes.data.map((outcome) => (
-              <div key={outcome.id} className="rounded border border-gray-200 px-3 py-3">
+              <div key={outcome.id} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium text-gray-900">{outcome.complianceCycle ?? "—"} • {outcome.status}</div>
-                  <div className="text-xs text-gray-500">Year {outcome.filingYear ?? "—"}</div>
+                  <div className="font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
+                    {outcome.complianceCycle?.replace("_", " ") ?? "—"}
+                    <span className="text-zinc-300 font-normal">|</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">{outcome.status}</span>
+                  </div>
+                  <div className="text-[13px] font-medium text-zinc-500">Year {outcome.filingYear ?? "—"}</div>
                 </div>
-                <div className="mt-2 text-xs text-gray-600">
-                  Evidence artifacts {outcome.evidenceArtifacts.length} • Created {formatDate(outcome.createdAt)}
+                <div className="mt-3 text-[13px] font-medium text-zinc-500">
+                  <span className="text-zinc-900">{outcome.evidenceArtifacts.length}</span> artifacts • Created {formatDate(outcome.createdAt)}
                 </div>
-                <details className="mt-2 rounded border border-gray-100 bg-gray-50 px-3 py-2">
-                  <summary className="cursor-pointer text-xs font-medium text-gray-700">Payload</summary>
-                  <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-gray-600">
-                    {JSON.stringify(outcome.filingPayload, null, 2)}
-                  </pre>
+                <details className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50/50 px-4 py-3 group outline-none">
+                  <summary className="cursor-pointer text-[13px] font-semibold tracking-tight text-zinc-700 outline-none">Payload Data</summary>
+                  <div className="mt-3 bg-white border border-zinc-100 rounded-md p-3 max-h-48 overflow-y-auto">
+                    <pre className="text-xs text-zinc-600 font-mono">
+                        {JSON.stringify(outcome.filingPayload, null, 2)}
+                    </pre>
+                  </div>
                 </details>
               </div>
             ))}

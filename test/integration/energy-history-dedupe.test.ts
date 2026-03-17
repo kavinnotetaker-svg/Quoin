@@ -147,4 +147,46 @@ describe("energy history deduplication", () => {
     expect(report.energyHistory).toHaveLength(2);
     expect(report.energyHistory[0]?.consumptionKbtu).toBe(443.56);
   });
+
+  it("prefers a manual override for the displayed energy history after editing a reading", async () => {
+    const caller = createCaller();
+
+    const synced = await prisma.energyReading.create({
+      data: {
+        buildingId: building.id,
+        organizationId: org.id,
+        source: "ESPM_SYNC",
+        meterType: "GAS",
+        periodStart: new Date("2025-03-01T00:00:00.000Z"),
+        periodEnd: new Date("2025-03-31T00:00:00.000Z"),
+        consumption: 100,
+        unit: "THERMS",
+        consumptionKbtu: 10000,
+        ingestedAt: new Date("2026-03-01T00:00:00.000Z"),
+      },
+    });
+
+    await caller.building.createEnergyReadingOverride({
+      buildingId: building.id,
+      readingId: synced.id,
+      consumption: 120,
+      cost: 55,
+    });
+
+    const energyReadings = await caller.building.energyReadings({
+      buildingId: building.id,
+      months: 24,
+    });
+
+    const override = energyReadings.find(
+      (reading) =>
+        reading.meterType === "GAS" &&
+        new Date(reading.periodStart).toISOString() === "2025-03-01T00:00:00.000Z",
+    );
+
+    expect(override?.source).toBe("MANUAL");
+    expect(override?.consumption).toBe(120);
+    expect(override?.cost).toBe(55);
+    expect(override?.consumptionKbtu).toBe(12000);
+  });
 });

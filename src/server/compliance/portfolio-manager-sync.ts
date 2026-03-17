@@ -1,19 +1,34 @@
 import type {
   ActorType,
   BenchmarkSubmissionStatus,
-  EnergyUnit,
   EspmShareStatus,
   MeterType,
   Prisma,
 } from "@/generated/prisma/client";
 import type { ESPM, PropertyMetrics } from "@/server/integrations/espm";
 import { prisma } from "@/server/lib/db";
-import { getConversionFactor, normalizeUnitKey } from "@/server/pipelines/data-ingestion/normalizer";
+import { getConversionFactor } from "@/server/pipelines/data-ingestion/normalizer";
 import { buildSnapshotData } from "@/server/pipelines/data-ingestion/snapshot";
 import {
   evaluateAndUpsertBenchmarkSubmission,
   type BenchmarkReadinessResult,
 } from "./benchmarking";
+import { syncPortfolioManagerForBuildingReliable } from "./portfolio-manager-sync-reliable";
+import {
+  classifyPortfolioManagerError,
+  parsePortfolioManagerConsumptionReadings,
+  parsePortfolioManagerMeterDetail,
+  parsePortfolioManagerMeterIds,
+  parsePortfolioManagerProperty,
+  summarizePortfolioManagerSyncState,
+  type PortfolioManagerConsumptionReading,
+  type PortfolioManagerMeterSnapshot,
+  type PortfolioManagerPropertySnapshot,
+  type PortfolioManagerSyncDiagnostics,
+  type PortfolioManagerSyncErrorDetail,
+  type PortfolioManagerSyncStep,
+  type PortfolioManagerSyncStepStatus,
+} from "./portfolio-manager-support";
 
 const PM_SYNC_SYSTEM = "ENERGY_STAR_PORTFOLIO_MANAGER";
 const PM_STALE_DAYS = 30;
@@ -46,36 +61,6 @@ export interface PortfolioManagerQaPayload {
   findings: PortfolioManagerQaFinding[];
 }
 
-interface PortfolioManagerPropertySnapshot {
-  propertyId: number | null;
-  name: string | null;
-  primaryFunction: string | null;
-  grossFloorArea: number | null;
-  yearBuilt: number | null;
-  addressLine1: string | null;
-  city: string | null;
-  state: string | null;
-  postalCode: string | null;
-}
-
-interface PortfolioManagerMeterSnapshot {
-  meterId: number;
-  meterType: MeterType;
-  name: string;
-  unit: EnergyUnit;
-  inUse: boolean;
-  rawType: string | null;
-  rawUnitOfMeasure: string | null;
-}
-
-interface PortfolioManagerConsumptionReading {
-  periodStart: Date;
-  periodEnd: Date;
-  usage: number;
-  cost: number | null;
-  estimatedValue: boolean | null;
-}
-
 type PortfolioManagerSyncClient = Pick<ESPM, "property" | "meter" | "consumption" | "metrics">;
 type PortfolioManagerSyncStatus = "IDLE" | "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED";
 
@@ -89,188 +74,10 @@ function toRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function toArray(value: unknown): unknown[] {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  return value == null ? [] : [value];
-}
-
-function getNestedObject(value: unknown, key: string): Record<string, unknown> | null {
-  const record = toRecord(value);
-  const nested = record[key];
-  return nested && typeof nested === "object" && !Array.isArray(nested)
-    ? (nested as Record<string, unknown>)
-    : null;
-}
-
-function getString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function getNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-}
-
-function getBoolean(value: unknown): boolean | null {
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    if (value === "true") return true;
-    if (value === "false") return false;
-  }
-
-  return null;
-}
-
-function parseDate(value: unknown): Date | null {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim()) {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  return null;
-}
-
-function parsePortfolioManagerProperty(raw: unknown): PortfolioManagerPropertySnapshot {
-  const property = getNestedObject(raw, "property") ?? toRecord(raw);
-  const address = getNestedObject(property, "address");
-  const grossFloorArea = getNestedObject(property, "grossFloorArea");
-
-  return {
-    propertyId: getNumber(property["@_id"] ?? property["id"]),
-    name: getString(property["name"]),
-    primaryFunction: getString(property["primaryFunction"]),
-    grossFloorArea: getNumber(grossFloorArea?.["value"]),
-    yearBuilt: getNumber(property["yearBuilt"]),
-    addressLine1: getString(address?.["@_address1"] ?? address?.["address1"]),
-    city: getString(address?.["@_city"] ?? address?.["city"]),
-    state: getString(address?.["@_state"] ?? address?.["state"]),
-    postalCode: getString(address?.["@_postalCode"] ?? address?.["postalCode"]),
-  };
-}
-
-function parseMeterIds(raw: unknown): number[] {
-  const record = toRecord(raw);
-  const links =
-    getNestedObject(record, "response")?.["links"] ??
-    record["links"] ??
-    getNestedObject(record, "meterList")?.["link"] ??
-    record["link"];
-  const linkEntries =
-    getNestedObject(links, "link")?.["link"] ??
-    toRecord(links)["link"] ??
-    links;
-
-  return toArray(linkEntries)
-    .map((entry) => {
-      const link = toRecord(entry);
-      const idCandidate = getString(link["@_id"] ?? link["id"] ?? link["@_href"] ?? link["href"]);
-      if (!idCandidate) {
-        return null;
-      }
-
-      const match = idCandidate.match(/(\d+)/);
-      return match ? Number(match[1]) : null;
-    })
-    .filter((value): value is number => value != null && Number.isFinite(value));
-}
-
-function mapEspmMeterType(type: string | null): MeterType {
-  const normalized = type?.toLowerCase() ?? "";
-
-  if (normalized.includes("electric")) return "ELECTRIC";
-  if (normalized.includes("gas")) return "GAS";
-  if (normalized.includes("steam")) return "STEAM";
-
-  return "OTHER";
-}
-
-function mapEspmUnit(unit: string | null): EnergyUnit {
-  const normalized = normalizeUnitKey(unit ?? "");
-
-  switch (normalized) {
-    case "kwh":
-    case "mwh":
-      return "KWH";
-    case "therms":
-    case "ccf":
-    case "kcf":
-    case "mcf":
-    case "cf":
-      return "THERMS";
-    case "mlb":
-    case "lbs":
-      return "MMBTU";
-    case "kbtu":
-    case "gj":
-    default:
-      return "KBTU";
-  }
-}
-
-function parseMeterDetail(raw: unknown, meterId: number): PortfolioManagerMeterSnapshot {
-  const meter = getNestedObject(raw, "meter") ?? toRecord(raw);
-  const rawType = getString(meter["type"]);
-  const rawUnitOfMeasure = getString(meter["unitOfMeasure"]);
-
-  return {
-    meterId: getNumber(meter["@_id"] ?? meter["id"]) ?? meterId,
-    meterType: mapEspmMeterType(rawType),
-    name: getString(meter["name"]) ?? `Portfolio Manager meter ${meterId}`,
-    unit: mapEspmUnit(rawUnitOfMeasure),
-    inUse: getBoolean(meter["inUse"]) ?? true,
-    rawType,
-    rawUnitOfMeasure,
-  };
-}
-
-function parseConsumptionReadings(raw: unknown): PortfolioManagerConsumptionReading[] {
-  const record = toRecord(raw);
-  const nested =
-    getNestedObject(record, "meterData")?.["meterConsumption"] ??
-    getNestedObject(record, "consumptionData")?.["meterConsumption"] ??
-    getNestedObject(record, "consumptionData")?.["consumption"] ??
-    record["meterConsumption"] ??
-    record["consumption"];
-
-  return toArray(nested)
-    .map((entry) => {
-      const row = toRecord(entry);
-      const periodStart = parseDate(row["startDate"]);
-      const periodEnd = parseDate(row["endDate"]);
-      const usage = getNumber(row["usage"]);
-
-      if (!periodStart || !periodEnd || usage == null) {
-        return null;
-      }
-
-      return {
-        periodStart,
-        periodEnd,
-        usage,
-        cost: getNumber(row["cost"]),
-        estimatedValue: getBoolean(row["estimatedValue"]),
-      };
-    })
-    .filter((entry): entry is PortfolioManagerConsumptionReading => entry != null);
-}
+const parseMeterIds = parsePortfolioManagerMeterIds;
+const parseMeterDetail = parsePortfolioManagerMeterDetail;
+const parseConsumptionReadings = (raw: unknown): PortfolioManagerConsumptionReading[] =>
+  parsePortfolioManagerConsumptionReadings(raw).readings;
 
 function getDefaultReportingYear(now = new Date()) {
   return now.getUTCFullYear() - 1;
@@ -287,6 +94,72 @@ function normalizePeriodKey(
   end: Date,
 ) {
   return `${meterId ?? meterType}:${start.toISOString()}:${end.toISOString()}`;
+}
+
+function createInitialStepStatuses(
+  propertyStatus: PortfolioManagerSyncStepStatus = "PENDING",
+): Record<Exclude<PortfolioManagerSyncStep, "sync">, PortfolioManagerSyncStepStatus> {
+  return {
+    property: propertyStatus,
+    meters: "PENDING",
+    consumption: "PENDING",
+    metrics: "PENDING",
+    benchmarking: "PENDING",
+  };
+}
+
+function toSyncErrorRecord(error: PortfolioManagerSyncErrorDetail) {
+  return {
+    step: error.step,
+    message: error.message,
+    retryable: error.retryable,
+    errorCode: error.errorCode,
+    statusCode: error.statusCode,
+  };
+}
+
+function buildSyncErrorMetadata(input: {
+  warnings: string[];
+  errors: PortfolioManagerSyncErrorDetail[];
+}) {
+  const primary = input.errors[0] ?? null;
+  return {
+    message: primary?.message ?? (input.warnings[0] ?? null),
+    failedStep: primary?.step ?? null,
+    retryable: primary?.retryable ?? false,
+    errorCode: primary?.errorCode ?? null,
+    warnings: input.warnings,
+    errors: input.errors.map(toSyncErrorRecord),
+  };
+}
+
+function resolveFinalSyncStatus(
+  stepStatuses: Record<Exclude<PortfolioManagerSyncStep, "sync">, PortfolioManagerSyncStepStatus>,
+): PortfolioManagerSyncStatus {
+  const statuses = Object.values(stepStatuses);
+  const hasFailures = statuses.some((status) => status === "FAILED");
+  const hasPartials = statuses.some((status) => status === "PARTIAL");
+  const hasSuccessLike = statuses.some(
+    (status) => status === "SUCCEEDED" || status === "PARTIAL",
+  );
+
+  if (hasFailures) {
+    return hasSuccessLike ? "PARTIAL" : "FAILED";
+  }
+
+  if (hasPartials) {
+    return "PARTIAL";
+  }
+
+  return "SUCCEEDED";
+}
+
+export function describePortfolioManagerSyncState(syncState: {
+  status: PortfolioManagerSyncStatus;
+  lastErrorMetadata: unknown;
+  syncMetadata: unknown;
+} | null): PortfolioManagerSyncDiagnostics | null {
+  return summarizePortfolioManagerSyncState(syncState);
 }
 
 function determineScoreEligibility(
@@ -307,6 +180,22 @@ function determineScoreEligibility(
   }
 
   return currentValue;
+}
+
+function hasUsableMetrics(metrics: PropertyMetrics | null) {
+  if (!metrics) {
+    return false;
+  }
+
+  return [
+    metrics.score,
+    metrics.siteTotal,
+    metrics.sourceTotal,
+    metrics.siteIntensity,
+    metrics.sourceIntensity,
+    metrics.weatherNormalizedSiteIntensity,
+    metrics.weatherNormalizedSourceIntensity,
+  ].some((value) => value != null);
 }
 
 function buildQaPayload(input: {
@@ -506,12 +395,21 @@ export async function getPortfolioManagerSyncState(params: {
   organizationId: string;
   buildingId: string;
 }) {
-  return prisma.portfolioManagerSyncState.findFirst({
+  const syncState = await prisma.portfolioManagerSyncState.findFirst({
     where: {
       organizationId: params.organizationId,
       buildingId: params.buildingId,
     },
   });
+
+  if (!syncState) {
+    return null;
+  }
+
+  return {
+    ...syncState,
+    diagnostics: describePortfolioManagerSyncState(syncState),
+  };
 }
 
 export async function listPortfolioBenchmarkReadiness(params: {
@@ -573,14 +471,19 @@ export async function listPortfolioBenchmarkReadiness(params: {
     return {
       building,
       reportingYear,
-      syncState,
+      syncState: syncState
+        ? {
+            ...syncState,
+            diagnostics: describePortfolioManagerSyncState(syncState),
+          }
+        : null,
       benchmarkSubmission: submission,
       readiness: Object.keys(readiness).length > 0 ? readiness : null,
     };
   });
 }
 
-export async function syncPortfolioManagerForBuilding(params: {
+async function syncPortfolioManagerForBuildingLegacy(params: {
   organizationId: string;
   buildingId: string;
   reportingYear?: number;
@@ -952,7 +855,11 @@ export async function syncPortfolioManagerForBuilding(params: {
     }
 
     try {
-      metricsSummary = await params.espmClient.metrics.getPropertyMetrics(propertyId, reportingYear, 12);
+      metricsSummary = await params.espmClient.metrics.getLatestAvailablePropertyMetrics(
+        propertyId,
+        reportingYear,
+        12,
+      );
       let reasonsForNoScore: string[] = [];
       try {
         reasonsForNoScore = await params.espmClient.metrics.getReasonsForNoScore(propertyId);
@@ -1172,4 +1079,17 @@ export async function syncPortfolioManagerForBuilding(params: {
       benchmarkSubmission,
     };
   }
+}
+
+export async function syncPortfolioManagerForBuilding(params: {
+  organizationId: string;
+  buildingId: string;
+  reportingYear?: number;
+  espmClient: PortfolioManagerSyncClient;
+  producedByType: ActorType;
+  producedById?: string | null;
+  requestId?: string | null;
+  now?: Date;
+}) {
+  return syncPortfolioManagerForBuildingReliable(params);
 }

@@ -6,7 +6,14 @@ import {
   getLatestComplianceSnapshot,
   LATEST_SNAPSHOT_ORDER,
 } from "@/server/lib/compliance-snapshots";
-import { dedupeEnergyReadings } from "@/server/lib/energy-readings";
+import {
+  collapseDisplayEnergyReadings,
+  dedupeEnergyReadings,
+} from "@/server/lib/energy-readings";
+import {
+  getBuildingWorkflowSummary,
+  listPortfolioWorkflowSummaries,
+} from "@/server/compliance/building-workflow";
 
 const createBuildingInput = z.object({
   name: z.string().min(1).max(200),
@@ -111,15 +118,21 @@ export const buildingRouter = router({
   get: tenantProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const building = await ctx.tenantDb.building.findUnique({
-        where: { id: input.id },
-        include: {
-          complianceSnapshots: {
-            orderBy: LATEST_SNAPSHOT_ORDER,
-            take: 1,
+      const [building, workflowSummary] = await Promise.all([
+        ctx.tenantDb.building.findUnique({
+          where: { id: input.id },
+          include: {
+            complianceSnapshots: {
+              orderBy: LATEST_SNAPSHOT_ORDER,
+              take: 1,
+            },
           },
-        },
-      });
+        }),
+        getBuildingWorkflowSummary({
+          organizationId: ctx.organizationId,
+          buildingId: input.id,
+        }),
+      ]);
 
       if (!building) {
         throw new TRPCError({
@@ -131,7 +144,37 @@ export const buildingRouter = router({
       return {
         ...building,
         latestSnapshot: building.complianceSnapshots[0] ?? null,
+        workflowSummary,
       };
+    }),
+
+  workflowSummary: tenantProcedure
+    .input(z.object({ buildingId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const building = await ctx.tenantDb.building.findUnique({
+        where: { id: input.buildingId },
+      });
+
+      if (!building) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Building not found",
+        });
+      }
+
+      const summary = await getBuildingWorkflowSummary({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+      });
+
+      if (!summary) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow summary not found",
+        });
+      }
+
+      return summary;
     }),
 
   create: tenantProcedure
@@ -212,8 +255,11 @@ export const buildingRouter = router({
 
         await tx.filingPacket.deleteMany({ where: childScope });
         await tx.filingRecordEvent.deleteMany({ where: childScope });
+        await tx.benchmarkPacket.deleteMany({ where: childScope });
         await tx.financingPacket.deleteMany({ where: childScope });
         await tx.financingCaseCandidate.deleteMany({ where: childScope });
+        await tx.benchmarkRequestItem.deleteMany({ where: childScope });
+        await tx.bepsRequestItem.deleteMany({ where: childScope });
         await tx.evidenceArtifact.deleteMany({ where: childScope });
         await tx.filingRecord.deleteMany({ where: childScope });
         await tx.benchmarkSubmission.deleteMany({ where: childScope });
@@ -267,6 +313,55 @@ export const buildingRouter = router({
       });
     }),
 
+  createEnergyReadingOverride: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        readingId: z.string(),
+        consumption: z.number().positive(),
+        cost: z.number().min(0).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const sourceReading = await ctx.tenantDb.energyReading.findFirst({
+        where: {
+          id: input.readingId,
+          buildingId: input.buildingId,
+        },
+      });
+
+      if (!sourceReading) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Energy reading not found for building",
+        });
+      }
+
+      return ctx.tenantDb.energyReading.create({
+        data: {
+          buildingId: sourceReading.buildingId,
+          organizationId: ctx.organizationId,
+          source: "MANUAL",
+          meterType: sourceReading.meterType,
+          meterId: sourceReading.meterId,
+          periodStart: sourceReading.periodStart,
+          periodEnd: sourceReading.periodEnd,
+          consumption: input.consumption,
+          unit: sourceReading.unit,
+          consumptionKbtu:
+            sourceReading.consumption > 0
+              ? sourceReading.consumptionKbtu * (input.consumption / sourceReading.consumption)
+              : sourceReading.consumptionKbtu,
+          cost: input.cost ?? null,
+          isVerified: true,
+          rawPayload: {
+            overrideOfReadingId: sourceReading.id,
+            overrideSource: sourceReading.source,
+          },
+        },
+      });
+    }),
+
   energyReadings: tenantProcedure
     .input(
       z.object({
@@ -286,7 +381,7 @@ export const buildingRouter = router({
         orderBy: [{ periodStart: "asc" }, { ingestedAt: "desc" }, { id: "desc" }],
       });
 
-      return dedupeEnergyReadings(readings);
+      return collapseDisplayEnergyReadings(dedupeEnergyReadings(readings));
     }),
 
   complianceHistory: tenantProcedure
@@ -363,4 +458,17 @@ export const buildingRouter = router({
 
     return stats;
   }),
+
+  portfolioWorkflow: tenantProcedure
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(200).default(25),
+      }),
+    )
+    .query(async ({ ctx, input }) =>
+      listPortfolioWorkflowSummaries({
+        organizationId: ctx.organizationId,
+        limit: input.limit,
+      }),
+    ),
 });

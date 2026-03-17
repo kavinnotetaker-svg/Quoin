@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { NotFoundError } from "@/server/lib/errors";
 import {
   attachEvidenceToBepsFilingRecord,
   getCanonicalBepsInputState,
@@ -9,11 +10,14 @@ import {
   finalizeBepsFilingPacket,
   generateBepsFilingPacket,
   getBepsFactorSetKeyForCycle,
+  getBepsFilingPacketManifest,
   getLatestBepsFilingPacket,
+  listBepsRequestItems,
   listBepsFilingPackets,
   type BepsRuleConfig,
   refreshDerivedBepsMetricInput,
   transitionBepsFilingRecord,
+  upsertBepsRequestItem,
   upsertBepsAlternativeComplianceAgreementRecord,
   upsertBepsMetricInputRecord,
   upsertBepsPrescriptiveItemRecord,
@@ -38,10 +42,7 @@ async function ensureTenantBuilding(
   });
 
   if (!building) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Building not found",
-    });
+    throw new NotFoundError("Building not found");
   }
 }
 
@@ -132,6 +133,39 @@ const bepsCanonicalScopeSchema = z.object({
   cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).default("CYCLE_1"),
   filingYear: z.number().int().min(2024).max(2100).optional(),
 });
+
+const bepsPacketTypeSchema = z.enum([
+  "PATHWAY_SELECTION",
+  "COMPLETED_ACTIONS",
+  "PRESCRIPTIVE_PHASE_1_AUDIT",
+  "PRESCRIPTIVE_PHASE_2_ACTION_PLAN",
+  "PRESCRIPTIVE_PHASE_3_IMPLEMENTATION",
+  "PRESCRIPTIVE_PHASE_4_EVALUATION",
+  "DELAY_REQUEST",
+  "EXEMPTION_REQUEST",
+  "ACP_SUPPORT",
+]);
+
+const bepsRequestCategorySchema = z.enum([
+  "PATHWAY_SELECTION_SUPPORT",
+  "COMPLETED_ACTIONS_EVIDENCE",
+  "ENERGY_AUDIT",
+  "ACTION_PLAN_SUPPORT",
+  "IMPLEMENTATION_DOCUMENTATION",
+  "EVALUATION_MONITORING_DOCUMENTATION",
+  "DELAY_SUBSTANTIATION",
+  "EXEMPTION_SUBSTANTIATION",
+  "ACP_SUPPORT_DOCS",
+  "OTHER_PATHWAY_EVIDENCE",
+]);
+
+const bepsRequestStatusSchema = z.enum([
+  "NOT_REQUESTED",
+  "REQUESTED",
+  "RECEIVED",
+  "VERIFIED",
+  "BLOCKED",
+]);
 
 export const bepsRouter = router({
   evaluate: tenantProcedure
@@ -557,11 +591,91 @@ export const bepsRouter = router({
       });
     }),
 
+  listRequestItems: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        filingRecordId: z.string().optional(),
+        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).optional(),
+        filingYear: z.number().int().min(2024).max(2100).optional(),
+        packetType: bepsPacketTypeSchema.optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+
+      return listBepsRequestItems({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        filingRecordId: input.filingRecordId,
+        complianceCycle: input.cycle,
+        filingYear: input.filingYear,
+        packetType: input.packetType,
+      });
+    }),
+
+  upsertRequestItem: tenantProcedure
+    .input(
+      z.object({
+        requestItemId: z.string().optional(),
+        buildingId: z.string(),
+        filingRecordId: z.string().nullable().optional(),
+        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).nullable().optional(),
+        filingYear: z.number().int().min(2024).max(2100).nullable().optional(),
+        packetType: bepsPacketTypeSchema.nullable().optional(),
+        category: bepsRequestCategorySchema,
+        title: z.string().min(1).max(200),
+        status: bepsRequestStatusSchema.optional(),
+        isRequired: z.boolean().optional(),
+        dueDate: z.string().datetime().nullable().optional(),
+        assignedTo: z.string().max(200).nullable().optional(),
+        requestedFrom: z.string().max(200).nullable().optional(),
+        notes: z.string().max(5000).nullable().optional(),
+        sourceArtifactId: z.string().nullable().optional(),
+        evidenceArtifactId: z.string().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+
+      return upsertBepsRequestItem({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        requestItemId: input.requestItemId,
+        filingRecordId: input.filingRecordId ?? undefined,
+        complianceCycle: input.cycle ?? undefined,
+        filingYear: input.filingYear ?? undefined,
+        packetType: input.packetType ?? undefined,
+        category: input.category,
+        title: input.title,
+        status: input.status,
+        isRequired: input.isRequired,
+        dueDate:
+          input.dueDate === undefined
+            ? undefined
+            : input.dueDate === null
+              ? null
+              : new Date(input.dueDate),
+        assignedTo:
+          input.assignedTo === undefined ? undefined : (input.assignedTo ?? null),
+        requestedFrom:
+          input.requestedFrom === undefined ? undefined : (input.requestedFrom ?? null),
+        notes: input.notes === undefined ? undefined : (input.notes ?? null),
+        sourceArtifactId:
+          input.sourceArtifactId === undefined ? undefined : (input.sourceArtifactId ?? null),
+        evidenceArtifactId:
+          input.evidenceArtifactId === undefined ? undefined : (input.evidenceArtifactId ?? null),
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
+      });
+    }),
+
   generatePacket: tenantProcedure
     .input(
       z.object({
         buildingId: z.string(),
         filingRecordId: z.string(),
+        packetType: bepsPacketTypeSchema.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -571,6 +685,7 @@ export const bepsRouter = router({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         filingRecordId: input.filingRecordId,
+        packetType: input.packetType,
         createdByType: "USER",
         createdById: ctx.clerkUserId ?? null,
       });
@@ -581,6 +696,7 @@ export const bepsRouter = router({
       z.object({
         buildingId: z.string(),
         filingRecordId: z.string(),
+        packetType: bepsPacketTypeSchema.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -590,6 +706,7 @@ export const bepsRouter = router({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         filingRecordId: input.filingRecordId,
+        packetType: input.packetType,
         createdByType: "USER",
         createdById: ctx.clerkUserId ?? null,
       });
@@ -600,6 +717,7 @@ export const bepsRouter = router({
       z.object({
         buildingId: z.string(),
         filingRecordId: z.string(),
+        packetType: bepsPacketTypeSchema.optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -608,6 +726,7 @@ export const bepsRouter = router({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         filingRecordId: input.filingRecordId,
+        packetType: input.packetType,
       });
 
       if (!packet) {
@@ -624,6 +743,8 @@ export const bepsRouter = router({
     .input(
       z.object({
         buildingId: z.string().optional(),
+        filingRecordId: z.string().optional(),
+        packetType: bepsPacketTypeSchema.optional(),
         limit: z.number().int().min(1).max(100).default(25),
       }),
     )
@@ -635,6 +756,8 @@ export const bepsRouter = router({
       return listBepsFilingPackets({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
+        filingRecordId: input.filingRecordId,
+        packetType: input.packetType,
         limit: input.limit,
       });
     }),
@@ -644,14 +767,16 @@ export const bepsRouter = router({
       z.object({
         buildingId: z.string(),
         filingRecordId: z.string(),
+        packetType: bepsPacketTypeSchema.optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
       await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
-      const packet = await getLatestBepsFilingPacket({
+      const packet = await getBepsFilingPacketManifest({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         filingRecordId: input.filingRecordId,
+        packetType: input.packetType,
       });
 
       if (!packet) {
@@ -661,19 +786,7 @@ export const bepsRouter = router({
         });
       }
 
-      const payload =
-        packet.packetPayload && typeof packet.packetPayload === "object" && !Array.isArray(packet.packetPayload)
-          ? (packet.packetPayload as Record<string, unknown>)
-          : {};
-
-      return {
-        id: packet.id,
-        version: packet.version,
-        status: packet.status,
-        evidenceManifest:
-          Array.isArray(payload["evidenceManifest"]) ? payload["evidenceManifest"] : [],
-        warnings: Array.isArray(payload["warnings"]) ? payload["warnings"] : [],
-      };
+      return packet;
     }),
 
   exportPacket: tenantProcedure
@@ -681,7 +794,8 @@ export const bepsRouter = router({
       z.object({
         buildingId: z.string(),
         filingRecordId: z.string(),
-        format: z.enum(["JSON", "MARKDOWN"]).default("JSON"),
+        packetType: bepsPacketTypeSchema.optional(),
+        format: z.enum(["JSON", "MARKDOWN", "PDF"]).default("JSON"),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -691,6 +805,7 @@ export const bepsRouter = router({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         filingRecordId: input.filingRecordId,
+        packetType: input.packetType,
         format: input.format,
       });
     }),

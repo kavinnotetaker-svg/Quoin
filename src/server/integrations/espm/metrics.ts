@@ -25,6 +25,8 @@ export class MetricsService {
       "sourceTotal",
       "siteIntensity",
       "sourceIntensity",
+      "weatherNormalizedSiteIntensity",
+      "weatherNormalizedSourceIntensity",
       "directGHGEmissions",
       "medianScore",
     ].join(", ");
@@ -35,6 +37,25 @@ export class MetricsService {
     );
 
     return this.parseMetrics(raw);
+  }
+
+  async getLatestAvailablePropertyMetrics(
+    propertyId: number,
+    year: number,
+    endMonth = 12,
+  ): Promise<PropertyMetrics> {
+    let fallback: PropertyMetrics | null = null;
+
+    for (let month = endMonth; month >= 1; month -= 1) {
+      const metrics = await this.getPropertyMetrics(propertyId, year, month);
+      fallback ??= metrics;
+
+      if (this.hasUsableMetrics(metrics)) {
+        return metrics;
+      }
+    }
+
+    return fallback ?? this.emptyMetrics(propertyId, year, endMonth);
   }
 
   /**
@@ -77,6 +98,35 @@ export class MetricsService {
       ),
       directGHGEmissions: getNumericValue("directGHGEmissions"),
       medianScore: getNumericValue("medianScore"),
+    };
+  }
+
+  private hasUsableMetrics(metrics: PropertyMetrics): boolean {
+    return [
+      metrics.score,
+      metrics.siteTotal,
+      metrics.sourceTotal,
+      metrics.siteIntensity,
+      metrics.sourceIntensity,
+      metrics.weatherNormalizedSiteIntensity,
+      metrics.weatherNormalizedSourceIntensity,
+    ].some((value) => value != null);
+  }
+
+  private emptyMetrics(propertyId: number, year: number, month: number): PropertyMetrics {
+    return {
+      propertyId,
+      year,
+      month,
+      score: null,
+      siteTotal: null,
+      sourceTotal: null,
+      siteIntensity: null,
+      sourceIntensity: null,
+      weatherNormalizedSiteIntensity: null,
+      weatherNormalizedSourceIntensity: null,
+      directGHGEmissions: null,
+      medianScore: null,
     };
   }
 }

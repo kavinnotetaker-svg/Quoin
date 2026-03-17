@@ -1,6 +1,6 @@
-import crypto from "node:crypto";
 import { Prisma, type ActorType, type ComplianceCycle } from "@/generated/prisma/client";
 import { prisma } from "@/server/lib/db";
+import { hashDeterministicJson } from "@/server/lib/deterministic-json";
 
 export const BOOTSTRAP_RULE_PACKAGE_KEYS = {
   benchmarking2025: "DC_BENCHMARKING_2025",
@@ -15,39 +15,6 @@ export class ComplianceProvenanceError extends Error {
     super(message);
     this.name = "ComplianceProvenanceError";
   }
-}
-
-function stableStringify(value: unknown): string {
-  if (typeof value === "bigint") {
-    return `{"$bigint":${JSON.stringify(value.toString())}}`;
-  }
-
-  if (value instanceof Date) {
-    return JSON.stringify(value.toISOString());
-  }
-
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
-  }
-
-  if (typeof (value as { toJSON?: () => unknown }).toJSON === "function") {
-    return stableStringify((value as { toJSON: () => unknown }).toJSON());
-  }
-
-  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
-  return `{${entries
-    .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
-    .join(",")}}`;
-}
-
-function hashJson(value: unknown): string {
-  return crypto.createHash("sha256").update(stableStringify(value)).digest("hex");
 }
 
 function toJson(value: unknown): Prisma.InputJsonValue {
@@ -281,7 +248,7 @@ export interface RecordComplianceEvaluationInput {
 }
 
 export async function recordComplianceEvaluation(input: RecordComplianceEvaluationInput) {
-  const inputSnapshotHash = hashJson(input.inputSnapshotPayload);
+  const inputSnapshotHash = hashDeterministicJson(input.inputSnapshotPayload);
   const executedAt = input.manifest.executedAt ?? new Date();
 
   return prisma.$transaction(async (tx) => {

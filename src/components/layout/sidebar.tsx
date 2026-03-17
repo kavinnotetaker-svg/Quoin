@@ -9,6 +9,7 @@ import {
   Settings,
   Menu,
   X,
+  Zap
 } from "lucide-react";
 import { useState } from "react";
 
@@ -43,7 +44,7 @@ export function Sidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed left-3 top-3 z-50 rounded p-1 text-gray-500 hover:text-gray-900 lg:hidden"
+        className="fixed left-3 top-3 z-50 rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 lg:hidden transition-colors"
       >
         <Menu size={20} />
       </button>
@@ -51,33 +52,36 @@ export function Sidebar() {
       {/* Overlay */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/20 lg:hidden"
+          className="fixed inset-0 z-40 bg-zinc-950/40 backdrop-blur-sm lg:hidden transition-opacity duration-300"
           onClick={() => setOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[200px] flex-col border-r border-gray-200 bg-white transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col bg-zinc-950 text-zinc-300 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-12 items-center justify-between border-b border-gray-200 px-4">
+        {/* Brand Header */}
+        <div className="flex h-14 items-center justify-between border-b border-white/10 px-5">
           <Link
             href="/dashboard"
-            className="text-sm font-medium text-gray-900"
+            className="flex items-center gap-2 text-sm font-semibold tracking-tight text-white transition-opacity hover:opacity-80"
           >
+            <Zap size={16} className="fill-white" />
             Quoin
           </Link>
           <button
             onClick={() => setOpen(false)}
-            className="text-gray-400 hover:text-gray-600 lg:hidden"
+            className="text-zinc-400 hover:text-white transition-colors lg:hidden"
           >
             <X size={16} />
           </button>
         </div>
 
-        <nav className="flex-1 px-2 py-3">
+        {/* Navigation */}
+        <nav className="flex-1 space-y-1 px-3 py-4">
           {NAV_ITEMS.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(item.href + "/");
@@ -87,18 +91,30 @@ export function Sidebar() {
                 key={item.label}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className={`flex items-center gap-2 rounded px-2 py-1.5 text-[13px] ${
+                className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200 ${
                   active
-                    ? "bg-gray-100 text-gray-900"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    ? "bg-white text-zinc-950 shadow-sm"
+                    : "text-zinc-400 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <Icon size={16} strokeWidth={1.5} />
+                <Icon 
+                  size={16} 
+                  strokeWidth={active ? 2 : 1.5} 
+                  className={`transition-colors duration-200 ${active ? "text-zinc-950" : "text-zinc-400 group-hover:text-white"}`}
+                />
                 {item.label}
               </Link>
             );
           })}
         </nav>
+        
+        {/* Footer Area inside Sidebar (Optional placeholder for bottom items) */}
+        <div className="p-4 border-t border-white/10">
+          <div className="rounded-lg bg-white/5 p-3 flex flex-col gap-1 text-xs">
+            <span className="font-medium text-white">Enterprise Plan</span>
+            <span className="text-zinc-500">All systems operational</span>
+          </div>
+        </div>
       </aside>
     </>
   );

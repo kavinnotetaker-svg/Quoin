@@ -179,6 +179,71 @@ enum BenchmarkSubmissionStatus {
   REJECTED
 }
 
+enum BenchmarkRequestItemCategory {
+  DC_REAL_PROPERTY_ID
+  GROSS_FLOOR_AREA_SUPPORT
+  AREA_ANALYSIS_DRAWINGS
+  PROPERTY_USE_DETAILS_SUPPORT
+  METER_ROSTER_SUPPORT
+  UTILITY_BILLS
+  PORTFOLIO_MANAGER_ACCESS
+  DATA_QUALITY_CHECKER_SUPPORT
+  THIRD_PARTY_VERIFICATION_SUPPORT
+  OTHER_BENCHMARKING_SUPPORT
+}
+
+enum BenchmarkRequestItemStatus {
+  NOT_REQUESTED
+  REQUESTED
+  RECEIVED
+  VERIFIED
+  BLOCKED
+}
+
+enum BenchmarkPacketStatus {
+  DRAFT
+  GENERATED
+  STALE
+  FINALIZED
+}
+
+enum VerificationItemCategory {
+  PROPERTY_METADATA
+  GFA
+  METER_COMPLETENESS
+  DATA_COVERAGE
+  METRIC_AVAILABILITY
+  PM_LINKAGE
+  DQC
+}
+
+enum VerificationItemStatus {
+  PASS
+  FAIL
+  NEEDS_REVIEW
+}
+
+enum BepsRequestItemCategory {
+  PATHWAY_SELECTION_SUPPORT
+  COMPLETED_ACTIONS_EVIDENCE
+  ENERGY_AUDIT
+  ACTION_PLAN_SUPPORT
+  IMPLEMENTATION_DOCUMENTATION
+  EVALUATION_MONITORING_DOCUMENTATION
+  DELAY_SUBSTANTIATION
+  EXEMPTION_SUBSTANTIATION
+  ACP_SUPPORT_DOCS
+  OTHER_PATHWAY_EVIDENCE
+}
+
+enum BepsRequestItemStatus {
+  NOT_REQUESTED
+  REQUESTED
+  RECEIVED
+  VERIFIED
+  BLOCKED
+}
+
 enum FilingType {
   BENCHMARKING
   BEPS_COMPLIANCE
@@ -199,6 +264,18 @@ enum FilingPacketStatus {
   GENERATED
   STALE
   FINALIZED
+}
+
+enum BepsPacketType {
+  PATHWAY_SELECTION
+  COMPLETED_ACTIONS
+  PRESCRIPTIVE_PHASE_1_AUDIT
+  PRESCRIPTIVE_PHASE_2_ACTION_PLAN
+  PRESCRIPTIVE_PHASE_3_IMPLEMENTATION
+  PRESCRIPTIVE_PHASE_4_EVALUATION
+  DELAY_REQUEST
+  EXEMPTION_REQUEST
+  ACP_SUPPORT
 }
 
 enum FilingRecordEventAction {
@@ -345,6 +422,10 @@ model Organization {
   filingRecords                       FilingRecord[]
   filingRecordEvents                  FilingRecordEvent[]
   filingPackets                       FilingPacket[]
+  benchmarkRequestItems               BenchmarkRequestItem[]
+  benchmarkPackets                    BenchmarkPacket[]
+  verificationItemResults             VerificationItemResult[]
+  bepsRequestItems                    BepsRequestItem[]
   bepsMetricInputs                    BepsMetricInput[]
   bepsPrescriptiveItems               BepsPrescriptiveItem[]
   bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
@@ -354,6 +435,8 @@ model Organization {
   financingCases                      FinancingCase[]
   financingCaseCandidates             FinancingCaseCandidate[]
   financingPackets                    FinancingPacket[]
+  auditLogs                           AuditLog[]
+  jobs                                Job[]
 
   @@map("organizations")
 }
@@ -432,6 +515,10 @@ model Building {
   filingRecords                       FilingRecord[]
   filingRecordEvents                  FilingRecordEvent[]
   filingPackets                       FilingPacket[]
+  benchmarkRequestItems               BenchmarkRequestItem[]
+  benchmarkPackets                    BenchmarkPacket[]
+  verificationItemResults             VerificationItemResult[]
+  bepsRequestItems                    BepsRequestItem[]
   bepsMetricInputs                    BepsMetricInput[]
   bepsPrescriptiveItems               BepsPrescriptiveItem[]
   bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
@@ -441,6 +528,8 @@ model Building {
   financingCases                      FinancingCase[]
   financingCaseCandidates             FinancingCaseCandidate[]
   financingPackets                    FinancingPacket[]
+  auditLogs                           AuditLog[]
+  jobs                                Job[]
 
   @@unique([id, organizationId])
   @@index([organizationId])
@@ -576,6 +665,51 @@ model PipelineRun {
   @@index([pipelineType, status, createdAt(sort: Desc)])
   @@index([organizationId, buildingId])
   @@map("pipeline_runs")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  timestamp      DateTime @default(now())
+  actorType      String   @map("actor_type")
+  actorId        String?  @map("actor_id")
+  organizationId String?  @map("organization_id")
+  buildingId     String?  @map("building_id")
+  action         String
+  inputSnapshot  Json?    @map("input_snapshot")
+  outputSnapshot Json?    @map("output_snapshot")
+  errorCode      String?  @map("error_code")
+  requestId      String?  @map("request_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  building     Building?     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+
+  @@index([organizationId, timestamp(sort: Desc)])
+  @@index([buildingId, timestamp(sort: Desc)])
+  @@index([action, timestamp(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model Job {
+  id             String    @id @default(cuid())
+  type           String
+  status         String
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(3) @map("max_attempts")
+  organizationId String?   @map("organization_id")
+  buildingId     String?   @map("building_id")
+  lastError      String?   @map("last_error") @db.Text
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  building     Building?     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([buildingId, status, createdAt(sort: Desc)])
+  @@index([type, status, createdAt(sort: Desc)])
+  @@map("jobs")
 }
 
 model DriftAlert {
@@ -761,6 +895,8 @@ model SourceArtifact {
   ruleVersions                        RuleVersion[]
   factorSetVersions                   FactorSetVersion[]
   evidenceArtifacts                   EvidenceArtifact[]
+  benchmarkRequestItems               BenchmarkRequestItem[]
+  bepsRequestItems                    BepsRequestItem[]
   bepsMetricInputs                    BepsMetricInput[]
   bepsPrescriptiveItems               BepsPrescriptiveItem[]
   bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
@@ -786,12 +922,14 @@ model EvidenceArtifact {
   createdById           String?              @map("created_by_id")
   createdAt             DateTime             @default(now()) @map("created_at")
 
-  organization        Organization         @relation(fields: [organizationId], references: [id])
-  building            Building?            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
-  complianceRun       ComplianceRun?       @relation(fields: [complianceRunId], references: [id], onDelete: Cascade)
-  benchmarkSubmission BenchmarkSubmission? @relation(fields: [benchmarkSubmissionId], references: [id], onDelete: Cascade)
-  filingRecord        FilingRecord?        @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
-  sourceArtifact      SourceArtifact?      @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  organization          Organization           @relation(fields: [organizationId], references: [id])
+  building              Building?              @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  complianceRun         ComplianceRun?         @relation(fields: [complianceRunId], references: [id], onDelete: Cascade)
+  benchmarkSubmission   BenchmarkSubmission?   @relation(fields: [benchmarkSubmissionId], references: [id], onDelete: Cascade)
+  filingRecord          FilingRecord?          @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
+  sourceArtifact        SourceArtifact?        @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  benchmarkRequestItems BenchmarkRequestItem[]
+  bepsRequestItems      BepsRequestItem[]
 
   @@index([organizationId, buildingId, createdAt(sort: Desc)])
   @@index([complianceRunId])
@@ -823,6 +961,7 @@ model BenchmarkSubmission {
   factorSetVersion  FactorSetVersion   @relation(fields: [factorSetVersionId], references: [id])
   complianceRun     ComplianceRun?     @relation(fields: [complianceRunId], references: [id], onDelete: SetNull)
   evidenceArtifacts EvidenceArtifact[]
+  benchmarkPackets  BenchmarkPacket[]
   filingRecords     FilingRecord[]
 
   @@unique([buildingId, reportingYear])
@@ -855,6 +994,7 @@ model FilingRecord {
   evidenceArtifacts   EvidenceArtifact[]
   events              FilingRecordEvent[]
   packets             FilingPacket[]
+  bepsRequestItems    BepsRequestItem[]
 
   @@unique([buildingId, filingType, filingYear, complianceCycle])
   @@index([organizationId, buildingId, filingType, createdAt(sort: Desc)])
@@ -889,6 +1029,7 @@ model FilingPacket {
   organizationId  String             @map("organization_id")
   buildingId      String             @map("building_id")
   filingRecordId  String             @map("filing_record_id")
+  packetType      BepsPacketType     @default(COMPLETED_ACTIONS) @map("packet_type")
   filingYear      Int?               @map("filing_year")
   complianceCycle ComplianceCycle?   @map("compliance_cycle")
   version         Int
@@ -909,10 +1050,125 @@ model FilingPacket {
   building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
   filingRecord FilingRecord @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
 
-  @@unique([filingRecordId, version])
-  @@index([organizationId, buildingId, generatedAt(sort: Desc)])
-  @@index([filingRecordId, generatedAt(sort: Desc)])
+  @@unique([filingRecordId, packetType, version])
+  @@index([organizationId, buildingId, packetType, generatedAt(sort: Desc)])
+  @@index([filingRecordId, packetType, generatedAt(sort: Desc)])
   @@map("filing_packets")
+}
+
+model BepsRequestItem {
+  id                 String                  @id @default(cuid())
+  organizationId     String                  @map("organization_id")
+  buildingId         String                  @map("building_id")
+  filingRecordId     String?                 @map("filing_record_id")
+  complianceCycle    ComplianceCycle?        @map("compliance_cycle")
+  filingYear         Int?                    @map("filing_year")
+  packetType         BepsPacketType?         @map("packet_type")
+  category           BepsRequestItemCategory
+  title              String
+  status             BepsRequestItemStatus   @default(NOT_REQUESTED)
+  isRequired         Boolean                 @default(true) @map("is_required")
+  dueDate            DateTime?               @map("due_date")
+  assignedTo         String?                 @map("assigned_to")
+  requestedFrom      String?                 @map("requested_from")
+  notes              String?                 @db.Text
+  sourceArtifactId   String?                 @map("source_artifact_id")
+  evidenceArtifactId String?                 @map("evidence_artifact_id")
+  createdByType      ActorType               @map("created_by_type")
+  createdById        String?                 @map("created_by_id")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  building         Building          @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  filingRecord     FilingRecord?     @relation(fields: [filingRecordId], references: [id], onDelete: SetNull)
+  sourceArtifact   SourceArtifact?   @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  evidenceArtifact EvidenceArtifact? @relation(fields: [evidenceArtifactId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, buildingId, filingYear, updatedAt(sort: Desc)])
+  @@index([organizationId, buildingId, filingRecordId, updatedAt(sort: Desc)])
+  @@index([organizationId, buildingId, packetType, status, updatedAt(sort: Desc)])
+  @@map("beps_request_items")
+}
+
+model BenchmarkRequestItem {
+  id                 String                       @id @default(cuid())
+  organizationId     String                       @map("organization_id")
+  buildingId         String                       @map("building_id")
+  reportingYear      Int?                         @map("reporting_year")
+  category           BenchmarkRequestItemCategory
+  title              String
+  status             BenchmarkRequestItemStatus   @default(NOT_REQUESTED)
+  isRequired         Boolean                      @default(true) @map("is_required")
+  dueDate            DateTime?                    @map("due_date")
+  assignedTo         String?                      @map("assigned_to")
+  requestedFrom      String?                      @map("requested_from")
+  notes              String?                      @db.Text
+  sourceArtifactId   String?                      @map("source_artifact_id")
+  evidenceArtifactId String?                      @map("evidence_artifact_id")
+  createdByType      ActorType                    @map("created_by_type")
+  createdById        String?                      @map("created_by_id")
+  createdAt          DateTime                     @default(now()) @map("created_at")
+  updatedAt          DateTime                     @updatedAt @map("updated_at")
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  building         Building          @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  sourceArtifact   SourceArtifact?   @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  evidenceArtifact EvidenceArtifact? @relation(fields: [evidenceArtifactId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, buildingId, reportingYear, updatedAt(sort: Desc)])
+  @@index([organizationId, buildingId, status, updatedAt(sort: Desc)])
+  @@map("benchmark_request_items")
+}
+
+model BenchmarkPacket {
+  id                    String                @id @default(cuid())
+  organizationId        String                @map("organization_id")
+  buildingId            String                @map("building_id")
+  benchmarkSubmissionId String                @map("benchmark_submission_id")
+  reportingYear         Int                   @map("reporting_year")
+  version               Int
+  status                BenchmarkPacketStatus @default(DRAFT)
+  packetHash            String                @map("packet_hash")
+  packetPayload         Json                  @default("{}") @map("packet_payload")
+  generatedAt           DateTime              @default(now()) @map("generated_at")
+  staleMarkedAt         DateTime?             @map("stale_marked_at")
+  finalizedAt           DateTime?             @map("finalized_at")
+  finalizedByType       ActorType?            @map("finalized_by_type")
+  finalizedById         String?               @map("finalized_by_id")
+  createdByType         ActorType             @map("created_by_type")
+  createdById           String?               @map("created_by_id")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  organization        Organization        @relation(fields: [organizationId], references: [id])
+  building            Building            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  benchmarkSubmission BenchmarkSubmission @relation(fields: [benchmarkSubmissionId], references: [id], onDelete: Cascade)
+
+  @@unique([benchmarkSubmissionId, version])
+  @@index([organizationId, buildingId, reportingYear, generatedAt(sort: Desc)])
+  @@index([benchmarkSubmissionId, generatedAt(sort: Desc)])
+  @@map("benchmark_packets")
+}
+
+model VerificationItemResult {
+  id             String                   @id @default(cuid())
+  organizationId String                   @map("organization_id")
+  buildingId     String                   @map("building_id")
+  reportingYear  Int                      @map("reporting_year")
+  category       VerificationItemCategory
+  key            String
+  status         VerificationItemStatus
+  explanation    String
+  evidenceRefs   String[]                 @default([]) @map("evidence_refs")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+
+  @@unique([buildingId, reportingYear, key])
+  @@index([organizationId, buildingId, reportingYear, createdAt(sort: Desc)])
+  @@map("verification_item_results")
 }
 
 model BepsMetricInput {

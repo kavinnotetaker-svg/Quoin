@@ -51,7 +51,7 @@ export function BuildingHeader({
     },
     onError: (err) => {
       console.error("[Delete] Failed:", err);
-      alert("Delete failed: " + err.message);
+      alert(`Delete failed: ${err.message}`);
       setConfirmDelete(false);
     },
   });
@@ -65,32 +65,32 @@ export function BuildingHeader({
     .join(" | ");
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-medium text-gray-900">{name}</h1>
-          <p className="mt-0.5 text-sm text-gray-500">{address}</p>
-          <p className="mt-0.5 text-xs text-gray-400">{details}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">{name}</h1>
+          <p className="mt-1 text-[15px] font-medium text-zinc-600">{address}</p>
+          <p className="mt-1 text-[13px] text-zinc-500">{details}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={onUpload}
-            className="rounded border border-gray-200 px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-50"
+            className="rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900"
           >
-            Upload Data
+            Upload Utility Data
           </button>
           {confirmDelete ? (
             <div className="flex items-center gap-1">
               <button
                 onClick={() => deleteBuilding.mutate({ id: buildingId })}
                 disabled={deleteBuilding.isPending}
-                className="rounded bg-red-600 px-3 py-1.5 text-[13px] text-white hover:bg-red-700 disabled:opacity-50"
+                className="rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50"
               >
-                {deleteBuilding.isPending ? "Deleting…" : "Confirm"}
+                {deleteBuilding.isPending ? "Deleting..." : "Confirm"}
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
-                className="px-2 py-1.5 text-[13px] text-gray-500 hover:text-gray-700"
+                className="px-3 py-2 text-[13px] font-medium text-zinc-500 transition-colors hover:text-zinc-700"
               >
                 Cancel
               </button>
@@ -98,7 +98,7 @@ export function BuildingHeader({
           ) : (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="rounded border border-red-200 px-3 py-1.5 text-[13px] text-red-600 hover:bg-red-50"
+              className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-medium text-red-700 shadow-sm transition-colors hover:bg-red-100"
             >
               Delete
             </button>
@@ -106,18 +106,17 @@ export function BuildingHeader({
         </div>
       </div>
 
-      {/* ESPM Link */}
-      <div className="flex items-center gap-2 rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-[13px]">
-        <span className="font-medium text-gray-600">ESPM Property ID:</span>
+      <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-[13px]">
+        <span className="font-semibold text-zinc-700">Portfolio Manager Property:</span>
         {editing ? (
-          <>
+          <div className="flex items-center gap-2">
             <input
               type="text"
               inputMode="numeric"
               value={espmId}
-              onChange={(e) => setEspmId(e.target.value.replace(/[^0-9]/g, ""))}
+              onChange={(event) => setEspmId(event.target.value.replace(/[^0-9]/g, ""))}
               placeholder="e.g., 88762425"
-              className="w-32 rounded border border-gray-300 px-2 py-0.5 text-[13px] focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+              className="w-36 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[13px] text-zinc-900 shadow-sm transition-all focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               autoFocus
             />
             <button
@@ -128,32 +127,36 @@ export function BuildingHeader({
                 })
               }
               disabled={updateBuilding.isPending}
-              className="rounded bg-gray-900 px-2 py-0.5 text-xs text-white hover:bg-gray-800 disabled:opacity-50"
+              className="rounded-md bg-zinc-900 px-3 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50"
             >
-              {updateBuilding.isPending ? "Saving…" : "Save"}
+              {updateBuilding.isPending ? "Saving..." : "Save"}
             </button>
             <button
               onClick={() => {
                 setEditing(false);
                 setEspmId(espmPropertyId ?? "");
               }}
-              className="text-xs text-gray-500 hover:text-gray-700"
+              className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-700"
             >
               Cancel
             </button>
-          </>
+          </div>
         ) : (
-          <>
-            <span className={espmPropertyId ? "text-gray-900" : "text-gray-400 italic"}>
+          <div className="flex items-center gap-3">
+            <span
+              className={
+                espmPropertyId ? "font-medium text-zinc-900" : "italic text-zinc-400"
+              }
+            >
               {espmPropertyId ?? "Not linked"}
             </span>
             <button
               onClick={() => setEditing(true)}
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="text-xs font-semibold text-zinc-600 underline decoration-zinc-300 underline-offset-2 transition-colors hover:text-zinc-900"
             >
               {espmPropertyId ? "Edit" : "Link"}
             </button>
-          </>
+          </div>
         )}
       </div>
     </div>

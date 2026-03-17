@@ -548,7 +548,6 @@ describe("BEPS engine", () => {
           baselineEnergyStarScore: 55,
           evaluationEnergyStarScore: 60,
           evaluationSnapshotId: snapshotA.id,
-          sourceArtifactId: factorSource.id,
           notesJson: { scope },
         },
         {
@@ -568,7 +567,6 @@ describe("BEPS engine", () => {
           baselineWeatherNormalizedSourceEui: 84,
           evaluationWeatherNormalizedSourceEui: 72,
           evaluationSnapshotId: snapshotB.id,
-          sourceArtifactId: factorSource.id,
           notesJson: { scope },
         },
       ],

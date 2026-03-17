@@ -12,15 +12,15 @@ import {
 } from "recharts";
 
 const FUNDING_COLORS: Record<string, string> = {
-  GRANT: "#22c55e",
-  TAX_CREDIT: "#3b82f6",
-  LOAN: "#f59e0b",
-  CPACE: "#8b5cf6",
-  EQUITY: "#6b7280",
+  GRANT: "#10b981", // emerald-500
+  TAX_CREDIT: "#3b82f6", // blue-500
+  LOAN: "#f59e0b", // amber-500
+  CPACE: "#8b5cf6", // violet-500
+  EQUITY: "#71717a", // zinc-500
 };
 
 const PRIORITY_BADGE: Record<string, { bg: string; text: string }> = {
-  QUICK_WIN: { bg: "bg-green-100", text: "text-green-800" },
+  QUICK_WIN: { bg: "bg-emerald-100", text: "text-emerald-800" },
   DEEP_RETROFIT: { bg: "bg-orange-100", text: "text-orange-800" },
 };
 
@@ -32,16 +32,21 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
   if (isLoading) {
     return (
       <div className="overflow-hidden">
-        <div className="loading-bar h-0.5 w-1/3 bg-gray-300" />
+        <div className="loading-bar h-0.5 w-1/3 bg-zinc-300" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <p className="py-8 text-center text-sm text-gray-500">
-        Capital analysis unavailable. Ensure compliance data has been uploaded.
-      </p>
+      <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
+        <svg className="mx-auto h-12 w-12 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p className="py-4 text-sm text-zinc-500 font-medium tracking-tight">
+          Capital analysis unavailable. Ensure compliance data has been uploaded.
+        </p>
+      </div>
     );
   }
 
@@ -80,8 +85,8 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
       </div>
 
       {/* Capital Stack Waterfall */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+        <h3 className="text-lg font-semibold tracking-tight text-zinc-900 mb-6">
           Capital Stack
         </h3>
         {waterfallData.length > 0 ? (
@@ -90,31 +95,46 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
               <XAxis
                 type="number"
                 tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
+                stroke="#a1a1aa"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
               />
-              <YAxis type="category" dataKey="name" width={70} />
+              <YAxis 
+                type="category" 
+                dataKey="name" 
+                width={70} 
+                stroke="#71717a" 
+                fontSize={12} 
+                tickLine={false} 
+                axisLine={false} 
+              />
               <Tooltip
                 formatter={(value) => `$${Number(value ?? 0).toLocaleString()}`}
+                contentStyle={{ borderRadius: '8px', border: '1px solid #e4e4e7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
               />
               <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                 {waterfallData.map((entry, idx) => (
                   <Cell
                     key={idx}
-                    fill={FUNDING_COLORS[entry.fundingType] ?? "#9ca3af"}
+                    fill={FUNDING_COLORS[entry.fundingType] ?? "#a1a1aa"}
                   />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <p className="py-4 text-sm text-gray-500">No funding layers available.</p>
+          <div className="py-8 text-center text-sm font-medium text-zinc-500 bg-zinc-50/50 rounded-lg border border-dashed border-zinc-200">
+            No funding layers available.
+          </div>
         )}
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-600">
+        <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-zinc-600 justify-center">
           {Object.entries(FUNDING_COLORS).map(([type, color]) => (
-            <div key={type} className="flex items-center gap-1.5">
+            <div key={type} className="flex items-center gap-1.5 bg-zinc-50 px-2 py-1 rounded-md border border-zinc-100">
               <span
-                className="inline-block h-3 w-3 rounded"
+                className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: color }}
               />
               {type}
@@ -124,45 +144,48 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
       </div>
 
       {/* Funding Programs */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+        <h3 className="text-lg font-semibold tracking-tight text-zinc-900 mb-6">
           Program Eligibility
         </h3>
         <div className="space-y-3">
           {data.eligibility.map((prog) => (
             <div
               key={prog.programCode}
-              className="flex items-start justify-between rounded-md border border-gray-100 bg-gray-50 p-3"
+              className="flex items-start justify-between rounded-lg border border-zinc-100 bg-zinc-50 p-4 transition-colors hover:bg-zinc-100/50"
             >
               <div>
                 <div className="flex items-center gap-2">
                   <span
-                    className={`inline-block h-2 w-2 rounded-full ${prog.eligible ? "bg-green-500" : "bg-red-400"}`}
+                    className={`inline-block h-2 w-2 rounded-full shadow-sm ring-1 ring-white/50 ${prog.eligible ? "bg-emerald-500" : "bg-red-400"}`}
                   />
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-semibold text-zinc-900 tracking-tight">
                     {prog.programName}
                   </span>
                 </div>
                 {prog.eligible && prog.maxFundingAmount !== null && (
-                  <p className="mt-1 text-xs text-gray-600 ml-4">
-                    Up to ${prog.maxFundingAmount.toLocaleString()}
+                  <p className="mt-1.5 text-xs text-zinc-600 ml-4 font-medium">
+                    Up to <span className="text-zinc-900">${prog.maxFundingAmount.toLocaleString()}</span>
                     {prog.interestRate !== null && ` at ${prog.interestRate}%`}
                     {prog.termYears !== null && ` / ${prog.termYears}yr`}
                   </p>
                 )}
                 {!prog.eligible && prog.disqualifiers.length > 0 && (
-                  <ul className="mt-1 ml-4 text-xs text-red-600">
+                  <ul className="mt-2 ml-4 text-[13px] text-red-600 leading-relaxed font-medium">
                     {prog.disqualifiers.map((d, i) => (
-                      <li key={i}>{d}</li>
+                      <li key={i} className="flex gap-1.5 items-start">
+                        <span className="mt-1 text-red-400 text-[10px]">●</span>
+                        {d}
+                      </li>
                     ))}
                   </ul>
                 )}
               </div>
               <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md shadow-sm ring-1 ring-inset ring-current/20 ${
                   prog.eligible
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-700"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-red-50 text-red-700"
                 }`}
               >
                 {prog.eligible ? "Eligible" : "Not Eligible"}
@@ -173,67 +196,69 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
       </div>
 
       {/* ECM Table */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          Recommended ECMs
-        </h3>
-        <p className="text-xs text-gray-500 mb-4">
-          Pathway: {data.pathway.replace("_", " ")} | Projected EUI:{" "}
-          {data.projectedSiteEui.toFixed(1)} kBtu/ft²
-        </p>
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+        <div className="flex flex-wrap items-baseline justify-between gap-4 mb-6">
+          <h3 className="text-lg font-semibold tracking-tight text-zinc-900">
+            Recommended ECMs
+          </h3>
+          <p className="text-[13px] font-medium text-zinc-500 bg-zinc-50 px-2 py-1 rounded-md border border-zinc-100">
+            Pathway: <span className="text-zinc-900">{data.pathway.replace("_", " ")}</span> | Projected EUI:{" "}
+            <span className="text-zinc-900">{data.projectedSiteEui.toFixed(1)} kBtu/ft²</span>
+          </p>
+        </div>
 
         {data.ecms.length === 0 ? (
-          <p className="py-4 text-sm text-gray-500">
+          <div className="py-10 text-center text-sm font-medium text-zinc-500 bg-zinc-50/50 rounded-lg border border-dashed border-zinc-200">
             No ECMs recommended for this building.
-          </p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
-                  <th className="pb-2 pr-4">Measure</th>
-                  <th className="pb-2 pr-4">Category</th>
-                  <th className="pb-2 pr-4">Priority</th>
-                  <th className="pb-2 pr-4 text-right">Est. Cost</th>
-                  <th className="pb-2 pr-4 text-right">Savings</th>
-                  <th className="pb-2 pr-4 text-right">Payback</th>
-                  <th className="pb-2 text-right">Score</th>
+                <tr className="border-b border-zinc-200 text-left text-[12px] font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-50/50">
+                  <th className="py-3 px-4 rounded-tl-lg">Measure</th>
+                  <th className="py-3 px-4">Category</th>
+                  <th className="py-3 px-4">Priority</th>
+                  <th className="py-3 px-4 text-right">Est. Cost</th>
+                  <th className="py-3 px-4 text-right">Savings</th>
+                  <th className="py-3 px-4 text-right">Payback</th>
+                  <th className="py-3 px-4 text-right rounded-tr-lg">Score</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-zinc-100">
                 {data.ecms.map((ecm) => {
                   const badge = PRIORITY_BADGE[ecm.priority] ?? {
-                    bg: "bg-gray-100",
-                    text: "text-gray-800",
+                    bg: "bg-zinc-100",
+                    text: "text-zinc-800",
                   };
                   return (
                     <tr
                       key={ecm.id}
-                      className="border-b border-gray-50 last:border-0"
+                      className="transition-colors hover:bg-zinc-50/80"
                     >
-                      <td className="py-2 pr-4 font-medium text-gray-900">
+                      <td className="py-3 px-4 font-medium text-zinc-900">
                         {ecm.name}
                       </td>
-                      <td className="py-2 pr-4 text-gray-600">
+                      <td className="py-3 px-4 text-[13px] text-zinc-600">
                         {ecm.category}
                       </td>
-                      <td className="py-2 pr-4">
+                      <td className="py-3 px-4">
                         <span
-                          className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-full ${badge.bg} ${badge.text}`}
+                          className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md ring-1 ring-inset ring-current/20 shadow-sm ${badge.bg} ${badge.text}`}
                         >
                           {ecm.priority.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="py-2 pr-4 text-right text-gray-700">
+                      <td className="py-3 px-4 text-right text-[13px] font-medium text-zinc-700">
                         ${ecm.estimatedCost.toLocaleString()}
                       </td>
-                      <td className="py-2 pr-4 text-right text-gray-700">
+                      <td className="py-3 px-4 text-right text-[13px] font-medium text-zinc-700">
                         {ecm.estimatedSavingsPct}%
                       </td>
-                      <td className="py-2 pr-4 text-right text-gray-700">
+                      <td className="py-3 px-4 text-right text-[13px] font-medium text-zinc-700">
                         {ecm.simplePaybackYears}yr
                       </td>
-                      <td className="py-2 text-right text-gray-700">
+                      <td className="py-3 px-4 text-right text-[13px] font-medium text-zinc-700">
                         {ecm.relevanceScore}
                       </td>
                     </tr>
@@ -247,11 +272,11 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
 
       {/* AI Narrative */}
       {data.narrativeSummary && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-6">
-          <h3 className="text-sm font-medium text-blue-900 mb-2">
+        <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-6 shadow-sm">
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-blue-800 mb-3">
             Executive Summary
           </h3>
-          <p className="text-sm text-blue-800 whitespace-pre-line">
+          <p className="text-[15px] font-medium leading-relaxed text-blue-900 whitespace-pre-line">
             {data.narrativeSummary}
           </p>
         </div>
@@ -262,9 +287,9 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-gray-900">{value}</p>
+    <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+      <p className="text-[12px] font-semibold text-zinc-500 uppercase tracking-wider">{label}</p>
+      <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">{value}</p>
     </div>
   );
 }

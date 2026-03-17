@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { BuildingHeader } from "./building-header";
 import { ScoreSection } from "./score-section";
+import { WorkflowPanel } from "./workflow-panel";
 import { EnergyTab } from "./energy-tab";
 import { BenchmarkingTab } from "./benchmarking-tab";
+import { VerificationRequestsTab } from "./verification-requests-tab";
 import { BepsTab } from "./beps-tab";
 import { ComplianceTab } from "./compliance-tab";
 import { CapitalTab } from "./capital-tab";
@@ -23,10 +25,11 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { key: "energy", label: "Energy" },
+  { key: "energy", label: "Energy Data" },
   { key: "benchmarking", label: "Benchmarking" },
-  { key: "beps", label: "BEPS" },
-  { key: "retrofit", label: "Retrofit" },
+  { key: "verification", label: "Verification & Requests" },
+  { key: "beps", label: "BEPS & Filing" },
+  { key: "retrofit", label: "Retrofit Plan" },
   { key: "financing", label: "Financing" },
   { key: "operations", label: "Operations" },
   { key: "provenance", label: "Provenance" },
@@ -44,17 +47,35 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
     id: buildingId,
   });
 
+  useEffect(() => {
+    const applyHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (TABS.some((tab) => tab.key === hash)) {
+        setActiveTab(hash);
+      }
+    };
+
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
+  const handleTabChange = (tabKey: string) => {
+    setActiveTab(tabKey);
+    window.history.replaceState(null, "", `#${tabKey}`);
+  };
+
   if (isLoading) {
     return (
       <div className="overflow-hidden">
-        <div className="loading-bar h-0.5 w-1/3 bg-gray-300" />
+        <div className="loading-bar h-0.5 w-1/3 bg-zinc-300" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <p className="py-12 text-center text-sm text-gray-500">
+      <p className="py-12 text-center text-sm text-zinc-500">
         {error.data?.code === "NOT_FOUND"
           ? "Building not found."
           : "Something went wrong. Try refreshing."}
@@ -67,7 +88,7 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
   const snap = data.latestSnapshot;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <BuildingHeader
         buildingId={buildingId}
         name={data.name}
@@ -79,8 +100,6 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
         onUpload={() => setShowUpload(true)}
       />
 
-      <hr className="border-gray-200" />
-
       <ScoreSection
         energyStarScore={snap?.energyStarScore ?? null}
         complianceStatus={snap?.complianceStatus ?? "PENDING_DATA"}
@@ -90,25 +109,29 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
         snapshotDate={snap?.snapshotDate ?? null}
       />
 
-      <hr className="border-gray-200" />
+      {data.workflowSummary ? (
+        <WorkflowPanel
+          nextAction={data.workflowSummary.nextAction}
+          stages={data.workflowSummary.stages}
+        />
+      ) : null}
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-4 border-b border-gray-200 text-[13px]">
+      <div className="flex flex-wrap gap-6 border-b border-zinc-200 text-[13px] font-medium">
         {TABS.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => !tab.disabled && setActiveTab(tab.key)}
-            className={`border-b-2 pb-2 ${tab.disabled
-              ? "pointer-events-none border-transparent text-gray-300"
+            onClick={() => !tab.disabled && handleTabChange(tab.key)}
+            className={`border-b-2 pb-2.5 transition-colors duration-200 ${tab.disabled
+              ? "pointer-events-none border-transparent text-zinc-300"
               : activeTab === tab.key
-                ? "border-gray-900 text-gray-900"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "border-zinc-900 text-zinc-900"
+                : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300"
               }`}
           >
             {tab.label}
             {tab.disabled && (
-              <span className="ml-1 text-[10px] text-gray-300">
-                Coming soon
+              <span className="ml-1.5 inline-flex items-center rounded-sm bg-zinc-100 px-1 py-0.5 text-[10px] font-semibold text-zinc-500">
+                SOON
               </span>
             )}
           </button>
@@ -116,18 +139,23 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
       </div>
 
       {/* Tab content */}
-      {activeTab === "energy" && <EnergyTab buildingId={buildingId} />}
-      {activeTab === "benchmarking" && <BenchmarkingTab buildingId={buildingId} />}
-      {activeTab === "beps" && <BepsTab buildingId={buildingId} />}
-      {activeTab === "retrofit" && <RetrofitTab buildingId={buildingId} />}
-      {activeTab === "financing" && <FinancingTab buildingId={buildingId} />}
-      {activeTab === "operations" && <OperationsTab buildingId={buildingId} />}
-      {activeTab === "provenance" && <ProvenanceTab buildingId={buildingId} />}
-      {activeTab === "compliance" && (
-        <ComplianceTab buildingId={buildingId} />
-      )}
-      {activeTab === "capital" && <CapitalTab buildingId={buildingId} />}
-      {activeTab === "alerts" && <AlertsTab buildingId={buildingId} />}
+      <div className="pt-2">
+        {activeTab === "energy" && <EnergyTab buildingId={buildingId} />}
+        {activeTab === "benchmarking" && <BenchmarkingTab buildingId={buildingId} />}
+        {activeTab === "verification" && (
+          <VerificationRequestsTab buildingId={buildingId} />
+        )}
+        {activeTab === "beps" && <BepsTab buildingId={buildingId} />}
+        {activeTab === "retrofit" && <RetrofitTab buildingId={buildingId} />}
+        {activeTab === "financing" && <FinancingTab buildingId={buildingId} />}
+        {activeTab === "operations" && <OperationsTab buildingId={buildingId} />}
+        {activeTab === "provenance" && <ProvenanceTab buildingId={buildingId} />}
+        {activeTab === "compliance" && (
+          <ComplianceTab buildingId={buildingId} />
+        )}
+        {activeTab === "capital" && <CapitalTab buildingId={buildingId} />}
+        {activeTab === "alerts" && <AlertsTab buildingId={buildingId} />}
+      </div>
 
       {/* Upload modal */}
       {showUpload && (

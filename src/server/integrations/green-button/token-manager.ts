@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { GreenButtonConfig, GreenButtonTokens } from "./types";
 import { refreshAccessToken } from "./oauth";
+import { createLogger } from "@/server/lib/logger";
 
 const ALGORITHM = "aes-256-gcm";
 const SALT = "quoin-gb-salt";
@@ -55,6 +56,11 @@ export async function getValidToken(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
 ): Promise<GreenButtonTokens | null> {
+  const logger = createLogger({
+    buildingId,
+    integration: "GREEN_BUTTON",
+  });
+
   const building = await db.building.findUnique({
     where: { id: buildingId },
     select: {
@@ -116,10 +122,10 @@ export async function getValidToken(
 
     return newTokens;
   } catch (err) {
-    console.error(
-      `[Green Button] Token refresh failed for building ${buildingId}:`,
-      err,
-    );
+    logger.error("Green Button token refresh failed", {
+      error: err,
+      operation: "token_refresh",
+    });
     return null;
   }
 }

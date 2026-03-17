@@ -6,6 +6,42 @@ import { appRouter } from "@/server/trpc/routers";
 describe("benchmarking workflow", () => {
   const scope = `${Date.now()}`;
   const freshDqcCheckedAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+  const benchmarkingApplicabilityBands = [
+    {
+      ownershipType: "PRIVATE" as const,
+      minimumGrossSquareFeet: 10000,
+      maximumGrossSquareFeet: 24999,
+      label: "PRIVATE_10K_TO_24_999",
+      verificationYears: [2027],
+      verificationCadenceYears: 6,
+      deadlineType: "MAY_1_FOLLOWING_YEAR" as const,
+    },
+    {
+      ownershipType: "PRIVATE" as const,
+      minimumGrossSquareFeet: 25000,
+      maximumGrossSquareFeet: 49999,
+      label: "PRIVATE_25K_TO_49_999",
+      verificationYears: [2024, 2027],
+      verificationCadenceYears: 6,
+      deadlineType: "MAY_1_FOLLOWING_YEAR" as const,
+    },
+    {
+      ownershipType: "PRIVATE" as const,
+      minimumGrossSquareFeet: 50000,
+      label: "PRIVATE_50K_PLUS",
+      verificationYears: [2024, 2027],
+      verificationCadenceYears: 6,
+      deadlineType: "MAY_1_FOLLOWING_YEAR" as const,
+    },
+    {
+      ownershipType: "DISTRICT" as const,
+      minimumGrossSquareFeet: 10000,
+      label: "DISTRICT_10K_PLUS",
+      deadlineType: "WITHIN_DAYS_OF_BENCHMARK_GENERATION" as const,
+      deadlineDaysFromGeneration: 60,
+      manualSubmissionAllowedWhenNotBenchmarkable: true,
+    },
+  ];
 
   let orgA: { id: string; clerkOrgId: string };
   let orgB: { id: string; clerkOrgId: string };
@@ -71,8 +107,6 @@ describe("benchmarking workflow", () => {
             propertyIdPattern: "^RPUID-[0-9]{6}$",
             dqcFreshnessDays: 30,
             verification: {
-              minimumGrossSquareFeet: 50000,
-              requiredReportingYears: [2025],
               evidenceKind: "VERIFICATION",
             },
             gfaCorrection: {
@@ -100,8 +134,6 @@ describe("benchmarking workflow", () => {
             propertyIdPattern: "^RPUID-[0-9]{6}$",
             dqcFreshnessDays: 30,
             verification: {
-              minimumGrossSquareFeet: 50000,
-              requiredReportingYears: [2025],
               evidenceKind: "VERIFICATION",
             },
             gfaCorrection: {
@@ -126,6 +158,7 @@ describe("benchmarking workflow", () => {
         factorsJson: {
           benchmarking: {
             dqcFreshnessDays: 30,
+            applicabilityBands: benchmarkingApplicabilityBands,
           },
           beps: {
             applicability: {
@@ -172,6 +205,7 @@ describe("benchmarking workflow", () => {
         factorsJson: {
           benchmarking: {
             dqcFreshnessDays: 30,
+            applicabilityBands: benchmarkingApplicabilityBands,
           },
           beps: {
             applicability: {
@@ -483,6 +517,11 @@ describe("benchmarking workflow", () => {
     expect(evaluated.readiness.status).toBe("READY");
     expect(evaluated.benchmarkSubmission.status).toBe("READY");
     expect(evaluated.benchmarkSubmission.complianceRunId).toBeTruthy();
+    expect(evaluated.readiness.governance).toMatchObject({
+      rulePackageKey: "DC_BENCHMARKING_2025",
+      factorSetKey: "DC_CURRENT_STANDARDS",
+      ownershipTypeUsed: "PRIVATE",
+    });
 
     const persisted = await caller.benchmarking.getReadiness({
       buildingId: buildingA.id,
@@ -492,6 +531,12 @@ describe("benchmarking workflow", () => {
     const readinessPayload = persisted.submissionPayload as Record<string, unknown>;
     const readiness = readinessPayload["readiness"] as Record<string, unknown>;
     expect(readiness["status"]).toBe("READY");
+    expect(readiness).toMatchObject({
+      governance: {
+        rulePackageKey: "DC_BENCHMARKING_2025",
+        factorSetKey: "DC_CURRENT_STANDARDS",
+      },
+    });
 
     const updated = await caller.benchmarking.upsertSubmission({
       buildingId: buildingA.id,
@@ -549,5 +594,201 @@ describe("benchmarking workflow", () => {
         reportingYear: 2025,
       }),
     ).rejects.toBeInstanceOf(TRPCError);
+  });
+
+  it("surfaces governed scope and deadline metadata through the router", async () => {
+    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+
+    const smallPrivateBuilding = await prisma.building.create({
+      data: {
+        organizationId: orgA.id,
+        name: `Benchmark Small Private ${scope}`,
+        address: "710 Test St NW, Washington, DC 20001",
+        latitude: 38.901,
+        longitude: -77.031,
+        grossSquareFeet: 20000,
+        propertyType: "OFFICE",
+        ownershipType: "PRIVATE",
+        bepsTargetScore: 71,
+        maxPenaltyExposure: 200000,
+        doeeBuildingId: "RPUID-222222",
+        espmPropertyId: BigInt(222222),
+        espmShareStatus: "LINKED",
+      },
+      select: { id: true },
+    });
+
+    const districtBuilding = await prisma.building.create({
+      data: {
+        organizationId: orgA.id,
+        name: `Benchmark District ${scope}`,
+        address: "720 Test St NW, Washington, DC 20001",
+        latitude: 38.902,
+        longitude: -77.032,
+        grossSquareFeet: 15000,
+        propertyType: "OFFICE",
+        ownershipType: "DISTRICT",
+        bepsTargetScore: 71,
+        maxPenaltyExposure: 150000,
+        doeeBuildingId: "RPUID-333333",
+        espmPropertyId: BigInt(333333),
+        espmShareStatus: "LINKED",
+      },
+      select: { id: true },
+    });
+
+    try {
+      for (const [periodStart, periodEnd] of [
+        ["2027-01-01", "2027-01-31"],
+        ["2027-02-01", "2027-02-28"],
+        ["2027-03-01", "2027-03-31"],
+        ["2027-04-01", "2027-04-30"],
+        ["2027-05-01", "2027-05-31"],
+        ["2027-06-01", "2027-06-30"],
+        ["2027-07-01", "2027-07-31"],
+        ["2027-08-01", "2027-08-31"],
+        ["2027-09-01", "2027-09-30"],
+        ["2027-10-01", "2027-10-31"],
+        ["2027-11-01", "2027-11-30"],
+        ["2027-12-01", "2027-12-31"],
+      ] as const) {
+        await prisma.energyReading.createMany({
+          data: [
+            {
+              buildingId: smallPrivateBuilding.id,
+              organizationId: orgA.id,
+              source: "CSV_UPLOAD",
+              meterType: "ELECTRIC",
+              periodStart: new Date(`${periodStart}T00:00:00.000Z`),
+              periodEnd: new Date(`${periodEnd}T00:00:00.000Z`),
+              consumption: 100,
+              unit: "KWH",
+              consumptionKbtu: 341.2,
+            },
+            {
+              buildingId: districtBuilding.id,
+              organizationId: orgA.id,
+              source: "CSV_UPLOAD",
+              meterType: "ELECTRIC",
+              periodStart: new Date(`${periodStart}T00:00:00.000Z`),
+              periodEnd: new Date(`${periodEnd}T00:00:00.000Z`),
+              consumption: 100,
+              unit: "KWH",
+              consumptionKbtu: 341.2,
+            },
+          ],
+        });
+      }
+
+      await prisma.evidenceArtifact.createMany({
+        data: [
+          {
+            organizationId: orgA.id,
+            buildingId: smallPrivateBuilding.id,
+            artifactType: "PM_REPORT",
+            name: `DQC small private ${scope}`,
+            artifactRef: "dqc-small-private",
+            metadata: {
+              benchmarking: {
+                kind: "DQC_REPORT",
+                reportingYear: 2027,
+                checkedAt: freshDqcCheckedAt,
+              },
+            },
+            createdByType: "SYSTEM",
+            createdById: "test",
+          },
+          {
+            organizationId: orgA.id,
+            buildingId: districtBuilding.id,
+            artifactType: "PM_REPORT",
+            name: `DQC district ${scope}`,
+            artifactRef: "dqc-district",
+            metadata: {
+              benchmarking: {
+                kind: "DQC_REPORT",
+                reportingYear: 2027,
+                checkedAt: freshDqcCheckedAt,
+              },
+            },
+            createdByType: "SYSTEM",
+            createdById: "test",
+          },
+        ],
+      });
+
+      const privateResult = await caller.benchmarking.evaluateReadiness({
+        buildingId: smallPrivateBuilding.id,
+        reportingYear: 2027,
+      });
+      const districtResult = await caller.benchmarking.evaluateReadiness({
+        buildingId: districtBuilding.id,
+        reportingYear: 2027,
+      });
+
+      expect(privateResult.readiness.summary.applicabilityBandLabel).toBe(
+        "PRIVATE_10K_TO_24_999",
+      );
+      expect(privateResult.readiness.summary.minimumGrossSquareFeet).toBe(10000);
+      expect(privateResult.readiness.summary.maximumGrossSquareFeet).toBe(24999);
+      expect(privateResult.readiness.summary.requiredReportingYears).toEqual([2027]);
+      expect(privateResult.readiness.summary.verificationCadenceYears).toBe(6);
+      expect(privateResult.readiness.summary.deadlineType).toBe("MAY_1_FOLLOWING_YEAR");
+      expect(privateResult.readiness.summary.submissionDueDate).toBe(
+        "2028-05-01T00:00:00.000Z",
+      );
+      expect(privateResult.readiness.summary.verificationRequired).toBe(true);
+      expect(privateResult.readiness.governance).toMatchObject({
+        rulePackageKey: "DC_BENCHMARKING_2025",
+        factorSetKey: "DC_CURRENT_STANDARDS",
+        ownershipTypeUsed: "PRIVATE",
+        applicabilityBandLabel: "PRIVATE_10K_TO_24_999",
+        minimumGrossSquareFeet: 10000,
+      });
+
+      expect(districtResult.readiness.summary.applicabilityBandLabel).toBe(
+        "DISTRICT_10K_PLUS",
+      );
+      expect(districtResult.readiness.summary.ownershipTypeUsed).toBe("DISTRICT");
+      expect(districtResult.readiness.summary.minimumGrossSquareFeet).toBe(10000);
+      expect(districtResult.readiness.summary.deadlineType).toBe(
+        "WITHIN_DAYS_OF_BENCHMARK_GENERATION",
+      );
+      expect(districtResult.readiness.summary.deadlineDaysFromGeneration).toBe(60);
+      expect(districtResult.readiness.summary.verificationRequired).toBe(false);
+      expect(districtResult.readiness.governance).toMatchObject({
+        rulePackageKey: "DC_BENCHMARKING_2025",
+        factorSetKey: "DC_CURRENT_STANDARDS",
+        ownershipTypeUsed: "DISTRICT",
+        applicabilityBandLabel: "DISTRICT_10K_PLUS",
+        deadlineType: "WITHIN_DAYS_OF_BENCHMARK_GENERATION",
+      });
+    } finally {
+      await prisma.evidenceArtifact.deleteMany({
+        where: {
+          buildingId: { in: [smallPrivateBuilding.id, districtBuilding.id] },
+        },
+      });
+      await prisma.benchmarkSubmission.deleteMany({
+        where: {
+          buildingId: { in: [smallPrivateBuilding.id, districtBuilding.id] },
+        },
+      });
+      await prisma.complianceRun.deleteMany({
+        where: {
+          buildingId: { in: [smallPrivateBuilding.id, districtBuilding.id] },
+        },
+      });
+      await prisma.energyReading.deleteMany({
+        where: {
+          buildingId: { in: [smallPrivateBuilding.id, districtBuilding.id] },
+        },
+      });
+      await prisma.building.deleteMany({
+        where: {
+          id: { in: [smallPrivateBuilding.id, districtBuilding.id] },
+        },
+      });
+    }
   });
 });

@@ -13,8 +13,340 @@ describe("financing packets", () => {
   let buildingA: { id: string };
   let buildingB: { id: string };
   let sourceArtifactA: { id: string };
+  let bepsSource: { id: string };
+  let factorSource: { id: string };
 
   beforeAll(async () => {
+    bepsSource = await prisma.sourceArtifact.create({
+      data: {
+        artifactType: "LAW",
+        name: `Financing BEPS source ${scope}`,
+        externalUrl: "https://example.com/financing-beps-source",
+        metadata: { scope },
+        createdByType: "SYSTEM",
+        createdById: "test",
+      },
+      select: { id: true },
+    });
+
+    factorSource = await prisma.sourceArtifact.create({
+      data: {
+        artifactType: "GUIDE",
+        name: `Financing BEPS factors ${scope}`,
+        externalUrl: "https://example.com/financing-beps-factors",
+        metadata: { scope },
+        createdByType: "SYSTEM",
+        createdById: "test",
+      },
+      select: { id: true },
+    });
+
+    const rulePackage = await prisma.rulePackage.upsert({
+      where: { key: "DC_BEPS_CYCLE_1" },
+      update: {
+        name: "DC BEPS Cycle 1",
+      },
+      create: {
+        key: "DC_BEPS_CYCLE_1",
+        name: "DC BEPS Cycle 1",
+      },
+    });
+
+    await prisma.ruleVersion.upsert({
+      where: {
+        rulePackageId_version: {
+          rulePackageId: rulePackage.id,
+          version: "test-v1",
+        },
+      },
+      update: {
+        sourceArtifactId: bepsSource.id,
+        status: "ACTIVE",
+        implementationKey: "beps/evaluator-v1",
+        configJson: {
+          cycle: "CYCLE_1",
+          filingYear: 2026,
+          applicability: {
+            minGrossSquareFeetPrivate: 50000,
+            minGrossSquareFeetDistrict: 10000,
+            ownershipClassFallback: "PRIVATE",
+            coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
+            recentConstructionExemptionYears: 5,
+            cycleStartYear: 2021,
+            cycleEndYear: 2026,
+          },
+          pathwayRouting: {
+            prescriptiveAlwaysEligible: true,
+            supportedPathways: ["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE"],
+          },
+          performance: {
+            requiredReductionFraction: 0.2,
+            scoreEligibleMetric: "ADJUSTED_SITE_EUI_AVERAGE",
+            nonScoreEligibleMetric: "WEATHER_NORMALIZED_SITE_EUI_AVERAGE",
+          },
+          standardTarget: {
+            defaultMaxGap: 15,
+            maxGapByPropertyType: {
+              OFFICE: 15,
+              MULTIFAMILY: 15,
+              MIXED_USE: 15,
+              OTHER: 15,
+            },
+            scoreEligibleMetric: "ENERGY_STAR_SCORE",
+            nonScoreEligibleMetric: "WEATHER_NORMALIZED_SOURCE_EUI",
+          },
+          prescriptive: {
+            defaultPointsNeeded: 25,
+            pointsNeededByPropertyType: {
+              OFFICE: 25,
+              MULTIFAMILY: 25,
+              MIXED_USE: 25,
+              OTHER: 25,
+            },
+            complianceBasis: "APPROVED_MEASURES_AND_MILESTONES",
+          },
+        },
+      },
+      create: {
+        rulePackageId: rulePackage.id,
+        sourceArtifactId: bepsSource.id,
+        version: "test-v1",
+        status: "ACTIVE",
+        effectiveFrom: new Date("2025-01-01T00:00:00.000Z"),
+        implementationKey: "beps/evaluator-v1",
+        configJson: {
+          cycle: "CYCLE_1",
+          filingYear: 2026,
+          applicability: {
+            minGrossSquareFeetPrivate: 50000,
+            minGrossSquareFeetDistrict: 10000,
+            ownershipClassFallback: "PRIVATE",
+            coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
+            recentConstructionExemptionYears: 5,
+            cycleStartYear: 2021,
+            cycleEndYear: 2026,
+          },
+          pathwayRouting: {
+            prescriptiveAlwaysEligible: true,
+            supportedPathways: ["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE"],
+          },
+          performance: {
+            requiredReductionFraction: 0.2,
+            scoreEligibleMetric: "ADJUSTED_SITE_EUI_AVERAGE",
+            nonScoreEligibleMetric: "WEATHER_NORMALIZED_SITE_EUI_AVERAGE",
+          },
+          standardTarget: {
+            defaultMaxGap: 15,
+            maxGapByPropertyType: {
+              OFFICE: 15,
+              MULTIFAMILY: 15,
+              MIXED_USE: 15,
+              OTHER: 15,
+            },
+            scoreEligibleMetric: "ENERGY_STAR_SCORE",
+            nonScoreEligibleMetric: "WEATHER_NORMALIZED_SOURCE_EUI",
+          },
+          prescriptive: {
+            defaultPointsNeeded: 25,
+            pointsNeededByPropertyType: {
+              OFFICE: 25,
+              MULTIFAMILY: 25,
+              MIXED_USE: 25,
+              OTHER: 25,
+            },
+            complianceBasis: "APPROVED_MEASURES_AND_MILESTONES",
+          },
+        },
+      },
+    });
+
+    const factorSet = await prisma.factorSetVersion.upsert({
+      where: {
+        key_version: {
+          key: "DC_BEPS_CYCLE_1_FACTORS_V1",
+          version: "test-v1",
+        },
+      },
+      update: {
+        sourceArtifactId: factorSource.id,
+        status: "ACTIVE",
+        factorsJson: {
+          beps: {
+            cycle: {
+              filingYear: 2026,
+              cycleStartYear: 2021,
+              cycleEndYear: 2026,
+              baselineYears: [2018, 2019],
+              evaluationYears: [2026],
+            },
+            applicability: {
+              minGrossSquareFeetPrivate: 50000,
+              minGrossSquareFeetDistrict: 10000,
+              ownershipClassFallback: "PRIVATE",
+              coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
+              recentConstructionExemptionYears: 5,
+              cycleStartYear: 2021,
+              cycleEndYear: 2026,
+              filingYear: 2026,
+            },
+            pathwayRouting: {
+              performanceScoreThreshold: 55,
+              prescriptiveAlwaysEligible: true,
+              supportedPathways: ["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE"],
+            },
+            performance: {
+              requiredReductionFraction: 0.2,
+              scoreEligibleMetric: "ADJUSTED_SITE_EUI_AVERAGE",
+              nonScoreEligibleMetric: "WEATHER_NORMALIZED_SITE_EUI_AVERAGE",
+              defaultBaselineYears: [2018, 2019],
+              defaultEvaluationYears: [2026],
+            },
+            standardTarget: {
+              defaultMaxGap: 15,
+              maxGapByPropertyType: {
+                OFFICE: 15,
+                MULTIFAMILY: 15,
+                MIXED_USE: 15,
+                OTHER: 15,
+              },
+              exactTargetScoresByPropertyType: {
+                OFFICE: 71,
+                MULTIFAMILY: 66,
+                MIXED_USE: 66,
+                OTHER: 54,
+              },
+              scoreEligibleMetric: "ENERGY_STAR_SCORE",
+              nonScoreEligibleMetric: "WEATHER_NORMALIZED_SOURCE_EUI",
+            },
+            prescriptive: {
+              defaultPointsNeeded: 25,
+              pointsNeededByPropertyType: {
+                OFFICE: 25,
+                MULTIFAMILY: 25,
+                MIXED_USE: 25,
+                OTHER: 25,
+              },
+              complianceBasis: "APPROVED_MEASURES_AND_MILESTONES",
+            },
+            alternativeCompliance: {
+              penaltyPerSquareFoot: 10,
+              maxPenaltyCap: 7500000,
+              agreementRequired: true,
+              allowedAgreementPathways: [
+                "PERFORMANCE",
+                "STANDARD_TARGET",
+                "PRESCRIPTIVE",
+              ],
+            },
+          },
+        },
+      },
+      create: {
+        key: "DC_BEPS_CYCLE_1_FACTORS_V1",
+        version: "test-v1",
+        status: "ACTIVE",
+        effectiveFrom: new Date("2025-01-01T00:00:00.000Z"),
+        sourceArtifactId: factorSource.id,
+        factorsJson: {
+          beps: {
+            cycle: {
+              filingYear: 2026,
+              cycleStartYear: 2021,
+              cycleEndYear: 2026,
+              baselineYears: [2018, 2019],
+              evaluationYears: [2026],
+            },
+            applicability: {
+              minGrossSquareFeetPrivate: 50000,
+              minGrossSquareFeetDistrict: 10000,
+              ownershipClassFallback: "PRIVATE",
+              coveredPropertyTypes: ["OFFICE", "MULTIFAMILY", "MIXED_USE", "OTHER"],
+              recentConstructionExemptionYears: 5,
+              cycleStartYear: 2021,
+              cycleEndYear: 2026,
+              filingYear: 2026,
+            },
+            pathwayRouting: {
+              performanceScoreThreshold: 55,
+              prescriptiveAlwaysEligible: true,
+              supportedPathways: ["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE"],
+            },
+            performance: {
+              requiredReductionFraction: 0.2,
+              scoreEligibleMetric: "ADJUSTED_SITE_EUI_AVERAGE",
+              nonScoreEligibleMetric: "WEATHER_NORMALIZED_SITE_EUI_AVERAGE",
+              defaultBaselineYears: [2018, 2019],
+              defaultEvaluationYears: [2026],
+            },
+            standardTarget: {
+              defaultMaxGap: 15,
+              maxGapByPropertyType: {
+                OFFICE: 15,
+                MULTIFAMILY: 15,
+                MIXED_USE: 15,
+                OTHER: 15,
+              },
+              exactTargetScoresByPropertyType: {
+                OFFICE: 71,
+                MULTIFAMILY: 66,
+                MIXED_USE: 66,
+                OTHER: 54,
+              },
+              scoreEligibleMetric: "ENERGY_STAR_SCORE",
+              nonScoreEligibleMetric: "WEATHER_NORMALIZED_SOURCE_EUI",
+            },
+            prescriptive: {
+              defaultPointsNeeded: 25,
+              pointsNeededByPropertyType: {
+                OFFICE: 25,
+                MULTIFAMILY: 25,
+                MIXED_USE: 25,
+                OTHER: 25,
+              },
+              complianceBasis: "APPROVED_MEASURES_AND_MILESTONES",
+            },
+            alternativeCompliance: {
+              penaltyPerSquareFoot: 10,
+              maxPenaltyCap: 7500000,
+              agreementRequired: true,
+              allowedAgreementPathways: [
+                "PERFORMANCE",
+                "STANDARD_TARGET",
+                "PRESCRIPTIVE",
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    await prisma.bepsCycleRegistry.upsert({
+      where: {
+        complianceCycle: "CYCLE_1",
+      },
+      update: {
+        cycleId: "BEPS_CYCLE_1",
+        cycleStartYear: 2021,
+        cycleEndYear: 2026,
+        baselineYearStart: 2018,
+        baselineYearEnd: 2019,
+        evaluationYear: 2026,
+        rulePackageId: rulePackage.id,
+        factorSetVersionId: factorSet.id,
+      },
+      create: {
+        cycleId: "BEPS_CYCLE_1",
+        complianceCycle: "CYCLE_1",
+        cycleStartYear: 2021,
+        cycleEndYear: 2026,
+        baselineYearStart: 2018,
+        baselineYearEnd: 2019,
+        evaluationYear: 2026,
+        rulePackageId: rulePackage.id,
+        factorSetVersionId: factorSet.id,
+      },
+    });
+
     orgA = await prisma.organization.create({
       data: {
         name: `Financing Org A ${scope}`,
@@ -210,7 +542,9 @@ describe("financing packets", () => {
       });
       await prisma.sourceArtifact.deleteMany({
         where: {
-          id: sourceArtifactA.id,
+          id: {
+            in: [sourceArtifactA.id, bepsSource.id, factorSource.id],
+          },
         },
       });
       await prisma.organizationMembership.deleteMany({

@@ -1,10 +1,17 @@
 import type {
   ActorType,
   BenchmarkSubmissionStatus,
+  BuildingOwnershipType,
   EspmShareStatus,
   EvidenceArtifactType,
 } from "@/generated/prisma/client";
 import { prisma } from "@/server/lib/db";
+import { NotFoundError } from "@/server/lib/errors";
+import { createLogger } from "@/server/lib/logger";
+import {
+  type BenchmarkYearDataValidationResult,
+  validateBenchmarkYearData,
+} from "./data-quality";
 import {
   BOOTSTRAP_FACTOR_SET_KEY,
   BOOTSTRAP_RULE_PACKAGE_KEYS,
@@ -14,8 +21,11 @@ import {
   recordComplianceEvaluation,
   upsertBenchmarkSubmissionRecord,
 } from "./provenance";
+import { evaluateVerification } from "./verification-engine";
 
 export const BENCHMARK_FINDING_CODES = {
+  benchmarkingScopeIdentified: "BENCHMARKING_SCOPE_IDENTIFIED",
+  benchmarkingDeadlineDetermined: "BENCHMARKING_DEADLINE_DETERMINED",
   missingPropertyId: "MISSING_PROPERTY_ID",
   missingCoverage: "MISSING_COVERAGE",
   overlappingBills: "OVERLAPPING_BILLS",
@@ -41,6 +51,7 @@ export interface BenchmarkBuildingInput {
   id: string;
   organizationId: string;
   grossSquareFeet: number;
+  ownershipType: BuildingOwnershipType;
   doeeBuildingId: string | null;
   espmPropertyId: bigint | number | null;
   espmShareStatus: EspmShareStatus;
@@ -72,8 +83,21 @@ export interface BenchmarkRuleConfig {
   } | null;
 }
 
+export interface BenchmarkApplicabilityBandConfig {
+  ownershipType: BuildingOwnershipType;
+  minimumGrossSquareFeet: number;
+  maximumGrossSquareFeet?: number | null;
+  label?: string | null;
+  verificationYears?: number[] | null;
+  verificationCadenceYears?: number | null;
+  deadlineType?: "MAY_1_FOLLOWING_YEAR" | "WITHIN_DAYS_OF_BENCHMARK_GENERATION" | null;
+  deadlineDaysFromGeneration?: number | null;
+  manualSubmissionAllowedWhenNotBenchmarkable?: boolean | null;
+}
+
 export interface BenchmarkFactorConfig {
   dqcFreshnessDays?: number | null;
+  applicabilityBands?: BenchmarkApplicabilityBandConfig[] | null;
 }
 
 export interface BenchmarkSubmissionContext {
@@ -97,13 +121,47 @@ export interface BenchmarkReadinessResult {
   blocking: boolean;
   reasonCodes: BenchmarkFindingCode[];
   findings: BenchmarkFinding[];
+  governance?: {
+    rulePackageKey: string;
+    ruleVersionId: string;
+    ruleVersion: string;
+    factorSetKey: string;
+    factorSetVersionId: string;
+    factorSetVersion: string;
+    ownershipTypeUsed: BuildingOwnershipType;
+    applicabilityBandLabel: string | null;
+    minimumGrossSquareFeet: number | null;
+    maximumGrossSquareFeet: number | null;
+    requiredReportingYears: number[];
+    verificationCadenceYears: number | null;
+    deadlineType:
+      | "MAY_1_FOLLOWING_YEAR"
+      | "WITHIN_DAYS_OF_BENCHMARK_GENERATION"
+      | null;
+    submissionDueDate: string | null;
+    deadlineDaysFromGeneration: number | null;
+  };
   summary: {
+    scopeState: "IN_SCOPE" | "OUT_OF_SCOPE";
+    ownershipTypeUsed: BuildingOwnershipType;
+    applicabilityBandLabel: string | null;
+    minimumGrossSquareFeet: number | null;
+    maximumGrossSquareFeet: number | null;
+    requiredReportingYears: number[];
+    verificationCadenceYears: number | null;
+    deadlineType:
+      | "MAY_1_FOLLOWING_YEAR"
+      | "WITHIN_DAYS_OF_BENCHMARK_GENERATION"
+      | null;
+    submissionDueDate: string | null;
+    deadlineDaysFromGeneration: number | null;
+    manualSubmissionAllowedWhenNotBenchmarkable: boolean;
     coverageComplete: boolean;
     missingCoverageStreams: string[];
     overlapStreams: string[];
-    propertyIdState: "PRESENT" | "MISSING" | "INVALID";
-    pmShareState: "READY" | "NOT_READY";
-    dqcFreshnessState: "FRESH" | "STALE" | "MISSING";
+    propertyIdState: "PRESENT" | "MISSING" | "INVALID" | "NOT_REQUIRED";
+    pmShareState: "READY" | "NOT_READY" | "NOT_REQUIRED";
+    dqcFreshnessState: "FRESH" | "STALE" | "MISSING" | "NOT_REQUIRED";
     verificationRequired: boolean;
     verificationEvidencePresent: boolean;
     gfaEvidenceRequired: boolean;
@@ -111,41 +169,8 @@ export interface BenchmarkReadinessResult {
   };
 }
 
-interface CoverageIssue {
-  streamKey: string;
-  start: string;
-  end: string;
-  days: number;
-}
-
-interface CoverageSummary {
-  coverageComplete: boolean;
-  missingCoverageStreams: string[];
-  overlapStreams: string[];
-  gapDetails: CoverageIssue[];
-  overlapDetails: CoverageIssue[];
-  streamCoverage: Array<{
-    streamKey: string;
-    firstStart: string | null;
-    lastEnd: string | null;
-    readingCount: number;
-  }>;
-}
-
-function toUtcDateOnly(value: Date) {
-  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
-}
-
 function addUtcDays(value: Date, days: number) {
   return new Date(value.getTime() + days * 24 * 60 * 60 * 1000);
-}
-
-function daysBetweenInclusive(start: Date, end: Date) {
-  return Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-}
-
-function buildStreamKey(reading: BenchmarkReadingInput) {
-  return reading.meterId ? `meter:${reading.meterId}` : `meterType:${reading.meterType}`;
 }
 
 function getNestedObject(value: Record<string, unknown> | null | undefined, key: string) {
@@ -199,108 +224,6 @@ function extractEvidenceTimestamp(evidence: BenchmarkEvidenceInput) {
   }
 
   return evidence.createdAt;
-}
-
-function summarizeCoverage(readings: BenchmarkReadingInput[], reportingYear: number): CoverageSummary {
-  const yearStart = new Date(Date.UTC(reportingYear, 0, 1));
-  const yearEnd = new Date(Date.UTC(reportingYear, 11, 31));
-
-  if (readings.length === 0) {
-    return {
-      coverageComplete: false,
-      missingCoverageStreams: ["all"],
-      overlapStreams: [],
-      gapDetails: [
-        {
-          streamKey: "all",
-          start: yearStart.toISOString(),
-          end: yearEnd.toISOString(),
-          days: daysBetweenInclusive(yearStart, yearEnd),
-        },
-      ],
-      overlapDetails: [],
-      streamCoverage: [],
-    };
-  }
-
-  const grouped = new Map<string, BenchmarkReadingInput[]>();
-  for (const reading of readings) {
-    const streamKey = buildStreamKey(reading);
-    const existing = grouped.get(streamKey) ?? [];
-    existing.push(reading);
-    grouped.set(streamKey, existing);
-  }
-
-  const missingCoverageStreams = new Set<string>();
-  const overlapStreams = new Set<string>();
-  const gapDetails: CoverageIssue[] = [];
-  const overlapDetails: CoverageIssue[] = [];
-  const streamCoverage: CoverageSummary["streamCoverage"] = [];
-
-  for (const [streamKey, streamReadings] of Array.from(grouped.entries())) {
-    const sorted = [...streamReadings].sort(
-      (a, b) => a.periodStart.getTime() - b.periodStart.getTime(),
-    );
-
-    let cursor = yearStart;
-    for (const reading of sorted) {
-      const rawStart = toUtcDateOnly(reading.periodStart);
-      const rawEnd = toUtcDateOnly(reading.periodEnd);
-      const start = rawStart < yearStart ? yearStart : rawStart;
-      const end = rawEnd > yearEnd ? yearEnd : rawEnd;
-
-      if (start > cursor) {
-        missingCoverageStreams.add(streamKey);
-        gapDetails.push({
-          streamKey,
-          start: cursor.toISOString(),
-          end: addUtcDays(start, -1).toISOString(),
-          days: daysBetweenInclusive(cursor, addUtcDays(start, -1)),
-        });
-      }
-
-      if (start <= addUtcDays(cursor, -1)) {
-        overlapStreams.add(streamKey);
-        overlapDetails.push({
-          streamKey,
-          start: start.toISOString(),
-          end: end.toISOString(),
-          days: daysBetweenInclusive(start, end),
-        });
-      }
-
-      const nextCursor = addUtcDays(end, 1);
-      if (nextCursor > cursor) {
-        cursor = nextCursor;
-      }
-    }
-
-    if (cursor <= yearEnd) {
-      missingCoverageStreams.add(streamKey);
-      gapDetails.push({
-        streamKey,
-        start: cursor.toISOString(),
-        end: yearEnd.toISOString(),
-        days: daysBetweenInclusive(cursor, yearEnd),
-      });
-    }
-
-    streamCoverage.push({
-      streamKey,
-      firstStart: sorted[0] ? toUtcDateOnly(sorted[0].periodStart).toISOString() : null,
-      lastEnd: sorted.at(-1) ? toUtcDateOnly(sorted.at(-1)!.periodEnd).toISOString() : null,
-      readingCount: sorted.length,
-    });
-  }
-
-  return {
-    coverageComplete: missingCoverageStreams.size === 0 && overlapStreams.size === 0,
-    missingCoverageStreams: Array.from(missingCoverageStreams),
-    overlapStreams: Array.from(overlapStreams),
-    gapDetails,
-    overlapDetails,
-    streamCoverage,
-  };
 }
 
 function evaluatePropertyId(
@@ -404,6 +327,103 @@ function determineVerificationRequirement(
   );
 }
 
+function normalizeApplicabilityBands(
+  factorConfig: BenchmarkFactorConfig,
+): BenchmarkApplicabilityBandConfig[] {
+  return Array.isArray(factorConfig.applicabilityBands)
+    ? factorConfig.applicabilityBands.filter(
+        (band): band is BenchmarkApplicabilityBandConfig =>
+          band != null &&
+          typeof band === "object" &&
+          typeof band.minimumGrossSquareFeet === "number" &&
+          (band.ownershipType === "PRIVATE" || band.ownershipType === "DISTRICT"),
+      )
+    : [];
+}
+
+function findBenchmarkApplicabilityBand(
+  building: BenchmarkBuildingInput,
+  factorConfig: BenchmarkFactorConfig,
+) {
+  const bands = normalizeApplicabilityBands(factorConfig);
+  return (
+    bands.find((band) => {
+      if (band.ownershipType !== building.ownershipType) {
+        return false;
+      }
+
+      if (building.grossSquareFeet < band.minimumGrossSquareFeet) {
+        return false;
+      }
+
+      if (
+        typeof band.maximumGrossSquareFeet === "number" &&
+        building.grossSquareFeet > band.maximumGrossSquareFeet
+      ) {
+        return false;
+      }
+
+      return true;
+    }) ?? null
+  );
+}
+
+function isVerificationYearForBand(
+  reportingYear: number,
+  band: BenchmarkApplicabilityBandConfig | null,
+) {
+  if (!band) {
+    return false;
+  }
+
+  const verificationYears = Array.isArray(band.verificationYears)
+    ? band.verificationYears.filter((year): year is number => Number.isFinite(year))
+    : [];
+
+  if (verificationYears.includes(reportingYear)) {
+    return true;
+  }
+
+  const cadenceYears = band.verificationCadenceYears;
+  if (
+    typeof cadenceYears !== "number" ||
+    cadenceYears <= 0 ||
+    verificationYears.length === 0
+  ) {
+    return false;
+  }
+
+  const anchorYear = Math.max(...verificationYears);
+  return reportingYear > anchorYear && (reportingYear - anchorYear) % cadenceYears === 0;
+}
+
+function resolveBenchmarkingDeadline(
+  reportingYear: number,
+  band: BenchmarkApplicabilityBandConfig | null,
+) {
+  if (!band?.deadlineType) {
+    return {
+      deadlineType: null,
+      submissionDueDate: null,
+      deadlineDaysFromGeneration: null,
+    };
+  }
+
+  if (band.deadlineType === "MAY_1_FOLLOWING_YEAR") {
+    return {
+      deadlineType: band.deadlineType,
+      submissionDueDate: new Date(Date.UTC(reportingYear + 1, 4, 1)).toISOString(),
+      deadlineDaysFromGeneration: null,
+    };
+  }
+
+  return {
+    deadlineType: band.deadlineType,
+    submissionDueDate: null,
+    deadlineDaysFromGeneration: band.deadlineDaysFromGeneration ?? 60,
+  };
+}
+
 function findEvidenceForYear(
   evidenceArtifacts: BenchmarkEvidenceInput[],
   reportingYear: number,
@@ -430,7 +450,77 @@ export function evaluateBenchmarkReadinessData(input: {
   const evaluatedAt = input.evaluatedAt ?? new Date();
   const ruleConfig = input.ruleConfig ?? {};
   const factorConfig = input.factorConfig ?? {};
-  const coverage = summarizeCoverage(input.readings, input.reportingYear);
+  const applicabilityBand = findBenchmarkApplicabilityBand(input.building, factorConfig);
+  const scopeState = applicabilityBand ? "IN_SCOPE" : "OUT_OF_SCOPE";
+  const deadline = resolveBenchmarkingDeadline(input.reportingYear, applicabilityBand);
+  const manualSubmissionAllowedWhenNotBenchmarkable =
+    applicabilityBand?.manualSubmissionAllowedWhenNotBenchmarkable ?? false;
+
+  if (scopeState === "OUT_OF_SCOPE") {
+    const findings: BenchmarkFinding[] = [
+      {
+        code: BENCHMARK_FINDING_CODES.benchmarkingScopeIdentified,
+        status: "PASS",
+        severity: "INFO",
+        message:
+          "Building is outside the governed benchmarking scope bands for the requested reporting year.",
+        metadata: {
+          ownershipType: input.building.ownershipType,
+          grossSquareFeet: input.building.grossSquareFeet,
+        },
+      },
+      {
+        code: BENCHMARK_FINDING_CODES.benchmarkingDeadlineDetermined,
+        status: "PASS",
+        severity: "INFO",
+        message: "No governed benchmarking deadline applies because the building is out of scope.",
+      },
+      {
+        code: BENCHMARK_FINDING_CODES.verificationRequired,
+        status: "PASS",
+        severity: "INFO",
+        message:
+          "Third-party verification is not required because the building is outside the governed benchmarking scope bands.",
+      },
+    ];
+
+    return {
+      reportingYear: input.reportingYear,
+      evaluatedAt: evaluatedAt.toISOString(),
+      status: "READY",
+      blocking: false,
+      reasonCodes: [],
+      findings,
+      summary: {
+        scopeState,
+        ownershipTypeUsed: input.building.ownershipType,
+        applicabilityBandLabel: null,
+        minimumGrossSquareFeet: null,
+        maximumGrossSquareFeet: null,
+        requiredReportingYears: [],
+        verificationCadenceYears: null,
+        deadlineType: null,
+        submissionDueDate: null,
+        deadlineDaysFromGeneration: null,
+        manualSubmissionAllowedWhenNotBenchmarkable,
+        coverageComplete: false,
+        missingCoverageStreams: [],
+        overlapStreams: [],
+        propertyIdState: "NOT_REQUIRED",
+        pmShareState: "NOT_REQUIRED",
+        dqcFreshnessState: "NOT_REQUIRED",
+        verificationRequired: false,
+        verificationEvidencePresent: false,
+        gfaEvidenceRequired: false,
+        gfaEvidencePresent: false,
+      },
+    };
+  }
+
+  const coverage: BenchmarkYearDataValidationResult = validateBenchmarkYearData(
+    input.readings,
+    input.reportingYear,
+  );
   const propertyId = evaluatePropertyId(input.building, ruleConfig);
   const pmShare = evaluatePmShare(input.building);
   const dqcFreshnessDays = factorConfig.dqcFreshnessDays ?? ruleConfig.dqcFreshnessDays ?? 30;
@@ -444,11 +534,10 @@ export function evaluateBenchmarkReadinessData(input: {
       : addUtcDays(freshestDqc, dqcFreshnessDays) < evaluatedAt
         ? "STALE"
         : "FRESH";
-  const verificationRequired = determineVerificationRequirement(
-    input.building,
-    input.reportingYear,
-    ruleConfig,
-  );
+  const verificationRequired =
+    normalizeApplicabilityBands(factorConfig).length > 0
+      ? isVerificationYearForBand(input.reportingYear, applicabilityBand)
+      : determineVerificationRequirement(input.building, input.reportingYear, ruleConfig);
   const verificationEvidenceKind = ruleConfig.verification?.evidenceKind ?? "VERIFICATION";
   const verificationArtifacts = findEvidenceForYear(
     input.evidenceArtifacts,
@@ -463,6 +552,34 @@ export function evaluateBenchmarkReadinessData(input: {
 
   const findings: BenchmarkFinding[] = [];
 
+  findings.push({
+    code: BENCHMARK_FINDING_CODES.benchmarkingScopeIdentified,
+    status: "PASS",
+    severity: "INFO",
+    message: "Benchmarking scope was resolved from the active governed rule set.",
+    metadata: {
+      ownershipType: input.building.ownershipType,
+      grossSquareFeet: input.building.grossSquareFeet,
+      applicabilityBandLabel: applicabilityBand?.label ?? null,
+      minimumGrossSquareFeet: applicabilityBand?.minimumGrossSquareFeet ?? null,
+      maximumGrossSquareFeet: applicabilityBand?.maximumGrossSquareFeet ?? null,
+    },
+  });
+  findings.push({
+    code: BENCHMARK_FINDING_CODES.benchmarkingDeadlineDetermined,
+    status: "PASS",
+    severity: "INFO",
+    message:
+      deadline.deadlineType === "MAY_1_FOLLOWING_YEAR"
+        ? "Private benchmarking deadline resolves to May 1 of the following year."
+        : "District/public benchmarking deadline resolves relative to benchmark generation.",
+    metadata: {
+      deadlineType: deadline.deadlineType,
+      submissionDueDate: deadline.submissionDueDate,
+      deadlineDaysFromGeneration: deadline.deadlineDaysFromGeneration,
+      manualSubmissionAllowedWhenNotBenchmarkable,
+    },
+  });
   findings.push(propertyId.finding);
 
   if (coverage.missingCoverageStreams.length > 0) {
@@ -547,8 +664,16 @@ export function evaluateBenchmarkReadinessData(input: {
     metadata: {
       reportingYear: input.reportingYear,
       grossSquareFeet: input.building.grossSquareFeet,
-      minimumGrossSquareFeet: ruleConfig.verification?.minimumGrossSquareFeet ?? null,
-      requiredReportingYears: ruleConfig.verification?.requiredReportingYears ?? [],
+      applicabilityBandLabel: applicabilityBand?.label ?? null,
+      minimumGrossSquareFeet:
+        applicabilityBand?.minimumGrossSquareFeet ??
+        ruleConfig.verification?.minimumGrossSquareFeet ??
+        null,
+      maximumGrossSquareFeet: applicabilityBand?.maximumGrossSquareFeet ?? null,
+      requiredReportingYears: applicabilityBand
+        ? (applicabilityBand.verificationYears ?? [])
+        : (ruleConfig.verification?.requiredReportingYears ?? []),
+      verificationCadenceYears: applicabilityBand?.verificationCadenceYears ?? null,
     },
   });
 
@@ -611,6 +736,22 @@ export function evaluateBenchmarkReadinessData(input: {
     reasonCodes,
     findings,
     summary: {
+      scopeState,
+      ownershipTypeUsed: input.building.ownershipType,
+      applicabilityBandLabel: applicabilityBand?.label ?? null,
+      minimumGrossSquareFeet:
+        applicabilityBand?.minimumGrossSquareFeet ??
+        ruleConfig.verification?.minimumGrossSquareFeet ??
+        null,
+      maximumGrossSquareFeet: applicabilityBand?.maximumGrossSquareFeet ?? null,
+      requiredReportingYears: applicabilityBand
+        ? (applicabilityBand.verificationYears ?? [])
+        : (ruleConfig.verification?.requiredReportingYears ?? []),
+      verificationCadenceYears: applicabilityBand?.verificationCadenceYears ?? null,
+      deadlineType: deadline.deadlineType,
+      submissionDueDate: deadline.submissionDueDate,
+      deadlineDaysFromGeneration: deadline.deadlineDaysFromGeneration,
+      manualSubmissionAllowedWhenNotBenchmarkable,
       coverageComplete: coverage.coverageComplete,
       missingCoverageStreams: coverage.missingCoverageStreams,
       overlapStreams: coverage.overlapStreams,
@@ -650,6 +791,7 @@ export async function evaluateBenchmarkingReadiness(params: {
           id: true,
           organizationId: true,
           grossSquareFeet: true,
+          ownershipType: true,
           doeeBuildingId: true,
           espmPropertyId: true,
           espmShareStatus: true,
@@ -692,15 +834,15 @@ export async function evaluateBenchmarkingReadiness(params: {
       }),
       getActiveRuleVersion(BOOTSTRAP_RULE_PACKAGE_KEYS.benchmarking2025),
       getActiveFactorSetVersion(BOOTSTRAP_FACTOR_SET_KEY),
-    ]);
+  ]);
 
   if (!building) {
-    throw new Error("Building not found for benchmarking readiness");
+    throw new NotFoundError("Building not found for benchmarking readiness");
   }
 
   const ruleConfig = normalizeRuleConfig(toJsonObject(activeRuleVersion.configJson));
   const factorConfig = normalizeFactorConfig(toJsonObject(activeFactorSetVersion.factorsJson));
-  const readiness = evaluateBenchmarkReadinessData({
+  const baseReadiness = evaluateBenchmarkReadinessData({
     building,
     readings,
     evidenceArtifacts: evidenceArtifacts.map((artifact) => ({
@@ -717,6 +859,26 @@ export async function evaluateBenchmarkingReadiness(params: {
     factorConfig,
     submissionContext: params.submissionContext ?? null,
   });
+  const readiness: BenchmarkReadinessResult = {
+    ...baseReadiness,
+    governance: {
+      rulePackageKey: BOOTSTRAP_RULE_PACKAGE_KEYS.benchmarking2025,
+      ruleVersionId: activeRuleVersion.id,
+      ruleVersion: activeRuleVersion.version,
+      factorSetKey: BOOTSTRAP_FACTOR_SET_KEY,
+      factorSetVersionId: activeFactorSetVersion.id,
+      factorSetVersion: activeFactorSetVersion.version,
+      ownershipTypeUsed: baseReadiness.summary.ownershipTypeUsed,
+      applicabilityBandLabel: baseReadiness.summary.applicabilityBandLabel,
+      minimumGrossSquareFeet: baseReadiness.summary.minimumGrossSquareFeet,
+      maximumGrossSquareFeet: baseReadiness.summary.maximumGrossSquareFeet,
+      requiredReportingYears: baseReadiness.summary.requiredReportingYears,
+      verificationCadenceYears: baseReadiness.summary.verificationCadenceYears,
+      deadlineType: baseReadiness.summary.deadlineType,
+      submissionDueDate: baseReadiness.summary.submissionDueDate,
+      deadlineDaysFromGeneration: baseReadiness.summary.deadlineDaysFromGeneration,
+    },
+  };
 
   const provenance = await recordComplianceEvaluation({
     organizationId: params.organizationId,
@@ -783,6 +945,11 @@ export async function evaluateAndUpsertBenchmarkSubmission(params: {
   additionalSubmissionPayload?: Record<string, unknown>;
   evidenceArtifacts?: EvidenceArtifactDraft[];
 }) {
+  const logger = createLogger({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    procedure: "benchmarking.evaluateAndUpsert",
+  });
   const evaluation = await evaluateBenchmarkingReadiness({
     organizationId: params.organizationId,
     buildingId: params.buildingId,
@@ -820,6 +987,19 @@ export async function evaluateAndUpsertBenchmarkSubmission(params: {
     createdByType: params.producedByType,
     createdById: params.producedById ?? null,
     evidenceArtifacts: params.evidenceArtifacts,
+  });
+
+  await evaluateVerification({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    reportingYear: params.reportingYear,
+  });
+
+  logger.info("Benchmark submission refreshed", {
+    reportingYear: params.reportingYear,
+    status: benchmarkSubmission.status,
+    readinessStatus: evaluation.readiness.status,
+    benchmarkSubmissionId: benchmarkSubmission.id,
   });
 
   return {

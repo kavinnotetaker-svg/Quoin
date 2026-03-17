@@ -1,7 +1,12 @@
 import "./lib/config"; // Validate env vars before starting workers
 import { startDataIngestionWorker } from "./pipelines/data-ingestion/worker";
+import { createLogger } from "./lib/logger";
 
-console.log("[Worker] Starting Quoin worker process...");
+const logger = createLogger({
+  component: "worker-entrypoint",
+});
+
+logger.info("Starting Quoin worker process");
 
 const workers = [
   startDataIngestionWorker(),
@@ -10,10 +15,12 @@ const workers = [
   // Future: startDriftDetectionWorker(),
 ];
 
-console.log(`[Worker] ${workers.length} worker(s) started. Listening for jobs...`);
+logger.info("Quoin workers started", {
+  workerCount: workers.length,
+});
 
 async function shutdown(signal: string) {
-  console.log(`[Worker] ${signal} received. Shutting down...`);
+  logger.info("Worker shutdown requested", { signal });
   await Promise.all(workers.map((w) => w.close()));
   process.exit(0);
 }

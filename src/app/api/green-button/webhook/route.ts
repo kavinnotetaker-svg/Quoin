@@ -1,6 +1,17 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
 import { createQueue, QUEUES } from "@/server/lib/queue";
+import { createAuditLog } from "@/server/lib/audit-log";
+import { toAppError } from "@/server/lib/errors";
+import {
+  createJob,
+  markCompleted,
+  markDead,
+  markFailed,
+  markRunning,
+} from "@/server/lib/jobs";
+import { createLogger } from "@/server/lib/logger";
 
 const webhookParser = new XMLParser({
   ignoreAttributes: false,
@@ -14,10 +25,68 @@ const webhookParser = new XMLParser({
  * Enqueues a job to fetch and process the data. Returns 200 immediately.
  */
 export async function POST(req: NextRequest) {
+  const requestId = randomUUID();
+  const job = await createJob({
+    type: "GREEN_BUTTON_WEBHOOK",
+    maxAttempts: 3,
+  });
+  const runningJob = await markRunning(job.id);
+  const logger = createLogger({
+    requestId,
+    jobId: job.id,
+    procedure: "greenButton.webhook",
+  });
+  const safelyPersist = async (
+    label: string,
+    operation: () => Promise<unknown>,
+  ) => {
+    try {
+      await operation();
+    } catch (persistenceError) {
+      logger.error("Green Button webhook persistence failed", {
+        error: persistenceError,
+        persistenceLabel: label,
+      });
+    }
+  };
+  const writeAudit = (input: {
+    action: string;
+    inputSnapshot?: Record<string, unknown>;
+    outputSnapshot?: Record<string, unknown>;
+    errorCode?: string | null;
+  }) =>
+    createAuditLog({
+      actorType: "SYSTEM",
+      requestId,
+      action: input.action,
+      inputSnapshot: input.inputSnapshot,
+      outputSnapshot: input.outputSnapshot,
+      errorCode: input.errorCode ?? null,
+    }).catch((auditError) => {
+      logger.error("Green Button webhook audit log persistence failed", {
+        error: auditError,
+        auditAction: input.action,
+      });
+      return null;
+    });
+
+  await writeAudit({
+    action: "green_button.webhook.started",
+  });
   try {
     const body = await req.text();
 
     if (!body.trim()) {
+      await safelyPersist("job.dead", () =>
+        markDead(runningJob.id, "Empty request body"),
+      );
+      await writeAudit({
+        action: "green_button.webhook.failed",
+        outputSnapshot: {
+          retryable: false,
+        },
+        errorCode: "VALIDATION_ERROR",
+      });
       return NextResponse.json(
         { error: "Empty request body" },
         { status: 400 },
@@ -61,7 +130,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!notificationUri) {
-      console.warn("[Green Button Webhook] Could not extract notification URI from payload");
+      logger.warn("Green Button webhook payload did not include notification URI");
+      await safelyPersist("job.completed", () => markCompleted(runningJob.id));
+      await writeAudit({
+        action: "green_button.webhook.ignored",
+        outputSnapshot: {
+          reason: "missing_notification_uri",
+        },
+      });
       // Still return 200 — don't make the utility retry
       return NextResponse.json({ received: true });
     }
@@ -74,17 +150,67 @@ export async function POST(req: NextRequest) {
         triggerType: "WEBHOOK",
         source: "GREEN_BUTTON",
       });
-      console.log(
-        `[Green Button Webhook] Enqueued job for notification: ${notificationUri}`,
-      );
+      logger.info("Enqueued Green Button webhook job", {
+        notificationUri,
+      });
+      await safelyPersist("job.completed", () => markCompleted(runningJob.id));
+      await writeAudit({
+        action: "green_button.webhook.succeeded",
+        outputSnapshot: {
+          notificationUri,
+          queue: QUEUES.DATA_INGESTION,
+        },
+      });
     } catch (queueErr) {
-      console.error("[Green Button Webhook] Failed to enqueue job:", queueErr);
+      const appError = toAppError(queueErr);
+      logger.error("Failed to enqueue Green Button webhook job", {
+        error: appError,
+        notificationUri,
+      });
+      if (appError.retryable && runningJob.attempts < runningJob.maxAttempts) {
+        await safelyPersist("job.failed", () =>
+          markFailed(runningJob.id, appError.message),
+        );
+      } else {
+        await safelyPersist("job.dead", () =>
+          markDead(runningJob.id, appError.message),
+        );
+      }
+      await writeAudit({
+        action: "green_button.webhook.failed",
+        inputSnapshot: {
+          notificationUri,
+        },
+        outputSnapshot: {
+          retryable: appError.retryable,
+        },
+        errorCode: appError.code,
+      });
       // Still return 200 — the data can be fetched on the next scheduled pull
     }
 
     return NextResponse.json({ received: true });
   } catch (err) {
-    console.error("[Green Button Webhook] Error processing notification:", err);
+    const appError = toAppError(err);
+    logger.error("Error processing Green Button webhook notification", {
+      error: appError,
+    });
+    if (appError.retryable && runningJob.attempts < runningJob.maxAttempts) {
+      await safelyPersist("job.failed", () =>
+        markFailed(runningJob.id, appError.message),
+      );
+    } else {
+      await safelyPersist("job.dead", () =>
+        markDead(runningJob.id, appError.message),
+      );
+    }
+    await writeAudit({
+      action: "green_button.webhook.failed",
+      outputSnapshot: {
+        retryable: appError.retryable,
+      },
+      errorCode: appError.code,
+    });
     // Return 200 even on error to prevent utility from retrying endlessly
     return NextResponse.json({ received: true });
   }

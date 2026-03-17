@@ -33,17 +33,17 @@ export function StepBuilding({ onNext, onSkip }: StepBuildingProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h2 className="text-lg font-medium text-gray-900">Add your first building</h2>
-        <p className="mt-1 text-sm text-gray-500">
+        <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Add your first building</h2>
+        <p className="mt-2 text-[15px] text-zinc-500 leading-relaxed">
           Enter your DC building details. You can add more buildings later.
         </p>
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="rounded-lg bg-red-50 p-4 border border-red-200">
+          <p className="text-[13px] font-medium text-red-800">{error}</p>
         </div>
       )}
 
@@ -52,7 +52,7 @@ export function StepBuilding({ onNext, onSkip }: StepBuildingProps) {
       <button
         type="button"
         onClick={onSkip}
-        className="w-full text-center text-sm text-gray-500 hover:text-gray-700"
+        className="w-full text-center text-[13px] font-medium text-zinc-500 hover:text-zinc-800 transition-colors"
       >
         Skip for now
       </button>

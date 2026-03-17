@@ -8,6 +8,7 @@ import { MetricsService } from "@/server/integrations/espm/metrics";
 import { ConsumptionService } from "@/server/integrations/espm/consumption";
 import { espmBuilder } from "@/server/integrations/espm/xml-config";
 import {
+  ESPMAccessError,
   ESPMAuthError,
   ESPMNotFoundError,
   ESPMValidationError,
@@ -132,6 +133,60 @@ describe("ESPM Client", () => {
     expect(result.siteTotal).toBeNull();
   });
 
+  it("falls back to the latest available month when December metrics are empty", async () => {
+    const decemberXml = `<?xml version="1.0" encoding="UTF-8"?>
+      <propertyMetrics propertyId="19879255" month="12" year="2025" measurementSystem="EPA">
+        <metric name="medianScore" dataType="numeric"><value>50</value></metric>
+      </propertyMetrics>`;
+    const novemberXml = `<?xml version="1.0" encoding="UTF-8"?>
+      <propertyMetrics propertyId="19879255" month="11" year="2025" measurementSystem="EPA">
+        <metric name="score" dataType="numeric"><value>19</value></metric>
+        <metric name="siteTotal" uom="kBtu" dataType="numeric"><value>10943640.4</value></metric>
+        <metric name="sourceTotal" uom="kBtu" dataType="numeric"><value>26380943.6</value></metric>
+        <metric name="siteIntensity" uom="kBtu/ft²" dataType="numeric"><value>120.3</value></metric>
+        <metric name="sourceIntensity" uom="kBtu/ft²" dataType="numeric"><value>289.9</value></metric>
+        <metric name="directGHGEmissions" dataType="numeric"><value>129.33</value></metric>
+        <metric name="medianScore" dataType="numeric"><value>50</value></metric>
+      </propertyMetrics>`;
+
+    server.use(
+      http.get(`${BASE_URL}/property/19879255/metrics`, ({ request }) => {
+        const url = new URL(request.url);
+        const month = url.searchParams.get("month");
+        return new HttpResponse(month === "12" ? decemberXml : novemberXml, {
+          headers: { "Content-Type": "application/xml" },
+        });
+      }),
+    );
+
+    const client = createClient();
+    const metricsService = new MetricsService(client);
+    const result = await metricsService.getLatestAvailablePropertyMetrics(19879255, 2025, 12);
+
+    expect(result.month).toBe(11);
+    expect(result.score).toBe(19);
+    expect(result.siteIntensity).toBe(120.3);
+    expect(result.sourceIntensity).toBe(289.9);
+  });
+
+  it("requests weather-normalized metrics in the PM-Metrics header", async () => {
+    server.use(
+      http.get(`${BASE_URL}/property/12345/metrics`, ({ request }) => {
+        const metricsHeader = request.headers.get("PM-Metrics") ?? "";
+        expect(metricsHeader).toContain("weatherNormalizedSiteIntensity");
+        expect(metricsHeader).toContain("weatherNormalizedSourceIntensity");
+
+        return new HttpResponse(loadFixture("property-metrics-compliant.xml"), {
+          headers: { "Content-Type": "application/xml" },
+        });
+      }),
+    );
+
+    const client = createClient();
+    const metricsService = new MetricsService(client);
+    await metricsService.getPropertyMetrics(12345, 2025, 12);
+  });
+
   // ─── Error Mapping ────────────────────────────────────────────────────
 
   it("maps 401 to ESPMAuthError", async () => {
@@ -145,6 +200,17 @@ describe("ESPM Client", () => {
     await expect(
       client.get("/property/1/metrics"),
     ).rejects.toThrow(ESPMAuthError);
+  });
+
+  it("maps 403 to ESPMAccessError", async () => {
+    server.use(
+      http.get(`${BASE_URL}/property/1`, () => {
+        return new HttpResponse("Access Denied", { status: 403 });
+      }),
+    );
+
+    const client = createClient();
+    await expect(client.get("/property/1")).rejects.toThrow(ESPMAccessError);
   });
 
   it("maps 404 to ESPMNotFoundError", async () => {
