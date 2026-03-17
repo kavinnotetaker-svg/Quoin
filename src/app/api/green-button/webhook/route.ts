@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
 import { createQueue, QUEUES } from "@/server/lib/queue";
 import { createAuditLog } from "@/server/lib/audit-log";
+import { prisma } from "@/server/lib/db";
 import { toAppError } from "@/server/lib/errors";
 import {
   createJob,
@@ -12,6 +13,8 @@ import {
   markRunning,
 } from "@/server/lib/jobs";
 import { createLogger } from "@/server/lib/logger";
+import { extractSubscriptionId } from "@/server/integrations/green-button";
+import { buildGreenButtonNotificationEnvelope } from "@/server/pipelines/data-ingestion/envelope";
 
 const webhookParser = new XMLParser({
   ignoreAttributes: false,
@@ -19,10 +22,42 @@ const webhookParser = new XMLParser({
   removeNSPrefix: true,
 });
 
+function extractNotificationUri(parsed: Record<string, unknown>) {
+  let notificationUri: string | null = null;
+
+  const batchList = parsed["BatchList"] as Record<string, unknown> | undefined;
+  if (batchList) {
+    const resources = batchList["resources"] as string | undefined;
+    notificationUri = resources ?? null;
+  }
+
+  const feed = parsed["feed"] as Record<string, unknown> | undefined;
+  if (feed) {
+    const entries = feed["entry"];
+    const entryArray = Array.isArray(entries) ? entries : entries ? [entries] : [];
+    for (const entry of entryArray as Record<string, unknown>[]) {
+      const content = entry["content"] as Record<string, unknown> | undefined;
+      const batchUrl = content?.["BatchList"] ?? entry["link"] ?? null;
+      if (typeof batchUrl === "string") {
+        notificationUri = batchUrl;
+        break;
+      }
+
+      const link = entry["link"] as Record<string, unknown> | undefined;
+      if (link?.["@_href"]) {
+        notificationUri = String(link["@_href"]);
+        break;
+      }
+    }
+  }
+
+  return notificationUri;
+}
+
 /**
  * POST /api/green-button/webhook
- * Public endpoint — receives push notifications from the utility when new data is available.
- * Enqueues a job to fetch and process the data. Returns 200 immediately.
+ * Public endpoint that receives utility push notifications and enqueues a
+ * canonical ingestion envelope for background processing.
  */
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -59,7 +94,10 @@ export async function POST(req: NextRequest) {
       actorType: "SYSTEM",
       requestId,
       action: input.action,
-      inputSnapshot: input.inputSnapshot,
+      inputSnapshot: {
+        jobId: job.id,
+        ...(input.inputSnapshot ?? {}),
+      },
       outputSnapshot: input.outputSnapshot,
       errorCode: input.errorCode ?? null,
     }).catch((auditError) => {
@@ -71,8 +109,12 @@ export async function POST(req: NextRequest) {
     });
 
   await writeAudit({
+    action: "green_button.webhook.received",
+  });
+  await writeAudit({
     action: "green_button.webhook.started",
   });
+
   try {
     const body = await req.text();
 
@@ -87,47 +129,11 @@ export async function POST(req: NextRequest) {
         },
         errorCode: "VALIDATION_ERROR",
       });
-      return NextResponse.json(
-        { error: "Empty request body" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Empty request body" }, { status: 400 });
     }
 
-    // Parse the Atom notification XML
     const parsed = webhookParser.parse(body) as Record<string, unknown>;
-
-    // Extract notification URI from the Atom entry
-    // Green Button notifications can come as Atom feed or simple XML
-    let notificationUri: string | null = null;
-
-    const batchList = parsed["BatchList"] as Record<string, unknown> | undefined;
-    if (batchList) {
-      // Simple batch list format
-      const resources = batchList["resources"] as string | undefined;
-      notificationUri = resources ?? null;
-    }
-
-    const feed = parsed["feed"] as Record<string, unknown> | undefined;
-    if (feed) {
-      const entries = feed["entry"];
-      const entryArray = Array.isArray(entries) ? entries : entries ? [entries] : [];
-      for (const entry of entryArray as Record<string, unknown>[]) {
-        const content = entry["content"] as Record<string, unknown> | undefined;
-        const batchUrl = content?.["BatchList"]
-          ?? entry["link"]
-          ?? null;
-        if (typeof batchUrl === "string") {
-          notificationUri = batchUrl;
-          break;
-        }
-        // Check link href
-        const link = entry["link"] as Record<string, unknown> | undefined;
-        if (link?.["@_href"]) {
-          notificationUri = String(link["@_href"]);
-          break;
-        }
-      }
-    }
+    const notificationUri = extractNotificationUri(parsed);
 
     if (!notificationUri) {
       logger.warn("Green Button webhook payload did not include notification URI");
@@ -138,26 +144,108 @@ export async function POST(req: NextRequest) {
           reason: "missing_notification_uri",
         },
       });
-      // Still return 200 — don't make the utility retry
       return NextResponse.json({ received: true });
     }
 
-    // Enqueue a job to fetch and ingest the new data
-    try {
-      const queue = createQueue(QUEUES.DATA_INGESTION);
-      await queue.add("green-button-webhook", {
-        notificationUri,
-        triggerType: "WEBHOOK",
-        source: "GREEN_BUTTON",
-      });
-      logger.info("Enqueued Green Button webhook job", {
+    const subscriptionId = extractSubscriptionId(notificationUri);
+    if (!subscriptionId) {
+      logger.warn("Green Button webhook notification URI did not contain subscription ID", {
         notificationUri,
       });
       await safelyPersist("job.completed", () => markCompleted(runningJob.id));
       await writeAudit({
-        action: "green_button.webhook.succeeded",
-        outputSnapshot: {
+        action: "green_button.webhook.ignored",
+        inputSnapshot: {
           notificationUri,
+        },
+        outputSnapshot: {
+          reason: "missing_subscription_id",
+        },
+      });
+      return NextResponse.json({ received: true });
+    }
+
+    const connection = await prisma.greenButtonConnection.findFirst({
+      where: {
+        status: "ACTIVE",
+        subscriptionId,
+      },
+      select: {
+        id: true,
+        organizationId: true,
+        buildingId: true,
+        subscriptionId: true,
+        resourceUri: true,
+      },
+    });
+
+    if (!connection) {
+      logger.warn("Green Button webhook could not resolve active connection", {
+        notificationUri,
+        subscriptionId,
+      });
+      await safelyPersist("job.completed", () => markCompleted(runningJob.id));
+      await writeAudit({
+        action: "green_button.webhook.ignored",
+        inputSnapshot: {
+          notificationUri,
+          subscriptionId,
+        },
+        outputSnapshot: {
+          reason: "connection_not_found",
+        },
+      });
+      return NextResponse.json({ received: true });
+    }
+
+    const envelope = buildGreenButtonNotificationEnvelope({
+      requestId,
+      organizationId: connection.organizationId,
+      buildingId: connection.buildingId,
+      connectionId: connection.id,
+      notificationUri,
+      subscriptionId: connection.subscriptionId ?? subscriptionId,
+      resourceUri: connection.resourceUri,
+    });
+
+    try {
+      await writeAudit({
+        action: "green_button.webhook.enqueue_attempted",
+        inputSnapshot: {
+          notificationUri,
+          subscriptionId,
+          organizationId: connection.organizationId,
+          buildingId: connection.buildingId,
+        },
+      });
+
+      const queue = createQueue(QUEUES.DATA_INGESTION);
+      await queue.add("green-button-webhook", envelope);
+      logger.info("Enqueued Green Button webhook job", {
+        notificationUri,
+        subscriptionId,
+        organizationId: connection.organizationId,
+        buildingId: connection.buildingId,
+      });
+
+      await safelyPersist("job.completed", () => markCompleted(runningJob.id));
+      await writeAudit({
+        action: "green_button.webhook.enqueue_succeeded",
+        inputSnapshot: {
+          notificationUri,
+          subscriptionId,
+          organizationId: connection.organizationId,
+          buildingId: connection.buildingId,
+        },
+        outputSnapshot: {
+          queue: QUEUES.DATA_INGESTION,
+          payloadVersion: envelope.payloadVersion,
+          jobType: envelope.jobType,
+        },
+      });
+      await writeAudit({
+        action: "green_button.webhook.completed",
+        outputSnapshot: {
           queue: QUEUES.DATA_INGESTION,
         },
       });
@@ -166,6 +254,7 @@ export async function POST(req: NextRequest) {
       logger.error("Failed to enqueue Green Button webhook job", {
         error: appError,
         notificationUri,
+        subscriptionId,
       });
       if (appError.retryable && runningJob.attempts < runningJob.maxAttempts) {
         await safelyPersist("job.failed", () =>
@@ -177,16 +266,18 @@ export async function POST(req: NextRequest) {
         );
       }
       await writeAudit({
-        action: "green_button.webhook.failed",
+        action: "green_button.webhook.enqueue_failed",
         inputSnapshot: {
           notificationUri,
+          subscriptionId,
+          organizationId: connection.organizationId,
+          buildingId: connection.buildingId,
         },
         outputSnapshot: {
           retryable: appError.retryable,
         },
         errorCode: appError.code,
       });
-      // Still return 200 — the data can be fetched on the next scheduled pull
     }
 
     return NextResponse.json({ received: true });
@@ -211,7 +302,6 @@ export async function POST(req: NextRequest) {
       },
       errorCode: appError.code,
     });
-    // Return 200 even on error to prevent utility from retrying endlessly
     return NextResponse.json({ received: true });
   }
 }

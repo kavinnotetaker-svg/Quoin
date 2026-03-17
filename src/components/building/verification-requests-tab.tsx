@@ -203,7 +203,7 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
   }
 
   const btnClass =
-    "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50";
+    "rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50";
 
   return (
     <div className="space-y-6">
@@ -216,7 +216,7 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
               type="number"
               value={reportingYear}
               onChange={(event) => setReportingYear(Number(event.target.value))}
-              className="w-28 rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] font-medium text-zinc-900 shadow-sm"
+              className="w-28 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-900 shadow-sm"
             />
             <button
               className={btnClass}
@@ -295,29 +295,29 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
         />
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-5 text-sm">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-5 text-sm">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-zinc-900">Current packet state</span>
+              <span className="font-semibold text-slate-900">Current packet state</span>
               <StatusBadge
                 label={packetStatusDisplay.label}
                 tone={packetStatusDisplay.tone}
               />
             </div>
-            <p className="mt-2 text-[13px] text-zinc-600">
+            <p className="mt-2 text-[13px] text-slate-600">
               {latestPacket.data
                 ? `Latest packet generated ${formatDate(latestPacket.data.generatedAt)}. Finalize only after blockers are resolved and required support is verified.`
                 : "No benchmark verification packet exists yet for this reporting year."}
             </p>
           </div>
 
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-5 text-sm">
-            <div className="font-semibold text-zinc-900">Warnings and blockers</div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-5 text-sm">
+            <div className="font-semibold text-slate-900">Warnings and blockers</div>
             {manifestWarnings.length === 0 && manifestBlockers.length === 0 ? (
-              <p className="mt-2 text-[13px] text-zinc-600">
+              <p className="mt-2 text-[13px] text-slate-600">
                 No packet warnings are currently recorded.
               </p>
             ) : (
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-zinc-700">
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-slate-700">
                 {manifestBlockers.map((item, index) => (
                   <li key={`blocker-${index}`} className="text-red-700">
                     {String(item)}
@@ -346,11 +346,11 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
               {requestItems.data.map((item) => {
                 const statusDisplay = getRequestItemStatusDisplay(item.status);
                 return (
-                  <div key={item.id} className="rounded-xl border border-zinc-200 p-4">
+                  <div key={item.id} className="rounded-xl border border-slate-200 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-zinc-900">{item.title}</div>
-                        <div className="mt-1 text-[13px] text-zinc-500">
+                        <div className="font-semibold text-slate-900">{item.title}</div>
+                        <div className="mt-1 text-[13px] text-slate-500">
                           {REQUEST_CATEGORIES.find((entry) => entry.value === item.category)?.label ??
                             item.category}
                           {item.isRequired ? " • Required" : " • Optional"}
@@ -362,14 +362,14 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
                           tone={statusDisplay.tone}
                         />
                         <button
-                          className="text-[12px] font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-4"
+                          className="text-[12px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-4"
                           onClick={() => hydrateEditor(item)}
                         >
                           Edit
                         </button>
                       </div>
                     </div>
-                    <div className="mt-3 grid gap-2 text-[13px] text-zinc-600 md:grid-cols-2">
+                    <div className="mt-3 grid gap-2 text-[13px] text-slate-600 md:grid-cols-2">
                       <div>Due: {formatDate(item.dueDate)}</div>
                       <div>Requested from: {item.requestedFrom ?? "—"}</div>
                       <div>Assigned to: {item.assignedTo ?? "—"}</div>
@@ -379,7 +379,7 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
                       </div>
                     </div>
                     {item.notes ? (
-                      <p className="mt-3 text-[13px] leading-relaxed text-zinc-700">{item.notes}</p>
+                      <p className="mt-3 text-[13px] leading-relaxed text-slate-700">{item.notes}</p>
                     ) : null}
                   </div>
                 );
@@ -413,7 +413,7 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
               });
             }}
           >
-            <label className="block text-[13px] font-medium text-zinc-700">
+            <label className="block text-[13px] font-medium text-slate-700">
               Category
               <select
                 value={category}
@@ -426,7 +426,7 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
                     setTitle(selected?.label ?? event.target.value);
                   }
                 }}
-                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-[13px]"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
               >
                 {REQUEST_CATEGORIES.map((item) => (
                   <option key={item.value} value={item.value}>
@@ -436,24 +436,24 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
               </select>
             </label>
 
-            <label className="block text-[13px] font-medium text-zinc-700">
+            <label className="block text-[13px] font-medium text-slate-700">
               Title
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-[13px]"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
               />
             </label>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="block text-[13px] font-medium text-zinc-700">
+              <label className="block text-[13px] font-medium text-slate-700">
                 Status
                 <select
                   value={status}
                   onChange={(event) =>
                     setStatus(event.target.value as (typeof REQUEST_STATUSES)[number])
                   }
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-[13px]"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
                 >
                   {REQUEST_STATUSES.map((item) => (
                     <option key={item} value={item}>
@@ -463,38 +463,38 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
                 </select>
               </label>
 
-              <label className="block text-[13px] font-medium text-zinc-700">
+              <label className="block text-[13px] font-medium text-slate-700">
                 Due date
                 <input
                   type="date"
                   value={dueDate}
                   onChange={(event) => setDueDate(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-[13px]"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
                 />
               </label>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="block text-[13px] font-medium text-zinc-700">
+              <label className="block text-[13px] font-medium text-slate-700">
                 Requested from
                 <input
                   value={requestedFrom}
                   onChange={(event) => setRequestedFrom(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-[13px]"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
                 />
               </label>
 
-              <label className="block text-[13px] font-medium text-zinc-700">
+              <label className="block text-[13px] font-medium text-slate-700">
                 Assigned to
                 <input
                   value={assignedTo}
                   onChange={(event) => setAssignedTo(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-[13px]"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
                 />
               </label>
             </div>
 
-            <label className="flex items-center gap-2 text-[13px] font-medium text-zinc-700">
+            <label className="flex items-center gap-2 text-[13px] font-medium text-slate-700">
               <input
                 type="checkbox"
                 checked={isRequired}
@@ -503,13 +503,13 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
               Required for verification readiness
             </label>
 
-            <label className="block text-[13px] font-medium text-zinc-700">
+            <label className="block text-[13px] font-medium text-slate-700">
               Notes
               <textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 rows={4}
-                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-[13px]"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
               />
             </label>
 
@@ -517,7 +517,7 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
               <button
                 type="submit"
                 disabled={upsertMutation.isPending}
-                className="rounded-md bg-zinc-900 px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+                className="rounded-md bg-slate-900 px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
               >
                 {upsertMutation.isPending
                   ? "Saving..."
@@ -560,13 +560,13 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
               return (
                 <div
                   key={packet.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 p-4"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
                 >
                   <div>
-                    <div className="font-semibold text-zinc-900">
+                    <div className="font-semibold text-slate-900">
                       Reporting year {packet.reportingYear} • v{packet.version}
                     </div>
-                    <div className="mt-1 text-[13px] text-zinc-500">
+                    <div className="mt-1 text-[13px] text-slate-500">
                       Generated {formatDate(packet.generatedAt)}
                     </div>
                   </div>

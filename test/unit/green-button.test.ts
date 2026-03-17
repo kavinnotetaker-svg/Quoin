@@ -132,7 +132,7 @@ describe("ESPI Parser", () => {
 
   it("throws on invalid XML without feed element", () => {
     expect(() => parseESPIXml("<root><data/></root>")).toThrow(
-      "Invalid ESPI XML: no <feed> element",
+      "Invalid ESPI XML payload: missing feed element.",
     );
   });
 
@@ -204,7 +204,7 @@ describe("Token Encryption", () => {
 
   it("fails on invalid encrypted format", () => {
     expect(() => decryptToken("not-valid-format", key)).toThrow(
-      "Invalid encrypted token format",
+      "Invalid encrypted Green Button token format.",
     );
   });
 

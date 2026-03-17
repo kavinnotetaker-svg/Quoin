@@ -25,8 +25,8 @@ export function WizardShell({ currentStep, children }: WizardShellProps) {
                     isCompleted
                       ? "bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm"
                       : isCurrent
-                        ? "bg-zinc-900 text-white shadow-md ring-4 ring-zinc-900/10 scale-110"
-                        : "border border-zinc-200 bg-white text-zinc-400"
+                        ? "bg-slate-900 text-white shadow-md ring-4 ring-slate-900/10 scale-110"
+                        : "border border-slate-200 bg-white text-slate-400"
                   }`}
                 >
                   {isCompleted ? (
@@ -37,7 +37,7 @@ export function WizardShell({ currentStep, children }: WizardShellProps) {
                 </div>
                 <span
                   className={`mt-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 ${
-                    isCurrent ? "text-zinc-900" : isCompleted ? "text-emerald-700" : "text-zinc-400"
+                    isCurrent ? "text-slate-900" : isCompleted ? "text-emerald-700" : "text-slate-400"
                   }`}
                 >
                   {label}
@@ -47,7 +47,7 @@ export function WizardShell({ currentStep, children }: WizardShellProps) {
                 <div className="flex-1 mx-2 sm:mx-4 flex items-center mb-6">
                   <div
                     className={`h-px w-full transition-colors duration-500 ${
-                      step < currentStep ? "bg-emerald-200" : "bg-zinc-200"
+                      step < currentStep ? "bg-emerald-200" : "bg-slate-200"
                     }`}
                   />
                 </div>
@@ -58,7 +58,7 @@ export function WizardShell({ currentStep, children }: WizardShellProps) {
       </div>
 
       {/* Step content */}
-      <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 sm:p-10 shadow-sm">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-sm">
         {children}
       </div>
     </div>

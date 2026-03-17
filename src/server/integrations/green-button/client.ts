@@ -1,5 +1,9 @@
 import type { GreenButtonTokens, GreenButtonReading } from "./types";
 import { parseESPIXml } from "./espi-parser";
+import {
+  createNonRetryableIntegrationError,
+  createRetryableIntegrationError,
+} from "@/server/lib/errors";
 
 const TIMEOUT_MS = 30_000;
 
@@ -11,7 +15,10 @@ export async function fetchSubscriptionData(
   tokens: GreenButtonTokens,
 ): Promise<GreenButtonReading[]> {
   if (!tokens.resourceUri || !tokens.subscriptionId) {
-    throw new Error("No subscription URI available");
+    throw createNonRetryableIntegrationError(
+      "GREEN_BUTTON",
+      "No Green Button subscription URI is available.",
+    );
   }
 
   const batchUrl = `${tokens.resourceUri}/Batch/Subscription/${tokens.subscriptionId}`;
@@ -48,12 +55,41 @@ async function fetchESPIData(
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(
-        `Green Button fetch failed (${response.status}): ${text}`,
+      const ErrorCtor =
+        response.status === 429 || response.status >= 500
+          ? createRetryableIntegrationError
+          : createNonRetryableIntegrationError;
+      throw ErrorCtor(
+        "GREEN_BUTTON",
+        `Green Button fetch failed (${response.status}).`,
+        {
+          httpStatus: response.status,
+          details: {
+            url,
+            responseBody: text.slice(0, 500),
+          },
+        },
       );
     }
 
     return await response.text();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw createRetryableIntegrationError(
+        "GREEN_BUTTON",
+        "Green Button fetch timed out.",
+        {
+          httpStatus: 504,
+          details: {
+            url,
+            timeoutMs: TIMEOUT_MS,
+          },
+          cause: error,
+        },
+      );
+    }
+
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

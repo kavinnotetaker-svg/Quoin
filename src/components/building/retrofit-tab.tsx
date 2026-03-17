@@ -61,8 +61,8 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
     return <ErrorState message="Retrofit ranking is unavailable." detail={error?.message} />;
   }
 
-  const inputClass = "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors";
-  const labelClass = "mb-1.5 block text-[13px] font-medium text-zinc-700";
+  const inputClass = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 transition-colors";
+  const labelClass = "mb-1.5 block text-[13px] font-medium text-slate-700";
 
   return (
     <div className="space-y-6">
@@ -101,7 +101,7 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
             <input value={estimatedImplementationMonths} onChange={(event) => setEstimatedImplementationMonths(event.target.value)} className={inputClass} placeholder="0" />
           </label>
         </div>
-        <div className="mt-6 pt-5 border-t border-zinc-100 flex justify-end">
+        <div className="mt-6 pt-5 border-t border-slate-100 flex justify-end">
           <button
             onClick={() =>
               createCandidate.mutate({
@@ -117,7 +117,7 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
               })
             }
             disabled={createCandidate.isPending}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50"
+            className="rounded-md bg-slate-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-slate-800 disabled:opacity-50"
           >
             {createCandidate.isPending ? "Saving..." : "Save retrofit candidate"}
           </button>
@@ -131,17 +131,17 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
           ) : (
             <div className="space-y-3">
               {candidates.data.map((candidate) => (
-                <div key={candidate.id} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
-                  <div className="font-semibold text-[15px] tracking-tight text-zinc-900">{candidate.name}</div>
-                  <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
-                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.projectType}</span>
-                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.status}</span>
-                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.confidenceBand}</span>
+                <div key={candidate.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+                  <div className="font-semibold text-[15px] tracking-tight text-slate-900">{candidate.name}</div>
+                  <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.projectType}</span>
+                    <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.status}</span>
+                    <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.confidenceBand}</span>
                   </div>
-                  <div className="mt-4 grid gap-3 text-[13px] text-zinc-600 font-medium sm:grid-cols-3">
-                    <div>Capex: <span className="text-zinc-900">{formatMoney(candidate.estimatedCapex)}</span></div>
-                    <div>Savings: <span className="text-zinc-900">{formatMoney(candidate.estimatedAnnualSavingsUsd)}</span></div>
-                    <div>BEPS: <span className="text-zinc-900">{formatNumber(candidate.estimatedBepsImprovementPct)}%</span></div>
+                  <div className="mt-4 grid gap-3 text-[13px] text-slate-600 font-medium sm:grid-cols-3">
+                    <div>Capex: <span className="text-slate-900">{formatMoney(candidate.estimatedCapex)}</span></div>
+                    <div>Savings: <span className="text-slate-900">{formatMoney(candidate.estimatedAnnualSavingsUsd)}</span></div>
+                    <div>BEPS: <span className="text-slate-900">{formatNumber(candidate.estimatedBepsImprovementPct)}%</span></div>
                   </div>
                 </div>
               ))}
@@ -155,21 +155,21 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
           ) : (
             <div className="space-y-3">
               {rankings.data.map((ranking) => (
-                <div key={ranking.candidateId} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+                <div key={ranking.candidateId} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="font-semibold text-[15px] tracking-tight text-zinc-900">{ranking.name}</div>
+                    <div className="font-semibold text-[15px] tracking-tight text-slate-900">{ranking.name}</div>
                     <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md shadow-sm">{ranking.priorityBand}</div>
                   </div>
-                  <div className="mt-4 grid gap-3 text-[13px] text-zinc-600 font-medium sm:grid-cols-2">
-                    <div>Priority score: <span className="text-zinc-900">{ranking.priorityScore}</span></div>
-                    <div>Avoided penalty: <span className="text-zinc-900">{formatMoney(ranking.estimatedAvoidedPenalty)}</span></div>
-                    <div>Net cost: <span className="text-zinc-900">{formatMoney(ranking.netProjectCost)}</span></div>
-                    <div>Payback: <span className="text-zinc-900">{ranking.paybackProxyYears ?? "—"} years</span></div>
+                  <div className="mt-4 grid gap-3 text-[13px] text-slate-600 font-medium sm:grid-cols-2">
+                    <div>Priority score: <span className="text-slate-900">{ranking.priorityScore}</span></div>
+                    <div>Avoided penalty: <span className="text-slate-900">{formatMoney(ranking.estimatedAvoidedPenalty)}</span></div>
+                    <div>Net cost: <span className="text-slate-900">{formatMoney(ranking.netProjectCost)}</span></div>
+                    <div>Payback: <span className="text-slate-900">{ranking.paybackProxyYears ?? "—"} years</span></div>
                   </div>
                   {ranking.reasonCodes.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-zinc-100 flex flex-wrap gap-2">
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2">
                       {ranking.reasonCodes.map((reasonCode) => (
-                        <span key={reasonCode} className="rounded-md bg-zinc-50 border border-zinc-200 shadow-sm px-2 py-1 text-[11px] font-semibold text-zinc-600">
+                        <span key={reasonCode} className="rounded-md bg-slate-50 border border-slate-200 shadow-sm px-2 py-1 text-[11px] font-semibold text-slate-600">
                           {reasonCode}
                         </span>
                       ))}

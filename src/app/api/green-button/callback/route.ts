@@ -123,6 +123,12 @@ export async function GET(req: NextRequest) {
     });
 
   await writeAudit({
+    action: "green_button.callback.received",
+    inputSnapshot: {
+      buildingId,
+    },
+  });
+  await writeAudit({
     action: "green_button.callback.started",
     inputSnapshot: {
       buildingId,
@@ -195,7 +201,25 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    await writeAudit({
+      action: "green_button.callback.external_request.started",
+      inputSnapshot: {
+        buildingId,
+        externalService: "GREEN_BUTTON_OAUTH",
+      },
+    });
     const tokens = await exchangeCodeForTokens(config, code);
+    await writeAudit({
+      action: "green_button.callback.external_request.succeeded",
+      inputSnapshot: {
+        buildingId,
+        externalService: "GREEN_BUTTON_OAUTH",
+      },
+      outputSnapshot: {
+        subscriptionId: tokens.subscriptionId,
+        resourceUri: tokens.resourceUri,
+      },
+    });
 
     await tenant.tenantDb.greenButtonConnection.upsert({
       where: { buildingId },
@@ -244,6 +268,17 @@ export async function GET(req: NextRequest) {
     );
   } catch (err) {
     const appError = toAppError(err);
+    await writeAudit({
+      action: "green_button.callback.external_request.failed",
+      inputSnapshot: {
+        buildingId,
+        externalService: "GREEN_BUTTON_OAUTH",
+      },
+      outputSnapshot: {
+        retryable: appError.retryable,
+      },
+      errorCode: appError.code,
+    });
     jobLogger.error("Green Button callback failed", {
       error: appError,
       retryable: appError.retryable,

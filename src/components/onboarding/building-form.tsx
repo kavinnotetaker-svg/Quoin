@@ -83,8 +83,8 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
     });
   }
 
-  const inputClass = "mt-1.5 block w-full rounded-lg border border-zinc-300 px-4 py-3 text-[15px] text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-shadow";
-  const labelClass = "block text-[13px] font-semibold tracking-wide text-zinc-700";
+  const inputClass = "mt-1.5 block w-full rounded-lg border border-slate-300 px-4 py-3 text-[15px] text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-shadow";
+  const labelClass = "block text-[13px] font-semibold tracking-wide text-slate-700";
   const errorClass = "mt-1.5 text-xs font-medium text-red-600";
 
   return (
@@ -194,7 +194,7 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
       {/* Year built */}
       <div>
         <label htmlFor="bld-year" className={labelClass}>
-          Year built <span className="text-zinc-400 font-medium">(optional)</span>
+          Year built <span className="text-slate-400 font-medium">(optional)</span>
         </label>
         <input
           id="bld-year"
@@ -211,7 +211,7 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
       {/* ESPM Property ID (optional) */}
       <div>
         <label htmlFor="bld-espm" className={labelClass}>
-          ESPM Property ID <span className="text-zinc-400 font-medium">(optional)</span>
+          ESPM Property ID <span className="text-slate-400 font-medium">(optional)</span>
         </label>
         <input
           id="bld-espm"
@@ -222,18 +222,18 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
           placeholder="e.g., 88762425"
           className={inputClass}
         />
-        <p className="mt-2 text-xs text-zinc-500 leading-relaxed font-medium">
+        <p className="mt-2 text-xs text-slate-500 leading-relaxed font-medium">
           Find this in your ENERGY STAR Portfolio Manager account under property details.
         </p>
       </div>
 
       {/* Target score (auto-populated, read-only) */}
-      <div className="rounded-lg bg-zinc-50/80 p-4 border border-zinc-200">
-        <p className="text-[13px] text-zinc-600">
-          <span className="font-semibold text-zinc-900">BEPS Cycle 1 target score:</span>{" "}
-          <span className="font-bold text-zinc-900">{targetScore}</span>
+      <div className="rounded-lg bg-slate-50/80 p-4 border border-slate-200">
+        <p className="text-[13px] text-slate-600">
+          <span className="font-semibold text-slate-900">BEPS Cycle 1 target score:</span>{" "}
+          <span className="font-bold text-slate-900">{targetScore}</span>
         </p>
-        <p className="mt-1 text-xs font-medium text-zinc-500">
+        <p className="mt-1 text-xs font-medium text-slate-500">
           Based on DC BEPS regulations for {PROPERTY_TYPE_LABELS[propertyType] ?? propertyType} properties.
         </p>
       </div>
@@ -241,7 +241,7 @@ export function BuildingForm({ onSubmit, loading }: BuildingFormProps) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-zinc-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-zinc-800 transition-all disabled:opacity-50 active:scale-[0.98] mt-2"
+        className="w-full rounded-lg bg-slate-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-slate-800 transition-all disabled:opacity-50 active:scale-[0.98] mt-2"
       >
         {loading ? "Adding…" : "Add building"}
       </button>

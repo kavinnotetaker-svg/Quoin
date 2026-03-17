@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 export function LoadingState() {
   return (
     <div className="overflow-hidden rounded-md">
-      <div className="loading-bar h-1 w-1/3 bg-zinc-300" />
+      <div className="loading-bar h-1 w-1/3 bg-slate-300" />
     </div>
   );
 }
@@ -37,7 +37,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 p-8 text-center text-sm text-zinc-500">
+    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-8 text-center text-sm text-slate-500">
       <p className="font-medium">{message}</p>
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
@@ -56,11 +56,11 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+    <section className="card-machined p-6 transition-all duration-200 hover:shadow-md">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold tracking-tight text-zinc-900">{title}</h3>
-          {subtitle ? <p className="mt-1 text-[13px] text-zinc-500">{subtitle}</p> : null}
+          <h3 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h3>
+          {subtitle ? <p className="mt-1 text-[13px] text-slate-500">{subtitle}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
@@ -79,7 +79,7 @@ export function MetricGrid({
   }>;
 }) {
   const tones = {
-    default: "text-zinc-900",
+    default: "text-slate-900",
     danger: "text-red-700",
     warning: "text-amber-700",
     success: "text-emerald-700",
@@ -90,10 +90,10 @@ export function MetricGrid({
       {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:border-zinc-300"
+          className="card-machined p-5 transition-all duration-200 hover:shadow-md hover:border-slate-300"
         >
-          <p className="text-[13px] font-medium text-zinc-500">{item.label}</p>
-          <p className={`mt-2 text-2xl font-semibold tracking-tight ${tones[item.tone ?? "default"]}`}>
+          <p className="text-[13px] font-medium text-slate-500">{item.label}</p>
+          <p className={`mt-2 font-mono text-2xl font-semibold tracking-tight ${tones[item.tone ?? "default"]}`}>
             {item.value}
           </p>
         </div>

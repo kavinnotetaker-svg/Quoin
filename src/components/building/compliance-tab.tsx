@@ -24,7 +24,7 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
   if (historyLoading || buildingLoading) {
     return (
       <div className="overflow-hidden rounded-md">
-        <div className="loading-bar h-1 w-1/3 bg-zinc-300" />
+        <div className="loading-bar h-1 w-1/3 bg-slate-300" />
       </div>
     );
   }
@@ -86,8 +86,8 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
       {latestSnap && (
         <div className="grid gap-6 md:grid-cols-2">
           {/* Pathway Metrics */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-zinc-300">
-            <h3 className="text-lg font-semibold tracking-tight text-zinc-900 mb-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-slate-300">
+            <h3 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">
               Pathway: {pathway.replace("_", " ")}
             </h3>
 
@@ -95,20 +95,20 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
               <div className="space-y-5">
                 <div>
                   <div className="flex justify-between text-sm mb-1.5 font-medium">
-                    <span className="text-zinc-500">Current Score</span>
-                    <span className="text-zinc-900">{latestSnap.energyStarScore}</span>
+                    <span className="text-slate-500">Current Score</span>
+                    <span className="text-slate-900">{latestSnap.energyStarScore}</span>
                   </div>
-                  <div className="w-full bg-zinc-100 rounded-full h-2 overflow-hidden shadow-inner">
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
                     <div className="bg-blue-600 h-2 rounded-full transition-all duration-1000 ease-out" style={{ width: `${latestSnap.energyStarScore}%` }}></div>
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1.5 font-medium">
-                    <span className="text-zinc-500">Target Score</span>
-                    <span className="text-zinc-900">{building.bepsTargetScore}</span>
+                    <span className="text-slate-500">Target Score</span>
+                    <span className="text-slate-900">{building.bepsTargetScore}</span>
                   </div>
-                  <div className="w-full bg-zinc-100 rounded-full h-2 overflow-hidden shadow-inner">
-                    <div className="bg-zinc-400 h-2 rounded-full transition-all duration-1000 ease-out" style={{ width: `${building.bepsTargetScore}%` }}></div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
+                    <div className="bg-slate-400 h-2 rounded-full transition-all duration-1000 ease-out" style={{ width: `${building.bepsTargetScore}%` }}></div>
                   </div>
                 </div>
               </div>
@@ -118,16 +118,16 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-sm mb-1 font-medium">
-                    <span className="text-zinc-500">Current Adjusted Site EUI</span>
-                    <span className="text-zinc-900">{latestSnap.weatherNormalizedSiteEui?.toFixed(1) || 'N/A'}</span>
+                    <span className="text-slate-500">Current Adjusted Site EUI</span>
+                    <span className="text-slate-900">{latestSnap.weatherNormalizedSiteEui?.toFixed(1) || 'N/A'}</span>
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1 font-medium">
-                    <span className="text-zinc-500">Target Reduction (20%)</span>
-                    <span className="text-zinc-900">Required</span>
+                    <span className="text-slate-500">Target Reduction (20%)</span>
+                    <span className="text-slate-900">Required</span>
                   </div>
-                  <p className="text-[13px] text-zinc-500 mt-2 leading-relaxed">
+                  <p className="text-[13px] text-slate-500 mt-2 leading-relaxed">
                     This building scored {latestSnap.energyStarScore}, falling below the 55 threshold, so the 1-100 score gap is ignored.
                   </p>
                 </div>
@@ -135,15 +135,15 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
             )}
 
             {pathway === "COMPLIANT" && (
-              <p className="text-[13px] text-zinc-600 leading-relaxed font-medium">
+              <p className="text-[13px] text-slate-600 leading-relaxed font-medium">
                 This building has exceeded its target score. No further action needed.
               </p>
             )}
           </div>
 
           {/* Penalty Risk Gauge */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-zinc-300">
-            <h3 className="text-lg font-semibold tracking-tight text-zinc-900 mb-6">Penalty Risk Exposure</h3>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-slate-300">
+            <h3 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">Penalty Risk Exposure</h3>
             <div className="relative pt-1">
               <div className="flex mb-3 items-center justify-between">
                 <div>
@@ -163,7 +163,7 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
                   className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-500 transition-all duration-1000 ease-out"
                 ></div>
               </div>
-              <div className="flex justify-between text-xs font-medium text-zinc-500">
+              <div className="flex justify-between text-xs font-medium text-slate-500">
                 <span>$0</span>
                 <span>Max: ${maxPenaltyExposure.toLocaleString()}</span>
               </div>
@@ -173,46 +173,46 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
       )}
 
       {/* History Timeline */}
-      <div className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-        <h3 className="text-lg font-semibold tracking-tight text-zinc-900 mb-6">Compliance History</h3>
+      <div className="mt-10 rounded-xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+        <h3 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">Compliance History</h3>
 
         {!history || history.length === 0 ? (
-          <p className="py-10 text-center text-sm font-medium text-zinc-500 bg-zinc-50/50 rounded-lg border border-dashed border-zinc-200">
+          <p className="py-10 text-center text-sm font-medium text-slate-500 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
             No compliance snapshots yet. Upload data to generate one.
           </p>
         ) : (
           <div className="relative pl-6">
-            <div className="absolute bottom-0 left-[9px] top-2 w-[2px] rounded-full bg-zinc-100" />
+            <div className="absolute bottom-0 left-[9px] top-2 w-[2px] rounded-full bg-slate-100" />
             <div className="space-y-6">
               {history.map((snap) => {
                 const date = new Date(snap.snapshotDate);
                 return (
                   <div key={snap.id} className="relative">
-                    <div className="absolute -left-6 top-1.5 h-3 w-3 rounded-full border-[3px] border-white bg-zinc-300 shadow-sm" />
+                    <div className="absolute -left-6 top-1.5 h-3 w-3 rounded-full border-[3px] border-white bg-slate-300 shadow-sm" />
                     <div className="text-[13px] font-medium flex flex-wrap items-center gap-2">
-                      <span className="text-zinc-500 min-w-24">
+                      <span className="text-slate-500 min-w-24">
                         {date.toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
                         })}
                       </span>
-                      <span className="text-zinc-300 hidden sm:inline">—</span>
-                      <span className="text-zinc-700 bg-zinc-50 border border-zinc-100 px-2 py-0.5 rounded-md">
+                      <span className="text-slate-300 hidden sm:inline">—</span>
+                      <span className="text-slate-700 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">
                         Score: {snap.energyStarScore ?? "—"}
                       </span>
                       {snap.weatherNormalizedSiteEui != null && (
                         <>
-                          <span className="text-zinc-300 hidden sm:inline">|</span>
-                          <span className="text-zinc-700 bg-zinc-50 border border-zinc-100 px-2 py-0.5 rounded-md">
+                          <span className="text-slate-300 hidden sm:inline">|</span>
+                          <span className="text-slate-700 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">
                             Adj. Site EUI: {snap.weatherNormalizedSiteEui.toFixed(1)}
                           </span>
                         </>
                       )}
-                      <span className="text-zinc-300 hidden sm:inline">|</span>
+                      <span className="text-slate-300 hidden sm:inline">|</span>
                       <StatusDot status={snap.complianceStatus} />
-                      <span className="text-zinc-300 hidden sm:inline">|</span>
-                      <span className="text-zinc-400 text-[11px] uppercase tracking-wider font-semibold">
+                      <span className="text-slate-300 hidden sm:inline">|</span>
+                      <span className="text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
                         {TRIGGER_LABELS[snap.triggerType] ?? snap.triggerType}
                       </span>
                     </div>

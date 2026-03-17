@@ -478,11 +478,7 @@ export async function computeVerificationEvaluation(params: {
   }
 
   const utilityBillLinks = linksFromRequestCategories(context.requestItems, ["UTILITY_BILLS"]);
-  if (
-    !coverage.coverageComplete ||
-    coverage.missingCoverageStreams.length > 0 ||
-    coverage.overlapStreams.length > 0
-  ) {
+  if (coverage.verdict === "FAIL") {
     const reasons: string[] = [];
     if (coverage.missingCoverageStreams.length > 0) {
       reasons.push(`gaps in ${coverage.missingCoverageStreams.join(", ")}`);

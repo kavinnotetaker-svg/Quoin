@@ -67,6 +67,17 @@ export class ValidationError extends AppError {
   }
 }
 
+export class ContractValidationError extends AppError {
+  constructor(message: string, options: Omit<AppErrorOptions, "code"> = {}) {
+    super(message, {
+      code: "CONTRACT_VALIDATION_ERROR",
+      httpStatus: options.httpStatus ?? 400,
+      ...options,
+    });
+    this.name = "ContractValidationError";
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(message: string, options: Omit<AppErrorOptions, "code"> = {}) {
     super(message, {

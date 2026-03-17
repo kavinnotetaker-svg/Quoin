@@ -582,7 +582,7 @@ export function evaluateBenchmarkReadinessData(input: {
   });
   findings.push(propertyId.finding);
 
-  if (coverage.missingCoverageStreams.length > 0) {
+  if (coverage.verdict === "FAIL" && coverage.missingCoverageStreams.length > 0) {
     findings.push({
       code: BENCHMARK_FINDING_CODES.missingCoverage,
       status: "FAIL",
@@ -605,7 +605,7 @@ export function evaluateBenchmarkReadinessData(input: {
     });
   }
 
-  if (coverage.overlapStreams.length > 0) {
+  if (coverage.verdict === "FAIL" && coverage.overlapStreams.length > 0) {
     findings.push({
       code: BENCHMARK_FINDING_CODES.overlappingBills,
       status: "FAIL",

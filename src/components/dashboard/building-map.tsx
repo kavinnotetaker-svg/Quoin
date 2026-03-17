@@ -44,10 +44,10 @@ export function BuildingMap({ buildings }: BuildingMapProps) {
 
   if (!MAPBOX_TOKEN) {
     return (
-      <div className="flex items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50"
+      <div className="flex items-center justify-center rounded border border-dashed border-slate-300 bg-slate-50"
         style={{ height: "calc(100vh - 280px)", minHeight: "400px" }}
       >
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-500">
           Map unavailable — add MAPBOX_TOKEN to .env
         </p>
       </div>
@@ -120,10 +120,10 @@ export function BuildingMap({ buildings }: BuildingMapProps) {
             className="building-popup"
           >
             <div className="p-1">
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-sm font-medium text-slate-900">
                 {selected.name}
               </p>
-              <p className="mt-0.5 text-xs text-gray-500">
+              <p className="mt-0.5 text-xs text-slate-500">
                 Score:{" "}
                 {selected.latestSnapshot?.energyStarScore != null
                   ? selected.latestSnapshot.energyStarScore
@@ -135,7 +135,7 @@ export function BuildingMap({ buildings }: BuildingMapProps) {
               </p>
               <button
                 onClick={() => router.push(`/buildings/${selected.id}`)}
-                className="mt-1 text-xs text-gray-500 hover:text-gray-900"
+                className="mt-1 text-xs text-slate-500 hover:text-slate-900"
               >
                 View details →
               </button>

@@ -2,9 +2,16 @@ import crypto from "crypto";
 import type { GreenButtonConfig, GreenButtonTokens } from "./types";
 import { refreshAccessToken } from "./oauth";
 import { createLogger } from "@/server/lib/logger";
+import {
+  ConfigError,
+  createRetryableIntegrationError,
+  NotFoundError,
+  WorkflowStateError,
+} from "@/server/lib/errors";
 
 const ALGORITHM = "aes-256-gcm";
 const SALT = "quoin-gb-salt";
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 /**
  * Encrypt a token string for DB storage using AES-256-GCM.
@@ -29,7 +36,7 @@ export function decryptToken(
 ): string {
   const parts = encrypted.split(":");
   if (parts.length !== 3) {
-    throw new Error("Invalid encrypted token format");
+    throw new ConfigError("Invalid encrypted Green Button token format.");
   }
   const [ivHex, authTagHex, ciphertext] = parts;
   const key = crypto.scryptSync(encryptionKey, SALT, 32);
@@ -42,90 +49,123 @@ export function decryptToken(
   return decrypted;
 }
 
-/** Token refresh buffer — refresh 5 minutes before expiry. */
-const REFRESH_BUFFER_MS = 5 * 60 * 1000;
-
 /**
  * Get a valid access token for a building's Green Button connection.
- * Automatically refreshes if expired. Returns null if no connection exists.
+ * Refreshes the token when it is close to expiry and persists the new values.
  */
 export async function getValidToken(
-  buildingId: string,
-  config: GreenButtonConfig,
-  encryptionKey: string,
+  input: {
+    buildingId: string;
+    organizationId: string;
+    config: GreenButtonConfig;
+    encryptionKey: string;
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
-): Promise<GreenButtonTokens | null> {
+): Promise<GreenButtonTokens> {
   const logger = createLogger({
-    buildingId,
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
     integration: "GREEN_BUTTON",
   });
 
-  const building = await db.building.findUnique({
-    where: { id: buildingId },
+  const connection = await db.greenButtonConnection.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      buildingId: input.buildingId,
+    },
     select: {
-      greenButtonAccessToken: true,
-      greenButtonRefreshToken: true,
-      greenButtonTokenExpiresAt: true,
-      greenButtonSubscriptionId: true,
-      greenButtonResourceUri: true,
+      id: true,
+      status: true,
+      accessToken: true,
+      refreshToken: true,
+      tokenExpiresAt: true,
+      resourceUri: true,
+      subscriptionId: true,
     },
   });
 
-  if (!building?.greenButtonAccessToken || !building?.greenButtonRefreshToken) {
-    return null;
+  if (!connection) {
+    throw new NotFoundError("Green Button connection not found.");
   }
 
-  const accessToken = decryptToken(
-    building.greenButtonAccessToken,
-    encryptionKey,
-  );
-  const refreshToken = decryptToken(
-    building.greenButtonRefreshToken,
-    encryptionKey,
-  );
-  const expiresAt = building.greenButtonTokenExpiresAt;
+  if (connection.status !== "ACTIVE") {
+    throw new WorkflowStateError(
+      "Green Button connection is not active for ingestion.",
+      {
+        details: {
+          status: connection.status,
+          connectionId: connection.id,
+        },
+      },
+    );
+  }
 
-  // Token still valid (with buffer)
-  if (expiresAt && new Date(expiresAt) > new Date(Date.now() + REFRESH_BUFFER_MS)) {
+  if (!connection.accessToken || !connection.refreshToken) {
+    throw new WorkflowStateError(
+      "Green Button connection is missing stored OAuth tokens.",
+      {
+        details: {
+          connectionId: connection.id,
+        },
+      },
+    );
+  }
+
+  const accessToken = decryptToken(connection.accessToken, input.encryptionKey);
+  const refreshToken = decryptToken(connection.refreshToken, input.encryptionKey);
+  const expiresAt = connection.tokenExpiresAt;
+
+  if (
+    expiresAt &&
+    new Date(expiresAt).getTime() > Date.now() + REFRESH_BUFFER_MS
+  ) {
     return {
       accessToken,
       refreshToken,
       expiresAt: new Date(expiresAt),
       scope: "",
-      resourceUri: building.greenButtonResourceUri ?? "",
+      resourceUri: connection.resourceUri ?? "",
       authorizationUri: "",
-      subscriptionId: building.greenButtonSubscriptionId ?? "",
+      subscriptionId: connection.subscriptionId ?? "",
     };
   }
 
-  // Token expired — refresh
   try {
-    const newTokens = await refreshAccessToken(config, refreshToken);
+    const refreshed = await refreshAccessToken(input.config, refreshToken);
 
-    await db.building.update({
-      where: { id: buildingId },
+    await db.greenButtonConnection.update({
+      where: { id: connection.id },
       data: {
-        greenButtonAccessToken: encryptToken(
-          newTokens.accessToken,
-          encryptionKey,
-        ),
-        greenButtonRefreshToken: encryptToken(
-          newTokens.refreshToken,
-          encryptionKey,
-        ),
-        greenButtonTokenExpiresAt: newTokens.expiresAt,
-        greenButtonSubscriptionId: newTokens.subscriptionId,
-        greenButtonResourceUri: newTokens.resourceUri,
+        accessToken: encryptToken(refreshed.accessToken, input.encryptionKey),
+        refreshToken: encryptToken(refreshed.refreshToken, input.encryptionKey),
+        tokenExpiresAt: refreshed.expiresAt,
+        subscriptionId: refreshed.subscriptionId,
+        resourceUri: refreshed.resourceUri,
+        status: "ACTIVE",
       },
     });
 
-    return newTokens;
-  } catch (err) {
-    logger.error("Green Button token refresh failed", {
-      error: err,
-      operation: "token_refresh",
+    logger.info("Green Button access token refreshed", {
+      connectionId: connection.id,
+      subscriptionId: refreshed.subscriptionId,
     });
-    return null;
+
+    return refreshed;
+  } catch (error) {
+    logger.error("Green Button token refresh failed", {
+      error,
+      connectionId: connection.id,
+    });
+    throw createRetryableIntegrationError(
+      "GREEN_BUTTON",
+      "Green Button token refresh failed.",
+      {
+        details: {
+          connectionId: connection.id,
+        },
+        cause: error,
+      },
+    );
   }
 }

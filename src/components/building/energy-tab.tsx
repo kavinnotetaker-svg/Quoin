@@ -120,18 +120,18 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
   if (isLoading) {
     return (
       <div className="overflow-hidden">
-        <div className="loading-bar h-0.5 w-1/3 bg-zinc-300" />
+        <div className="loading-bar h-0.5 w-1/3 bg-slate-300" />
       </div>
     );
   }
 
   if (!rows || rows.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-        <svg className="mx-auto h-12 w-12 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+        <svg className="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
-        <p className="mt-3 text-sm text-zinc-500">
+        <p className="mt-3 text-sm text-slate-500">
           No energy data yet. Upload a CSV to get started.
         </p>
       </div>
@@ -178,12 +178,12 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
     : "";
   const freshness = latestDate ? relativeTime(latestDate) : null;
 
-  const inputClass = "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors";
+  const inputClass = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 transition-colors";
 
   return (
     <div className="space-y-6">
       {/* Chart */}
-      <div className="h-[260px] rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <div className="h-[260px] rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} barCategoryGap="25%">
             <XAxis
@@ -261,21 +261,21 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
 
       {/* Data freshness */}
       {freshness && (
-        <p className="text-xs font-medium text-zinc-500">
+        <p className="text-xs font-medium text-slate-500">
           <span
             className="mr-1.5 inline-block h-2 w-2 rounded-full shadow-sm ring-1 ring-white/50"
             style={{ backgroundColor: freshness.color }}
           />
-          {freshnessText} <span className="text-zinc-400 font-normal">({freshness.text})</span>
+          {freshnessText} <span className="text-slate-400 font-normal">({freshness.text})</span>
         </p>
       )}
 
       {/* Readings table */}
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50/50 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <tr className="border-b border-slate-200 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <th className="py-3 px-4">Period</th>
                 <th className="py-3 px-4">Fuel</th>
                 <th className="py-3 px-4 text-right">Consumption</th>
@@ -285,13 +285,13 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
+            <tbody className="divide-y divide-slate-100">
               {[...rows].reverse().slice(0, 50).map((r) => (
                 <tr
                   key={r.id}
-                  className="group hover:bg-zinc-50/50 transition-colors"
+                  className="group hover:bg-slate-50/50 transition-colors"
                 >
-                  <td className="py-3 px-4 font-medium text-zinc-700 whitespace-nowrap">
+                  <td className="py-3 px-4 font-medium text-slate-700 whitespace-nowrap">
                     {new Date(r.periodStart).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -305,21 +305,21 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
                       timeZone: "UTC",
                     })}
                   </td>
-                  <td className="py-3 px-4 text-xs font-medium text-zinc-500">
-                    <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 ring-1 ring-inset ring-zinc-500/10">
+                  <td className="py-3 px-4 text-xs font-medium text-slate-500">
+                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">
                       {r.meterType}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-right text-zinc-900 font-mono text-[12px]">
+                  <td className="py-3 px-4 text-right text-slate-900 font-mono text-[12px]">
                     {r.consumption.toLocaleString()} {r.unit}
                   </td>
-                  <td className="py-3 px-4 text-right text-zinc-900 font-mono text-[12px]">
+                  <td className="py-3 px-4 text-right text-slate-900 font-mono text-[12px]">
                     {Math.round(r.consumptionKbtu).toLocaleString()}
                   </td>
-                  <td className="py-3 px-4 text-right text-zinc-500 font-mono text-[12px]">
+                  <td className="py-3 px-4 text-right text-slate-500 font-mono text-[12px]">
                     {r.cost != null ? `$${r.cost.toLocaleString()}` : "—"}
                   </td>
-                  <td className="py-3 px-4 text-xs text-zinc-400 truncate max-w-[120px]">{r.source}</td>
+                  <td className="py-3 px-4 text-xs text-slate-400 truncate max-w-[120px]">{r.source}</td>
                   <td className="py-3 px-4 text-right">
                     <button
                       onClick={() => {
@@ -345,12 +345,12 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl ring-1 ring-black/5 animate-in zoom-in-95 duration-200">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-lg font-semibold tracking-tight text-zinc-900">
+                <h3 className="text-lg font-semibold tracking-tight text-slate-900">
                   Edit Energy Reading
                 </h3>
-                <p className="mt-1.5 text-[13px] text-zinc-500">
+                <p className="mt-1.5 text-[13px] text-slate-500">
                   Save a manual override for{" "}
-                  <strong className="font-medium text-zinc-700">
+                  <strong className="font-medium text-slate-700">
                     {new Date(editingReading.periodStart).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -370,7 +370,7 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
               </div>
               <button
                 onClick={() => setEditingReading(null)}
-                className="text-zinc-400 hover:text-zinc-600 transition-colors"
+                className="text-slate-400 hover:text-slate-600 transition-colors"
                 aria-label="Close"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -379,7 +379,7 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
 
             <div className="mt-6 space-y-4">
               <label className="block text-sm">
-                <span className="mb-1.5 block text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Consumption ({editingReading.unit})</span>
+                <span className="mb-1.5 block text-[11px] font-semibold tracking-wider text-slate-500 uppercase">Consumption ({editingReading.unit})</span>
                 <input
                   type="number"
                   min="0"
@@ -391,7 +391,7 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1.5 block text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Cost (optional)</span>
+                <span className="mb-1.5 block text-[11px] font-semibold tracking-wider text-slate-500 uppercase">Cost (optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -402,15 +402,15 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
                 />
               </label>
 
-              <label className="flex items-start gap-3 text-[13px] text-zinc-700 mt-2 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+              <label className="flex items-start gap-3 text-[13px] text-slate-700 mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
                 <input
                   type="checkbox"
                   checked={pushAfterSave}
                   onChange={(event) => setPushAfterSave(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                 />
                 <span className="leading-snug">
-                  Push updated local <strong className="font-medium text-zinc-900">electricity/gas data</strong> to Portfolio Manager after save
+                  Push updated local <strong className="font-medium text-slate-900">electricity/gas data</strong> to Portfolio Manager after save
                 </span>
               </label>
             </div>
@@ -418,14 +418,14 @@ export function EnergyTab({ buildingId }: EnergyTabProps) {
             <div className="mt-8 flex justify-end gap-3">
               <button
                 onClick={() => setEditingReading(null)}
-                className="rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => void handleSaveOverride()}
                 disabled={createOverride.isPending || pushLocalData.isPending}
-                className="rounded-md bg-zinc-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                className="rounded-md bg-slate-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 transition-colors"
               >
                 {createOverride.isPending || pushLocalData.isPending
                   ? "Saving..."

@@ -13,7 +13,7 @@ export function toneClasses(tone: StatusTone) {
     case "info":
       return "border-sky-200 bg-sky-50 text-sky-700";
     default:
-      return "border-zinc-200 bg-zinc-50 text-zinc-600";
+      return "border-slate-200 bg-slate-50 text-slate-600";
   }
 }
 
@@ -151,7 +151,7 @@ export function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${toneClasses(
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-mono font-semibold uppercase tracking-tight ${toneClasses(
         tone,
       )}`}
     >

@@ -15,6 +15,7 @@ describe("validateBenchmarkYearData", () => {
       2025,
     );
 
+    expect(result.verdict).toBe("FAIL");
     expect(result.missingMonths).toEqual([7, 8, 9, 10, 11, 12]);
     expect(result.issues.map((issue) => issue.details.issueType)).toEqual(
       expect.arrayContaining(["MISSING_MONTHS", "INCOMPLETE_TWELVE_MONTH_COVERAGE"]),
@@ -40,6 +41,7 @@ describe("validateBenchmarkYearData", () => {
       2025,
     );
 
+    expect(result.verdict).toBe("FAIL");
     expect(result.overlapStreams).toEqual(["meter:meter_1"]);
     expect(result.issues.map((issue) => issue.details.issueType)).toContain(
       "OVERLAPPING_PERIODS",
@@ -59,6 +61,7 @@ describe("validateBenchmarkYearData", () => {
       2025,
     );
 
+    expect(result.verdict).toBe("PASS");
     expect(result.coverageComplete).toBe(true);
     expect(result.missingMonths).toEqual([]);
     expect(result.issues).toHaveLength(0);

@@ -73,11 +73,11 @@ const PROPERTY_LABELS: Record<string, string> = {
 export function BuildingTable({ buildings }: { buildings: BuildingRow[] }) {
   if (buildings.length === 0) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 p-8 text-center">
-        <p className="text-sm font-medium text-zinc-900">
+      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
+        <p className="text-sm font-medium text-slate-900">
           No buildings in this portfolio yet
         </p>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-slate-500">
           Add a building to start benchmarking, BEPS review, and filing work.
         </p>
       </div>
@@ -85,11 +85,11 @@ export function BuildingTable({ buildings }: { buildings: BuildingRow[] }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+    <div className="overflow-hidden card-machined">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50/50">
-            <tr className="border-b border-zinc-200 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+          <thead className="bg-slate-50/50">
+            <tr className="border-b border-slate-200/60 text-xs font-semibold uppercase tracking-wider text-slate-500">
               <th className="px-6 py-3 font-medium">Building</th>
               <th className="px-6 py-3 font-medium text-right">Latest Score</th>
               <th className="px-6 py-3 font-medium">Compliance Outlook</th>
@@ -101,7 +101,7 @@ export function BuildingTable({ buildings }: { buildings: BuildingRow[] }) {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100">
+          <tbody className="divide-y divide-slate-100">
             {buildings.map((building) => {
               const snapshot = building.latestSnapshot;
               const penalty = formatPenalty(snapshot?.estimatedPenalty);
@@ -115,27 +115,27 @@ export function BuildingTable({ buildings }: { buildings: BuildingRow[] }) {
               return (
                 <tr
                   key={building.id}
-                  className="group transition-colors duration-200 hover:bg-zinc-50"
+                  className="group transition-colors duration-200 hover:bg-slate-50"
                 >
                   <td className="px-6 py-4">
                     <Link
                       href={`/buildings/${building.id}`}
-                      className="font-semibold text-zinc-900 transition-colors group-hover:text-amber-600"
+                      className="font-semibold text-slate-900 transition-colors group-hover:text-amber-600"
                     >
                       {building.name}
                     </Link>
-                    <div className="mt-1 text-[13px] text-zinc-500">
+                    <div className="mt-1 text-[13px] text-slate-500">
                       {PROPERTY_LABELS[building.propertyType] ??
                         building.propertyType}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="font-semibold text-zinc-900">
+                    <div className="font-mono font-medium text-slate-800">
                       {snapshot?.energyStarScore != null
                         ? snapshot.energyStarScore
-                        : "Not scored"}
+                        : "---"}
                     </div>
-                    <div className="mt-1 text-[12px] text-zinc-500">
+                    <div className="mt-1 text-[12px] text-slate-500">
                       {snapshot?.energyStarScore != null
                         ? "Most recent score"
                         : "Needs usable benchmark data"}
@@ -146,7 +146,7 @@ export function BuildingTable({ buildings }: { buildings: BuildingRow[] }) {
                       label={compliance.label}
                       tone={compliance.tone}
                     />
-                    <div className="mt-1 text-[12px] text-zinc-500">
+                    <div className="mt-1 text-[12px] text-slate-500">
                       {snapshot?.complianceStatus === "NON_COMPLIANT"
                         ? "Immediate follow-up needed"
                         : snapshot?.complianceStatus === "AT_RISK"
@@ -157,21 +157,21 @@ export function BuildingTable({ buildings }: { buildings: BuildingRow[] }) {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="font-semibold" style={{ color: penalty.color }}>
+                    <div className="font-mono font-medium" style={{ color: penalty.color }}>
                       {penalty.text}
                     </div>
-                    <div className="mt-1 text-[12px] text-zinc-500">
+                    <div className="mt-1 text-[12px] text-slate-500">
                       {penalty.note}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div
-                      className="font-semibold text-[13px]"
+                      className="font-mono font-medium text-[13px]"
                       style={{ color: freshness.color }}
                     >
                       {freshness.text}
                     </div>
-                    <div className="mt-1 text-[12px] text-zinc-500">
+                    <div className="mt-1 text-[12px] text-slate-500">
                       {freshness.note}
                     </div>
                   </td>

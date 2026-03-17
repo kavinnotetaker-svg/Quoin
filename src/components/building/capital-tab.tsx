@@ -16,7 +16,7 @@ const FUNDING_COLORS: Record<string, string> = {
   TAX_CREDIT: "#3b82f6", // blue-500
   LOAN: "#f59e0b", // amber-500
   CPACE: "#8b5cf6", // violet-500
-  EQUITY: "#71717a", // zinc-500
+  EQUITY: "#71717a", // slate-500
 };
 
 const PRIORITY_BADGE: Record<string, { bg: string; text: string }> = {
@@ -32,18 +32,18 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
   if (isLoading) {
     return (
       <div className="overflow-hidden">
-        <div className="loading-bar h-0.5 w-1/3 bg-zinc-300" />
+        <div className="loading-bar h-0.5 w-1/3 bg-slate-300" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-        <svg className="mx-auto h-12 w-12 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+        <svg className="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p className="py-4 text-sm text-zinc-500 font-medium tracking-tight">
+        <p className="py-4 text-sm text-slate-500 font-medium tracking-tight">
           Capital analysis unavailable. Ensure compliance data has been uploaded.
         </p>
       </div>
@@ -85,8 +85,8 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
       </div>
 
       {/* Capital Stack Waterfall */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-        <h3 className="text-lg font-semibold tracking-tight text-zinc-900 mb-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+        <h3 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">
           Capital Stack
         </h3>
         {waterfallData.length > 0 ? (
@@ -124,15 +124,15 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div className="py-8 text-center text-sm font-medium text-zinc-500 bg-zinc-50/50 rounded-lg border border-dashed border-zinc-200">
+          <div className="py-8 text-center text-sm font-medium text-slate-500 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
             No funding layers available.
           </div>
         )}
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-zinc-600 justify-center">
+        <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-slate-600 justify-center">
           {Object.entries(FUNDING_COLORS).map(([type, color]) => (
-            <div key={type} className="flex items-center gap-1.5 bg-zinc-50 px-2 py-1 rounded-md border border-zinc-100">
+            <div key={type} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
               <span
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: color }}
@@ -144,28 +144,28 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
       </div>
 
       {/* Funding Programs */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-        <h3 className="text-lg font-semibold tracking-tight text-zinc-900 mb-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+        <h3 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">
           Program Eligibility
         </h3>
         <div className="space-y-3">
           {data.eligibility.map((prog) => (
             <div
               key={prog.programCode}
-              className="flex items-start justify-between rounded-lg border border-zinc-100 bg-zinc-50 p-4 transition-colors hover:bg-zinc-100/50"
+              className="flex items-start justify-between rounded-lg border border-slate-100 bg-slate-50 p-4 transition-colors hover:bg-slate-100/50"
             >
               <div>
                 <div className="flex items-center gap-2">
                   <span
                     className={`inline-block h-2 w-2 rounded-full shadow-sm ring-1 ring-white/50 ${prog.eligible ? "bg-emerald-500" : "bg-red-400"}`}
                   />
-                  <span className="text-sm font-semibold text-zinc-900 tracking-tight">
+                  <span className="text-sm font-semibold text-slate-900 tracking-tight">
                     {prog.programName}
                   </span>
                 </div>
                 {prog.eligible && prog.maxFundingAmount !== null && (
-                  <p className="mt-1.5 text-xs text-zinc-600 ml-4 font-medium">
-                    Up to <span className="text-zinc-900">${prog.maxFundingAmount.toLocaleString()}</span>
+                  <p className="mt-1.5 text-xs text-slate-600 ml-4 font-medium">
+                    Up to <span className="text-slate-900">${prog.maxFundingAmount.toLocaleString()}</span>
                     {prog.interestRate !== null && ` at ${prog.interestRate}%`}
                     {prog.termYears !== null && ` / ${prog.termYears}yr`}
                   </p>
@@ -196,26 +196,26 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
       </div>
 
       {/* ECM Table */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
         <div className="flex flex-wrap items-baseline justify-between gap-4 mb-6">
-          <h3 className="text-lg font-semibold tracking-tight text-zinc-900">
+          <h3 className="text-lg font-semibold tracking-tight text-slate-900">
             Recommended ECMs
           </h3>
-          <p className="text-[13px] font-medium text-zinc-500 bg-zinc-50 px-2 py-1 rounded-md border border-zinc-100">
-            Pathway: <span className="text-zinc-900">{data.pathway.replace("_", " ")}</span> | Projected EUI:{" "}
-            <span className="text-zinc-900">{data.projectedSiteEui.toFixed(1)} kBtu/ft²</span>
+          <p className="text-[13px] font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+            Pathway: <span className="text-slate-900">{data.pathway.replace("_", " ")}</span> | Projected EUI:{" "}
+            <span className="text-slate-900">{data.projectedSiteEui.toFixed(1)} kBtu/ft²</span>
           </p>
         </div>
 
         {data.ecms.length === 0 ? (
-          <div className="py-10 text-center text-sm font-medium text-zinc-500 bg-zinc-50/50 rounded-lg border border-dashed border-zinc-200">
+          <div className="py-10 text-center text-sm font-medium text-slate-500 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
             No ECMs recommended for this building.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-200 text-left text-[12px] font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-50/50">
+                <tr className="border-b border-slate-200 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-wider bg-slate-50/50">
                   <th className="py-3 px-4 rounded-tl-lg">Measure</th>
                   <th className="py-3 px-4">Category</th>
                   <th className="py-3 px-4">Priority</th>
@@ -225,21 +225,21 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
                   <th className="py-3 px-4 text-right rounded-tr-lg">Score</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100">
+              <tbody className="divide-y divide-slate-100">
                 {data.ecms.map((ecm) => {
                   const badge = PRIORITY_BADGE[ecm.priority] ?? {
-                    bg: "bg-zinc-100",
-                    text: "text-zinc-800",
+                    bg: "bg-slate-100",
+                    text: "text-slate-800",
                   };
                   return (
                     <tr
                       key={ecm.id}
-                      className="transition-colors hover:bg-zinc-50/80"
+                      className="transition-colors hover:bg-slate-50/80"
                     >
-                      <td className="py-3 px-4 font-medium text-zinc-900">
+                      <td className="py-3 px-4 font-medium text-slate-900">
                         {ecm.name}
                       </td>
-                      <td className="py-3 px-4 text-[13px] text-zinc-600">
+                      <td className="py-3 px-4 text-[13px] text-slate-600">
                         {ecm.category}
                       </td>
                       <td className="py-3 px-4">
@@ -249,16 +249,16 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
                           {ecm.priority.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right text-[13px] font-medium text-zinc-700">
+                      <td className="py-3 px-4 text-right text-[13px] font-medium text-slate-700">
                         ${ecm.estimatedCost.toLocaleString()}
                       </td>
-                      <td className="py-3 px-4 text-right text-[13px] font-medium text-zinc-700">
+                      <td className="py-3 px-4 text-right text-[13px] font-medium text-slate-700">
                         {ecm.estimatedSavingsPct}%
                       </td>
-                      <td className="py-3 px-4 text-right text-[13px] font-medium text-zinc-700">
+                      <td className="py-3 px-4 text-right text-[13px] font-medium text-slate-700">
                         {ecm.simplePaybackYears}yr
                       </td>
-                      <td className="py-3 px-4 text-right text-[13px] font-medium text-zinc-700">
+                      <td className="py-3 px-4 text-right text-[13px] font-medium text-slate-700">
                         {ecm.relevanceScore}
                       </td>
                     </tr>
@@ -287,9 +287,9 @@ export function CapitalTab({ buildingId }: { buildingId: string }) {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
-      <p className="text-[12px] font-semibold text-zinc-500 uppercase tracking-wider">{label}</p>
-      <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">{value}</p>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+      <p className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">{label}</p>
+      <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
     </div>
   );
 }

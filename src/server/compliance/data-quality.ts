@@ -17,7 +17,17 @@ export interface CoverageIssue {
   days: number;
 }
 
+export const DATA_QUALITY_VERDICT = {
+  PASS: "PASS",
+  WARN: "WARN",
+  FAIL: "FAIL",
+} as const;
+
+export type DataQualityVerdict =
+  (typeof DATA_QUALITY_VERDICT)[keyof typeof DATA_QUALITY_VERDICT];
+
 export interface BenchmarkYearDataValidationResult {
+  verdict: DataQualityVerdict;
   coverageComplete: boolean;
   missingCoverageStreams: string[];
   overlapStreams: string[];
@@ -89,6 +99,7 @@ export function validateBenchmarkYearData(
   if (records.length === 0) {
     const allMonths = Array.from({ length: 12 }, (_, index) => index + 1);
     return {
+      verdict: DATA_QUALITY_VERDICT.FAIL,
       coverageComplete: false,
       missingCoverageStreams: ["all"],
       overlapStreams: [],
@@ -276,6 +287,10 @@ export function validateBenchmarkYearData(
   }
 
   return {
+    verdict:
+      issues.length === 0
+        ? DATA_QUALITY_VERDICT.PASS
+        : DATA_QUALITY_VERDICT.FAIL,
     coverageComplete:
       missingCoverageStreams.size === 0 && overlapStreams.size === 0,
     missingCoverageStreams: Array.from(missingCoverageStreams),

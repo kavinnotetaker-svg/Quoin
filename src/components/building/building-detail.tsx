@@ -68,14 +68,14 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
   if (isLoading) {
     return (
       <div className="overflow-hidden">
-        <div className="loading-bar h-0.5 w-1/3 bg-zinc-300" />
+        <div className="loading-bar h-0.5 w-1/3 bg-slate-300" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <p className="py-12 text-center text-sm text-zinc-500">
+      <p className="py-12 text-center text-sm text-slate-500">
         {error.data?.code === "NOT_FOUND"
           ? "Building not found."
           : "Something went wrong. Try refreshing."}
@@ -116,21 +116,21 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
         />
       ) : null}
 
-      <div className="flex flex-wrap gap-6 border-b border-zinc-200 text-[13px] font-medium">
+      <div className="flex flex-wrap gap-6 border-b border-slate-200 text-[13px] font-medium">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => !tab.disabled && handleTabChange(tab.key)}
             className={`border-b-2 pb-2.5 transition-colors duration-200 ${tab.disabled
-              ? "pointer-events-none border-transparent text-zinc-300"
+              ? "pointer-events-none border-transparent text-slate-300"
               : activeTab === tab.key
-                ? "border-zinc-900 text-zinc-900"
-                : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300"
+                ? "border-slate-900 text-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300"
               }`}
           >
             {tab.label}
             {tab.disabled && (
-              <span className="ml-1.5 inline-flex items-center rounded-sm bg-zinc-100 px-1 py-0.5 text-[10px] font-semibold text-zinc-500">
+              <span className="ml-1.5 inline-flex items-center rounded-sm bg-slate-100 px-1 py-0.5 text-[10px] font-semibold text-slate-500">
                 SOON
               </span>
             )}

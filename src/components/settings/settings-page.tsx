@@ -70,13 +70,13 @@ export function SettingsPage() {
           ) : (
             <div className="space-y-3">
               {rulePackages.data.map((pkg) => (
-                <div key={pkg.id} className="rounded border border-gray-200 px-3 py-3">
-                  <div className="font-medium text-gray-900">{pkg.key}</div>
-                  <div className="mt-1 text-xs text-gray-500">{pkg.name}</div>
+                <div key={pkg.id} className="rounded border border-slate-200 px-3 py-3">
+                  <div className="font-medium text-slate-900">{pkg.key}</div>
+                  <div className="mt-1 text-xs text-slate-500">{pkg.name}</div>
                   <div className="mt-2 space-y-2">
                     {pkg.versions.map((version) => (
-                      <div key={version.id} className="rounded bg-gray-50 px-3 py-2 text-xs text-gray-700">
-                        <div className="font-medium text-gray-900">
+                      <div key={version.id} className="rounded bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                        <div className="font-medium text-slate-900">
                           {version.version} • {version.status}
                         </div>
                         <div>Effective {formatDate(version.effectiveFrom)}</div>
@@ -99,15 +99,15 @@ export function SettingsPage() {
           ) : (
             <div className="space-y-3">
               {factorSets.data.map((factorSet) => (
-                <div key={factorSet.id} className="rounded border border-gray-200 px-3 py-3">
-                  <div className="font-medium text-gray-900">{factorSet.key}</div>
-                  <div className="mt-1 text-xs text-gray-500">
+                <div key={factorSet.id} className="rounded border border-slate-200 px-3 py-3">
+                  <div className="font-medium text-slate-900">{factorSet.key}</div>
+                  <div className="mt-1 text-xs text-slate-500">
                     {factorSet.version} • {factorSet.status}
                   </div>
-                  <div className="mt-2 text-xs text-gray-600">
+                  <div className="mt-2 text-xs text-slate-600">
                     Effective {formatDate(factorSet.effectiveFrom)}
                   </div>
-                  <div className="mt-1 text-xs text-gray-600">
+                  <div className="mt-1 text-xs text-slate-600">
                     Source {factorSet.sourceArtifact?.name ?? "None"}
                   </div>
                 </div>
@@ -127,7 +127,7 @@ export function SettingsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-xs text-gray-500">
+                <tr className="border-b border-slate-200 text-xs text-slate-500">
                   <th className="pb-2 pr-4 font-normal">Building</th>
                   <th className="pb-2 pr-4 font-normal">Reporting Year</th>
                   <th className="pb-2 pr-4 font-normal">PM sync</th>
@@ -137,10 +137,10 @@ export function SettingsPage() {
               </thead>
               <tbody>
                 {readiness.data.map((entry) => (
-                  <tr key={entry.building.id} className="border-b border-gray-100 last:border-0">
-                    <td className="py-2 pr-4 font-medium text-gray-900">{entry.building.name}</td>
-                    <td className="py-2 pr-4 text-gray-700">{entry.reportingYear}</td>
-                    <td className="py-2 pr-4 text-gray-700">
+                  <tr key={entry.building.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 pr-4 font-medium text-slate-900">{entry.building.name}</td>
+                    <td className="py-2 pr-4 text-slate-700">{entry.reportingYear}</td>
+                    <td className="py-2 pr-4 text-slate-700">
                       <div>
                         <StatusBadge
                           label={getSyncStatusDisplay(entry.syncState?.status ?? "NOT_STARTED").label}
@@ -148,12 +148,12 @@ export function SettingsPage() {
                         />
                       </div>
                       {entry.syncState?.diagnostics?.failedStep ? (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-slate-500">
                           Phase {String(entry.syncState.diagnostics.failedStep).toLowerCase()}
                         </div>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-4 text-gray-700">
+                    <td className="py-2 pr-4 text-slate-700">
                       <StatusBadge
                         label={getReadinessStatusDisplay(
                           entry.readiness &&
@@ -171,7 +171,7 @@ export function SettingsPage() {
                         ).tone}
                       />
                     </td>
-                    <td className="py-2 text-gray-700">
+                    <td className="py-2 text-slate-700">
                       {entry.benchmarkSubmission?.status ?? "Not started"}
                     </td>
                   </tr>

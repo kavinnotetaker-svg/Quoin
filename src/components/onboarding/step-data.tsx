@@ -71,8 +71,8 @@ export function StepData({ buildingId, onNext, onSkip }: StepDataProps) {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Upload utility data</h2>
-        <p className="mt-2 text-[15px] text-zinc-500 leading-relaxed">
+        <h2 className="text-xl font-semibold tracking-tight text-slate-900">Upload utility data</h2>
+        <p className="mt-2 text-[15px] text-slate-500 leading-relaxed">
           {buildingId
             ? "Upload a Pepco or EUDS CSV file. You can also do this later from the building detail page."
             : "You skipped adding a building. You can upload data later from the building detail page."}
@@ -83,28 +83,28 @@ export function StepData({ buildingId, onNext, onSkip }: StepDataProps) {
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
-        className="flex flex-col items-center rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50/50 p-10 text-center transition-colors hover:border-zinc-400 hover:bg-zinc-50"
+        className="flex flex-col items-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-10 text-center transition-colors hover:border-slate-400 hover:bg-slate-50"
       >
         {file ? (
           <div className="space-y-2">
-            <p className="text-[15px] font-semibold text-zinc-900">{file.name}</p>
-            <p className="text-[13px] font-medium text-zinc-500">
+            <p className="text-[15px] font-semibold text-slate-900">{file.name}</p>
+            <p className="text-[13px] font-medium text-slate-500">
               {(file.size / 1024).toFixed(1)} KB
             </p>
             <button
               type="button"
               onClick={() => { setFile(null); setResult(null); }}
-              className="mt-1 text-[13px] font-medium text-zinc-500 underline hover:text-zinc-800 transition-colors"
+              className="mt-1 text-[13px] font-medium text-slate-500 underline hover:text-slate-800 transition-colors"
             >
               Remove
             </button>
           </div>
         ) : (
           <>
-            <p className="text-[15px] text-zinc-600">
+            <p className="text-[15px] text-slate-600">
               Drag & drop a CSV file here, or
             </p>
-            <label className="mt-2 cursor-pointer text-[15px] font-semibold text-zinc-900 underline hover:text-zinc-700 transition-colors">
+            <label className="mt-2 cursor-pointer text-[15px] font-semibold text-slate-900 underline hover:text-slate-700 transition-colors">
               browse files
               <input
                 type="file"
@@ -127,15 +127,15 @@ export function StepData({ buildingId, onNext, onSkip }: StepDataProps) {
       )}
 
       {result && (
-        <div className="rounded-lg bg-zinc-50/80 p-4 border border-zinc-200 text-[13px]">
-          <p className="font-semibold text-zinc-900">
+        <div className="rounded-lg bg-slate-50/80 p-4 border border-slate-200 text-[13px]">
+          <p className="font-semibold text-slate-900">
             {result.readingsCreated} readings imported
           </p>
           {result.readingsRejected > 0 && (
-            <p className="mt-1 font-medium text-zinc-500">{result.readingsRejected} rejected</p>
+            <p className="mt-1 font-medium text-slate-500">{result.readingsRejected} rejected</p>
           )}
           {result.warnings.length > 0 && (
-            <ul className="mt-3 list-inside list-disc text-xs font-medium text-zinc-500 space-y-1">
+            <ul className="mt-3 list-inside list-disc text-xs font-medium text-slate-500 space-y-1">
               {result.warnings.map((w, i) => (
                 <li key={i}>{w}</li>
               ))}
@@ -150,7 +150,7 @@ export function StepData({ buildingId, onNext, onSkip }: StepDataProps) {
             type="button"
             onClick={handleUpload}
             disabled={uploading}
-            className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-zinc-800 transition-all disabled:opacity-50 active:scale-[0.98]"
+            className="flex-1 rounded-lg bg-slate-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-slate-800 transition-all disabled:opacity-50 active:scale-[0.98]"
           >
             {uploading ? "Uploading…" : "Upload"}
           </button>
@@ -159,7 +159,7 @@ export function StepData({ buildingId, onNext, onSkip }: StepDataProps) {
           <button
             type="button"
             onClick={onNext}
-            className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-zinc-800 transition-all active:scale-[0.98]"
+            className="flex-1 rounded-lg bg-slate-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-slate-800 transition-all active:scale-[0.98]"
           >
             Continue Pipeline
           </button>
@@ -169,7 +169,7 @@ export function StepData({ buildingId, onNext, onSkip }: StepDataProps) {
       <button
         type="button"
         onClick={onSkip}
-        className="w-full text-center text-[13px] font-medium text-zinc-500 hover:text-zinc-800 transition-colors"
+        className="w-full text-center text-[13px] font-medium text-slate-500 hover:text-slate-800 transition-colors"
       >
         Skip for now
       </button>

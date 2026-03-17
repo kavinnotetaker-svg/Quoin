@@ -41,10 +41,10 @@ export function ProvenanceTab({ buildingId }: { buildingId: string }) {
           ) : (
             <div className="space-y-3">
               {rulePackages.data.map((pkg) => (
-                <div key={pkg.id} className="rounded border border-gray-200 px-3 py-3">
-                  <div className="font-medium text-gray-900">{pkg.key}</div>
-                  <div className="mt-1 text-xs text-gray-500">{pkg.name}</div>
-                  <div className="mt-2 text-xs text-gray-600">
+                <div key={pkg.id} className="rounded border border-slate-200 px-3 py-3">
+                  <div className="font-medium text-slate-900">{pkg.key}</div>
+                  <div className="mt-1 text-xs text-slate-500">{pkg.name}</div>
+                  <div className="mt-2 text-xs text-slate-600">
                     {pkg.versions.map((version) => `${version.version} (${version.status})`).join(", ")}
                   </div>
                 </div>
@@ -59,12 +59,12 @@ export function ProvenanceTab({ buildingId }: { buildingId: string }) {
           ) : (
             <div className="space-y-3">
               {factorSets.data.map((factorSet) => (
-                <div key={factorSet.id} className="rounded border border-gray-200 px-3 py-3">
-                  <div className="font-medium text-gray-900">{factorSet.key}</div>
-                  <div className="mt-1 text-xs text-gray-500">
+                <div key={factorSet.id} className="rounded border border-slate-200 px-3 py-3">
+                  <div className="font-medium text-slate-900">{factorSet.key}</div>
+                  <div className="mt-1 text-xs text-slate-500">
                     {factorSet.version} • {factorSet.status}
                   </div>
-                  <div className="mt-1 text-xs text-gray-600">
+                  <div className="mt-1 text-xs text-slate-600">
                     Effective {formatDate(factorSet.effectiveFrom)}
                   </div>
                 </div>
@@ -80,15 +80,15 @@ export function ProvenanceTab({ buildingId }: { buildingId: string }) {
         ) : (
           <div className="space-y-3">
             {runs.data.map((run) => (
-              <div key={run.id} className="rounded border border-gray-200 px-3 py-3">
+              <div key={run.id} className="rounded border border-slate-200 px-3 py-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium text-gray-900">{run.runType}</div>
-                  <div className="text-xs text-gray-500">{run.status}</div>
+                  <div className="font-medium text-slate-900">{run.runType}</div>
+                  <div className="text-xs text-slate-500">{run.status}</div>
                 </div>
-                <div className="mt-1 text-xs text-gray-500">
+                <div className="mt-1 text-xs text-slate-500">
                   Executed {formatDate(run.executedAt)} • {run.ruleVersion.rulePackage.key} {run.ruleVersion.version}
                 </div>
-                <div className="mt-1 text-xs text-gray-600">
+                <div className="mt-1 text-xs text-slate-600">
                   Factor set {run.factorSetVersion.key} {run.factorSetVersion.version}
                 </div>
               </div>
@@ -104,12 +104,12 @@ export function ProvenanceTab({ buildingId }: { buildingId: string }) {
           ) : (
             <div className="space-y-3">
               {submissions.data.map((submission) => (
-                <div key={submission.id} className="rounded border border-gray-200 px-3 py-3">
-                  <div className="font-medium text-gray-900">
+                <div key={submission.id} className="rounded border border-slate-200 px-3 py-3">
+                  <div className="font-medium text-slate-900">
                     Reporting year {submission.reportingYear}
                   </div>
-                  <div className="mt-1 text-xs text-gray-500">{submission.status}</div>
-                  <div className="mt-1 text-xs text-gray-600">
+                  <div className="mt-1 text-xs text-slate-500">{submission.status}</div>
+                  <div className="mt-1 text-xs text-slate-600">
                     Rule {submission.ruleVersion.rulePackage.key} {submission.ruleVersion.version}
                   </div>
                 </div>
@@ -124,14 +124,14 @@ export function ProvenanceTab({ buildingId }: { buildingId: string }) {
           ) : (
             <div className="space-y-3">
               {filings.data.map((filing) => (
-                <div key={filing.id} className="rounded border border-gray-200 px-3 py-3">
-                  <div className="font-medium text-gray-900">
+                <div key={filing.id} className="rounded border border-slate-200 px-3 py-3">
+                  <div className="font-medium text-slate-900">
                     {filing.filingType} • {filing.status}
                   </div>
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-slate-500">
                     Filing year {filing.filingYear ?? "—"} • {formatDate(filing.createdAt)}
                   </div>
-                  <div className="mt-1 text-xs text-gray-600">
+                  <div className="mt-1 text-xs text-slate-600">
                     Evidence artifacts {filing.evidenceArtifacts.length}
                   </div>
                 </div>

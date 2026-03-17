@@ -1,9 +1,15 @@
+import { UnrecoverableError, type Job as QueueJob } from "bullmq";
 import { createWorker, QUEUES } from "@/server/lib/queue";
 import { createAuditLog } from "@/server/lib/audit-log";
 import { getTenantClient } from "@/server/lib/db";
-import { toAppError, WorkflowStateError } from "@/server/lib/errors";
+import {
+  ContractValidationError,
+  toAppError,
+  WorkflowStateError,
+} from "@/server/lib/errors";
 import {
   createJob,
+  JOB_STATUS,
   markCompleted,
   markDead,
   markFailed,
@@ -11,184 +17,280 @@ import {
 } from "@/server/lib/jobs";
 import { createLogger } from "@/server/lib/logger";
 import { runIngestionPipeline } from "./logic";
+import {
+  INGESTION_JOB_TYPE,
+  parseIngestionEnvelope,
+  peekIngestionEnvelopeContext,
+  type IngestionEnvelope,
+} from "./envelope";
 import { createESPMClient } from "@/server/integrations/espm";
+import { processGreenButtonNotificationEnvelope } from "./green-button";
 
-export interface DataIngestionJobData {
-  buildingId: string;
-  organizationId: string;
-  uploadBatchId: string;
-  triggerType: "CSV_UPLOAD" | "MANUAL" | "WEBHOOK" | "SCHEDULED";
+function shouldRetryJob(error: ReturnType<typeof toAppError>, attemptsMade: number, maxAttempts: number) {
+  return error.retryable && attemptsMade < maxAttempts;
+}
+
+function queueErrorForWorker(error: ReturnType<typeof toAppError>) {
+  if (error.retryable) {
+    return error;
+  }
+
+  return new UnrecoverableError(error.message);
+}
+
+export async function processDataIngestionQueueJob(job: QueueJob) {
+  const envelopeHint = peekIngestionEnvelopeContext(job.data);
+  const operationalJob = await createJob({
+    type:
+      typeof envelopeHint.jobType === "string"
+        ? `DATA_INGESTION_${envelopeHint.jobType}`
+        : "DATA_INGESTION_WORKER",
+    organizationId: envelopeHint.organizationId,
+    buildingId: envelopeHint.buildingId,
+    maxAttempts:
+      typeof job.opts.attempts === "number" ? job.opts.attempts : 3,
+  });
+  const runningJob = await markRunning(operationalJob.id);
+  const logger = createLogger({
+    requestId: envelopeHint.requestId,
+    jobId: operationalJob.id,
+    organizationId: envelopeHint.organizationId,
+    buildingId: envelopeHint.buildingId,
+    procedure: "dataIngestion.worker",
+  });
+  const writeAudit = (input: {
+    action: string;
+    inputSnapshot?: Record<string, unknown>;
+    outputSnapshot?: Record<string, unknown>;
+    errorCode?: string | null;
+  }) =>
+    createAuditLog({
+      actorType: "SYSTEM",
+      organizationId: envelopeHint.organizationId,
+      buildingId: envelopeHint.buildingId,
+      requestId: envelopeHint.requestId,
+      action: input.action,
+      inputSnapshot: {
+        queueJobId: String(job.id ?? ""),
+        workerJobId: operationalJob.id,
+        ...(input.inputSnapshot ?? {}),
+      },
+      outputSnapshot: input.outputSnapshot,
+      errorCode: input.errorCode ?? null,
+    }).catch((auditError) => {
+      logger.error("Data ingestion audit log persistence failed", {
+        error: auditError,
+        auditAction: input.action,
+      });
+      return null;
+    });
+
+  await writeAudit({
+    action: "data_ingestion.worker.received",
+    inputSnapshot: {
+      payloadVersion: envelopeHint.payloadVersion,
+      jobType: envelopeHint.jobType,
+    },
+  });
+
+  let envelope: IngestionEnvelope;
+  try {
+    envelope = parseIngestionEnvelope(job.data);
+  } catch (error) {
+    const appError = toAppError(error);
+    await markDead(runningJob.id, appError.message);
+    await writeAudit({
+      action: "data_ingestion.worker.dead_lettered",
+      outputSnapshot: {
+        retryable: false,
+        payloadVersion: envelopeHint.payloadVersion,
+        jobType: envelopeHint.jobType,
+      },
+      errorCode: appError.code,
+    });
+    logger.warn("Rejected ingestion payload contract", {
+      error: appError,
+      payloadVersion: envelopeHint.payloadVersion,
+      jobType: envelopeHint.jobType,
+    });
+    throw new UnrecoverableError(appError.message);
+  }
+
+  const scopedLogger = logger.child({
+    requestId: envelope.requestId,
+    organizationId: envelope.organizationId,
+    buildingId: envelope.buildingId,
+  });
+  const tenantDb = getTenantClient(envelope.organizationId);
+  let finalizedStatus: (typeof JOB_STATUS)[keyof typeof JOB_STATUS] | null = null;
+
+  await writeAudit({
+    action: "data_ingestion.worker.running",
+    inputSnapshot: {
+      jobType: envelope.jobType,
+      payloadVersion: envelope.payloadVersion,
+      sourceSystem: envelope.sourceSystem,
+    },
+  });
+
+  try {
+    let result:
+      | Awaited<ReturnType<typeof runIngestionPipeline>>
+      | Awaited<ReturnType<typeof processGreenButtonNotificationEnvelope>>;
+    let completionOutput: Record<string, unknown>;
+
+    if (envelope.jobType === INGESTION_JOB_TYPE.CSV_UPLOAD_PIPELINE) {
+      result = await runIngestionPipeline({
+        buildingId: envelope.buildingId,
+        organizationId: envelope.organizationId,
+        uploadBatchId: envelope.payload.uploadBatchId,
+        triggerType: envelope.payload.triggerType,
+        tenantDb,
+        espmClient: createESPMClient(),
+      });
+
+      if (!result.success) {
+        throw new WorkflowStateError(result.summary, {
+          details: {
+            errors: result.errors,
+            uploadBatchId: envelope.payload.uploadBatchId,
+          },
+        });
+      }
+
+      completionOutput = {
+        summary: result.summary,
+        snapshotId: result.snapshotId,
+        pipelineRunId: result.pipelineRunId,
+      };
+    } else if (envelope.jobType === INGESTION_JOB_TYPE.GREEN_BUTTON_NOTIFICATION) {
+      result = await processGreenButtonNotificationEnvelope({
+        envelope,
+        tenantDb,
+        logger: scopedLogger.child({
+          sourceSystem: envelope.sourceSystem,
+        }),
+        writeAudit,
+      });
+
+      if (
+        result.pipelineResult &&
+        result.pipelineResult.success === false
+      ) {
+        throw new WorkflowStateError(result.pipelineResult.summary, {
+          details: {
+            errors: result.pipelineResult.errors,
+            uploadBatchId: result.uploadBatchId,
+          },
+        });
+      }
+
+      completionOutput = {
+        uploadBatchId: result.uploadBatchId,
+        importedCount: result.importedCount,
+        updatedCount: result.updatedCount,
+        pipelineSummary: result.pipelineResult?.summary ?? null,
+        pipelineRunId: result.pipelineResult?.pipelineRunId ?? null,
+      };
+    } else {
+      throw new ContractValidationError("Unsupported ingestion job type.", {
+        details: {
+          jobType: (envelope as { jobType: string }).jobType,
+        },
+      });
+    }
+
+    await markCompleted(runningJob.id);
+    finalizedStatus = JOB_STATUS.COMPLETED;
+    await writeAudit({
+      action: "data_ingestion.worker.completed",
+      inputSnapshot: {
+        jobType: envelope.jobType,
+      },
+      outputSnapshot: completionOutput,
+    });
+
+    scopedLogger.info("Data ingestion job completed", {
+      jobType: envelope.jobType,
+    });
+    return result;
+  } catch (error) {
+    const appError = toAppError(error);
+    const retryable = shouldRetryJob(
+      appError,
+      runningJob.attempts,
+      runningJob.maxAttempts,
+    );
+
+    if (!finalizedStatus) {
+      if (retryable) {
+        await markFailed(runningJob.id, appError.message);
+        finalizedStatus = JOB_STATUS.FAILED;
+        await writeAudit({
+          action: "data_ingestion.worker.retry_scheduled",
+          inputSnapshot: {
+            jobType: envelope.jobType,
+          },
+          outputSnapshot: {
+            retryable: true,
+            attempts: runningJob.attempts,
+            maxAttempts: runningJob.maxAttempts,
+          },
+          errorCode: appError.code,
+        });
+      } else {
+        await markDead(runningJob.id, appError.message);
+        finalizedStatus = JOB_STATUS.DEAD;
+        await writeAudit({
+          action: "data_ingestion.worker.dead_lettered",
+          inputSnapshot: {
+            jobType: envelope.jobType,
+          },
+          outputSnapshot: {
+            retryable: false,
+            attempts: runningJob.attempts,
+            maxAttempts: runningJob.maxAttempts,
+          },
+          errorCode: appError.code,
+        });
+      }
+    }
+
+    scopedLogger.error("Data ingestion worker execution failed", {
+      error: appError,
+      retryable,
+      jobType: envelope.jobType,
+    });
+    throw queueErrorForWorker(appError);
+  }
 }
 
 export function startDataIngestionWorker() {
   const worker = createWorker(
     QUEUES.DATA_INGESTION,
-    async (job) => {
-      const data = job.data as DataIngestionJobData;
-      const operationalJob = await createJob({
-        type: "DATA_INGESTION",
-        organizationId: data.organizationId,
-        buildingId: data.buildingId,
-        maxAttempts:
-          typeof job.opts.attempts === "number" ? job.opts.attempts : 3,
-      });
-      const runningJob = await markRunning(operationalJob.id);
-      const logger = createLogger({
-        jobId: operationalJob.id,
-        organizationId: data.organizationId,
-        buildingId: data.buildingId,
-        procedure: "dataIngestion.worker",
-      });
-      const writeAudit = (input: {
-        action: string;
-        inputSnapshot?: Record<string, unknown>;
-        outputSnapshot?: Record<string, unknown>;
-        errorCode?: string | null;
-      }) =>
-        createAuditLog({
-          actorType: "SYSTEM",
-          organizationId: data.organizationId,
-          buildingId: data.buildingId,
-          action: input.action,
-          inputSnapshot: input.inputSnapshot,
-          outputSnapshot: input.outputSnapshot,
-          errorCode: input.errorCode ?? null,
-        }).catch((auditError) => {
-          logger.error("Data ingestion audit log persistence failed", {
-            error: auditError,
-            auditAction: input.action,
-          });
-          return null;
-        });
-
-      await writeAudit({
-        action: "data_ingestion.worker.started",
-        inputSnapshot: {
-          queueJobId: String(job.id ?? ""),
-          uploadBatchId: data.uploadBatchId,
-          triggerType: data.triggerType,
-        },
-      });
-      logger.info("Processing data ingestion job", {
-        triggerType: data.triggerType,
-        uploadBatchId: data.uploadBatchId,
-      });
-      let jobFinalized = false;
-      try {
-        const tenantDb = getTenantClient(data.organizationId);
-
-        const result = await runIngestionPipeline({
-          buildingId: data.buildingId,
-          organizationId: data.organizationId,
-          uploadBatchId: data.uploadBatchId,
-          triggerType: data.triggerType,
-          tenantDb,
-          espmClient: createESPMClient(),
-        });
-
-        if (!result.success) {
-          logger.error("Data ingestion job failed", {
-            summary: result.summary,
-            errors: result.errors,
-            espmSync: result.espmSync,
-          });
-          const error = new WorkflowStateError(result.summary, {
-            details: {
-              errors: result.errors,
-              uploadBatchId: data.uploadBatchId,
-            },
-          });
-          const appError = toAppError(error);
-          if (appError.retryable && runningJob.attempts < runningJob.maxAttempts) {
-            await markFailed(runningJob.id, appError.message);
-          } else {
-            await markDead(runningJob.id, appError.message);
-          }
-          jobFinalized = true;
-          await writeAudit({
-            action: "data_ingestion.worker.failed",
-            inputSnapshot: {
-              queueJobId: String(job.id ?? ""),
-              uploadBatchId: data.uploadBatchId,
-              triggerType: data.triggerType,
-            },
-            outputSnapshot: {
-              summary: result.summary,
-              pipelineRunId: result.pipelineRunId,
-              snapshotId: result.snapshotId,
-              retryable: appError.retryable,
-            },
-            errorCode: appError.code,
-          });
-          throw error;
-        }
-
-        await markCompleted(runningJob.id);
-        jobFinalized = true;
-        await writeAudit({
-          action: "data_ingestion.worker.succeeded",
-          inputSnapshot: {
-            queueJobId: String(job.id ?? ""),
-            uploadBatchId: data.uploadBatchId,
-            triggerType: data.triggerType,
-          },
-          outputSnapshot: {
-            summary: result.summary,
-            snapshotId: result.snapshotId,
-            pipelineRunId: result.pipelineRunId,
-          },
-        });
-        logger.info("Data ingestion job completed", {
-          summary: result.summary,
-          snapshotId: result.snapshotId,
-          pipelineRunId: result.pipelineRunId,
-        });
-        return result;
-      } catch (error) {
-        const appError = toAppError(error);
-        logger.error("Data ingestion worker execution threw", {
-          error: appError,
-        });
-        if (!jobFinalized) {
-          if (appError.retryable && runningJob.attempts < runningJob.maxAttempts) {
-            await markFailed(runningJob.id, appError.message);
-          } else {
-            await markDead(runningJob.id, appError.message);
-          }
-          await writeAudit({
-            action: "data_ingestion.worker.failed",
-            inputSnapshot: {
-              queueJobId: String(job.id ?? ""),
-              uploadBatchId: data.uploadBatchId,
-              triggerType: data.triggerType,
-            },
-            outputSnapshot: {
-              retryable: appError.retryable,
-            },
-            errorCode: appError.code,
-          });
-        }
-        throw error;
-      }
-    },
-    3, // concurrency per CLAUDE.md queue topology
+    async (job) => processDataIngestionQueueJob(job),
+    3,
   );
 
   worker.on("failed", (job, err) => {
+    const context = peekIngestionEnvelopeContext(job?.data);
     createLogger({
+      requestId: context.requestId,
       jobId: String(job?.id ?? ""),
-      organizationId: (job?.data as DataIngestionJobData | undefined)?.organizationId,
-      buildingId: (job?.data as DataIngestionJobData | undefined)?.buildingId,
+      organizationId: context.organizationId,
+      buildingId: context.buildingId,
       procedure: "dataIngestion.worker",
-    }).error("Data ingestion job permanently failed", {
+    }).error("Data ingestion queue job failed", {
       error: err,
+      queueState:
+        err instanceof UnrecoverableError ? "UNRECOVERABLE" : "RETRYABLE",
     });
   });
 
   worker.on("error", (err) => {
     createLogger({
       procedure: "dataIngestion.worker",
-    }).error("Data ingestion worker error", {
+    }).error("Data ingestion worker process error", {
       error: err,
     });
   });

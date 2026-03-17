@@ -491,6 +491,24 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       });
       return null;
     });
+  const writePhaseAudit = (input: {
+    action: string;
+    phase: PortfolioManagerSyncStep;
+    inputSnapshot?: Record<string, unknown>;
+    outputSnapshot?: Record<string, unknown>;
+    errorCode?: string | null;
+  }) =>
+    writeAudit({
+      action: input.action,
+      inputSnapshot: {
+        reportingYear,
+        syncPhase: input.phase,
+        jobId: job.id,
+        ...(input.inputSnapshot ?? {}),
+      },
+      outputSnapshot: input.outputSnapshot,
+      errorCode: input.errorCode ?? null,
+    });
 
   const completeOperationalJob = async (input: {
     status: PortfolioManagerSyncStatus;
@@ -504,7 +522,7 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
     try {
       await markCompleted(job.id);
       await writeAudit({
-        action: "portfolio_manager.sync.succeeded",
+        action: "portfolio_manager.sync.completed",
         inputSnapshot: {
           reportingYear,
         },
@@ -538,8 +556,30 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
     try {
       if (appError.retryable) {
         await markFailed(job.id, appError.message);
+        await writeAudit({
+          action: "portfolio_manager.sync.retry_scheduled",
+          inputSnapshot: {
+            reportingYear,
+            jobId: job.id,
+          },
+          outputSnapshot: {
+            retryable: true,
+          },
+          errorCode: appError.code,
+        });
       } else {
         await markDead(job.id, appError.message);
+        await writeAudit({
+          action: "portfolio_manager.sync.dead_lettered",
+          inputSnapshot: {
+            reportingYear,
+            jobId: job.id,
+          },
+          outputSnapshot: {
+            retryable: false,
+          },
+          errorCode: appError.code,
+        });
       }
 
       await writeAudit({
@@ -571,6 +611,14 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
     action: "portfolio_manager.sync.started",
     inputSnapshot: {
       reportingYear,
+      jobId: job.id,
+    },
+  });
+  await writeAudit({
+    action: "portfolio_manager.sync.running",
+    inputSnapshot: {
+      reportingYear,
+      jobId: job.id,
     },
   });
   let building;
@@ -791,10 +839,17 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
     };
   }
 
-  try {
     try {
-      const propertyResponse = await params.espmClient.property.getProperty(propertyId);
-      propertySnapshot = parsePortfolioManagerProperty(propertyResponse, propertyId);
+      try {
+        await writePhaseAudit({
+          action: "portfolio_manager.sync.external_request.started",
+          phase: "property",
+          inputSnapshot: {
+            propertyId,
+          },
+        });
+        const propertyResponse = await params.espmClient.property.getProperty(propertyId);
+        propertySnapshot = parsePortfolioManagerProperty(propertyResponse, propertyId);
 
       const buildingUpdate: Record<string, unknown> = {};
       if (
@@ -820,6 +875,16 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       }
 
       stepStatuses.property = "SUCCEEDED";
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.succeeded",
+        phase: "property",
+        inputSnapshot: {
+          propertyId,
+        },
+        outputSnapshot: {
+          propertyId: propertySnapshot.propertyId,
+        },
+      });
     } catch (error) {
       const detail = classifyPortfolioManagerError(error, "property");
       stepErrors.push(detail);
@@ -834,10 +899,28 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       stepStatuses.consumption = "SKIPPED";
       stepStatuses.metrics = "SKIPPED";
       stepStatuses.benchmarking = "SKIPPED";
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.failed",
+        phase: "property",
+        inputSnapshot: {
+          propertyId,
+        },
+        outputSnapshot: {
+          retryable: detail.retryable,
+        },
+        errorCode: detail.errorCode,
+      });
       throw error;
     }
 
     try {
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.started",
+        phase: "meters",
+        inputSnapshot: {
+          propertyId,
+        },
+      });
       const meterIds = parsePortfolioManagerMeterIds(
         await params.espmClient.meter.listMeters(propertyId),
       );
@@ -903,6 +986,18 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       } else {
         stepStatuses.meters = "SUCCEEDED";
       }
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.succeeded",
+        phase: "meters",
+        inputSnapshot: {
+          propertyId,
+        },
+        outputSnapshot: {
+          meterCount: meterSnapshots.length,
+          activeLinkedMeters,
+          partialFailures: meterFailures,
+        },
+      });
     } catch (error) {
       const detail = classifyPortfolioManagerError(error, "meters");
       stepErrors.push(detail);
@@ -914,9 +1009,27 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       );
       warnings.push(`Meter refresh failed: ${detail.message}`);
       stepStatuses.meters = "FAILED";
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.failed",
+        phase: "meters",
+        inputSnapshot: {
+          propertyId,
+        },
+        outputSnapshot: {
+          retryable: detail.retryable,
+        },
+        errorCode: detail.errorCode,
+      });
     }
 
     try {
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.started",
+        phase: "consumption",
+        inputSnapshot: {
+          propertyId,
+        },
+      });
       const periodStart = new Date(Date.UTC(reportingYear, 0, 1));
       const periodEnd = new Date(Date.UTC(reportingYear, 11, 31));
       const localMeters = await prisma.meter.findMany({
@@ -1074,6 +1187,20 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       } else {
         stepStatuses.consumption = "SUCCEEDED";
       }
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.succeeded",
+        phase: "consumption",
+        inputSnapshot: {
+          propertyId,
+        },
+        outputSnapshot: {
+          readingsCreated,
+          readingsUpdated,
+          readingsSkipped,
+          malformedRows,
+          unsupportedUnitSkips,
+        },
+      });
     } catch (error) {
       const detail = classifyPortfolioManagerError(error, "consumption");
       stepErrors.push(detail);
@@ -1085,9 +1212,27 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       );
       warnings.push(`Consumption refresh failed: ${detail.message}`);
       stepStatuses.consumption = "FAILED";
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.failed",
+        phase: "consumption",
+        inputSnapshot: {
+          propertyId,
+        },
+        outputSnapshot: {
+          retryable: detail.retryable,
+        },
+        errorCode: detail.errorCode,
+      });
     }
 
     try {
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.started",
+        phase: "metrics",
+        inputSnapshot: {
+          propertyId,
+        },
+      });
       metricsSummary = await params.espmClient.metrics.getLatestAvailablePropertyMetrics(
         propertyId,
         reportingYear,
@@ -1190,6 +1335,19 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       }
 
       stepStatuses.metrics = metricsWarnings > 0 ? "PARTIAL" : "SUCCEEDED";
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.succeeded",
+        phase: "metrics",
+        inputSnapshot: {
+          propertyId,
+        },
+        outputSnapshot: {
+          score: metricsSummary?.score ?? null,
+          siteIntensity: metricsSummary?.siteIntensity ?? null,
+          sourceIntensity: metricsSummary?.sourceIntensity ?? null,
+          metricsWarnings,
+        },
+      });
     } catch (error) {
       const detail = classifyPortfolioManagerError(error, "metrics");
       stepErrors.push(detail);
@@ -1201,6 +1359,17 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       );
       warnings.push(`Metrics refresh failed: ${detail.message}`);
       stepStatuses.metrics = "FAILED";
+      await writePhaseAudit({
+        action: "portfolio_manager.sync.external_request.failed",
+        phase: "metrics",
+        inputSnapshot: {
+          propertyId,
+        },
+        outputSnapshot: {
+          retryable: detail.retryable,
+        },
+        errorCode: detail.errorCode,
+      });
     }
 
     try {
@@ -1289,6 +1458,16 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
         readiness,
         evaluatedAt: now,
       }),
+    });
+
+    await completeOperationalJob({
+      status: finalStatus,
+      stepStatuses,
+      readingsCreated,
+      readingsUpdated,
+      readingsSkipped,
+      snapshotId,
+      benchmarkSubmissionId: benchmarkSubmission?.id ?? null,
     });
 
     return {

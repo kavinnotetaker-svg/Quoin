@@ -64,12 +64,12 @@ export function ReportsPage() {
         subtitle="Choose a building to inspect the generated compliance and exemption report data."
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">Building</span>
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block text-xs text-slate-500">Building</span>
             <select
               value={buildingId}
               onChange={(event) => setBuildingId(event.target.value)}
-              className="w-full rounded border border-gray-300 px-3 py-2"
+              className="w-full rounded border border-slate-300 px-3 py-2"
             >
               <option value="">Select a building</option>
               {buildings.data?.buildings.map((building) => (
@@ -80,13 +80,13 @@ export function ReportsPage() {
             </select>
           </label>
 
-          <label className="text-sm text-gray-700">
-            <span className="mb-1 block text-xs text-gray-500">Reporting year</span>
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block text-xs text-slate-500">Reporting year</span>
             <input
               type="number"
               value={reportingYear}
               onChange={(event) => setReportingYear(Number(event.target.value))}
-              className="w-full rounded border border-gray-300 px-3 py-2"
+              className="w-full rounded border border-slate-300 px-3 py-2"
             />
           </label>
         </div>
@@ -117,7 +117,7 @@ export function ReportsPage() {
                       contentType: "application/json",
                     })
                   }
-                  className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   Download JSON
                 </button>
@@ -137,18 +137,18 @@ export function ReportsPage() {
               />
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-900">Energy History</h4>
-                  <div className="mt-2 space-y-2 text-sm text-gray-700">
+                  <h4 className="text-sm font-medium text-slate-900">Energy History</h4>
+                  <div className="mt-2 space-y-2 text-sm text-slate-700">
                     {complianceReport.data.energyHistory.slice(0, 8).map((reading) => (
                       <div
                         key={`${reading.periodStart}-${reading.periodEnd}-${reading.meterType}-${reading.source}`}
-                        className="rounded border border-gray-200 px-3 py-2"
+                        className="rounded border border-slate-200 px-3 py-2"
                       >
                         <div className="font-medium">{reading.meterType}</div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-slate-500">
                           {new Date(reading.periodStart).toLocaleDateString()} - {new Date(reading.periodEnd).toLocaleDateString()}
                         </div>
-                        <div className="mt-1 text-xs text-gray-600">
+                        <div className="mt-1 text-xs text-slate-600">
                           {reading.consumptionKbtu.toLocaleString()} kBtu • {reading.source}
                         </div>
                       </div>
@@ -156,15 +156,15 @@ export function ReportsPage() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-gray-900">Recent Pipeline Runs</h4>
-                  <div className="mt-2 space-y-2 text-sm text-gray-700">
+                  <h4 className="text-sm font-medium text-slate-900">Recent Pipeline Runs</h4>
+                  <div className="mt-2 space-y-2 text-sm text-slate-700">
                     {complianceReport.data.pipelineRuns.length === 0 ? (
                       <EmptyState message="No pipeline runs were included in the report payload." />
                     ) : (
                       complianceReport.data.pipelineRuns.map((run) => (
-                        <div key={run.id} className="rounded border border-gray-200 px-3 py-2">
+                        <div key={run.id} className="rounded border border-slate-200 px-3 py-2">
                           <div className="font-medium">{run.pipelineType}</div>
-                          <div className="text-xs text-gray-500">{run.status}</div>
+                          <div className="text-xs text-slate-500">{run.status}</div>
                         </div>
                       ))
                     )}
@@ -187,7 +187,7 @@ export function ReportsPage() {
                       contentType: "application/json",
                     })
                   }
-                  className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   Download JSON
                 </button>
@@ -207,27 +207,27 @@ export function ReportsPage() {
               />
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-900">Checklist</h4>
+                  <h4 className="text-sm font-medium text-slate-900">Checklist</h4>
                   <div className="mt-2 space-y-2">
                     {exemptionReport.data.filingChecklist.map((item) => (
-                      <div key={item.item} className="rounded border border-gray-200 px-3 py-2 text-sm">
-                        <div className="font-medium text-gray-900">{item.item}</div>
-                        <div className="text-xs text-gray-500">{item.status}</div>
-                        <div className="mt-1 text-xs text-gray-600">{item.notes}</div>
+                      <div key={item.item} className="rounded border border-slate-200 px-3 py-2 text-sm">
+                        <div className="font-medium text-slate-900">{item.item}</div>
+                        <div className="text-xs text-slate-500">{item.status}</div>
+                        <div className="mt-1 text-xs text-slate-600">{item.notes}</div>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-gray-900">Benchmark Submissions</h4>
+                  <h4 className="text-sm font-medium text-slate-900">Benchmark Submissions</h4>
                   <div className="mt-2 space-y-2">
                     {submissions.data && submissions.data.length > 0 ? (
                       submissions.data
                         .filter((submission) => submission.reportingYear === reportingYear)
                         .map((submission) => (
-                          <div key={submission.id} className="rounded border border-gray-200 px-3 py-2 text-sm">
-                            <div className="font-medium text-gray-900">Reporting year {submission.reportingYear}</div>
-                            <div className="text-xs text-gray-500">{submission.status}</div>
+                          <div key={submission.id} className="rounded border border-slate-200 px-3 py-2 text-sm">
+                            <div className="font-medium text-slate-900">Reporting year {submission.reportingYear}</div>
+                            <div className="text-xs text-slate-500">{submission.status}</div>
                           </div>
                         ))
                     ) : (

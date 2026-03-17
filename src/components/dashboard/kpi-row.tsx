@@ -11,20 +11,24 @@ export function KPIRow({ items }: { items: KPIItem[] }) {
       {items.map((item) => (
         <div 
           key={item.label}
-          className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:border-zinc-300"
+          className="card-machined overflow-hidden transition-all duration-200 hover:shadow-md hover:border-slate-300"
         >
-          <p className="text-sm font-medium text-zinc-500">{item.label}</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
-            {item.value}
-          </p>
-          {item.subtitle && (
-            <p
-              className="mt-1.5 text-[13px] font-medium"
-              style={{ color: item.subtitleColor ?? "var(--muted-foreground)" }}
-            >
-              {item.subtitle}
+          {/* Cyan-to-Emerald accent strip at top of each KPI */}
+          <div className="h-1 w-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+          <div className="p-5">
+            <p className="text-[13px] font-medium text-slate-500 uppercase tracking-wider">{item.label}</p>
+            <p className="mt-3 data-value-lg">
+              {item.value}
             </p>
-          )}
+            {item.subtitle && (
+              <p
+                className="mt-2 text-[13px] font-medium"
+                style={{ color: item.subtitleColor ?? "rgb(100, 116, 139)" }}
+              >
+                {item.subtitle}
+              </p>
+            )}
+          </div>
         </div>
       ))}
     </div>

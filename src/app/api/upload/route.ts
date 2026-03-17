@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { processCSVUpload } from "@/server/pipelines/data-ingestion/logic";
 import type { MeterType } from "@/server/pipelines/data-ingestion/types";
@@ -5,8 +6,15 @@ import {
   TenantAccessError,
   requireTenantContextFromSession,
 } from "@/server/lib/tenant-access";
+import { createLogger } from "@/server/lib/logger";
+import { buildCsvUploadIngestionEnvelope } from "@/server/pipelines/data-ingestion/envelope";
 
 export async function POST(req: NextRequest) {
+  const requestId = randomUUID();
+  const logger = createLogger({
+    requestId,
+    procedure: "upload.csv",
+  });
   let tenant;
   try {
     tenant = await requireTenantContextFromSession();
@@ -81,27 +89,42 @@ export async function POST(req: NextRequest) {
     // Run pipeline inline to create ComplianceSnapshot
     try {
       const { runIngestionPipeline } = await import("@/server/pipelines/data-ingestion/logic");
+      const envelope = buildCsvUploadIngestionEnvelope({
+        requestId,
+        organizationId: tenant.organizationId,
+        buildingId,
+        uploadBatchId: result.uploadBatchId,
+        triggerType: "CSV_UPLOAD",
+      });
       let espmClient;
       try {
         const { createESPMClient } = await import("@/server/integrations/espm");
         espmClient = createESPMClient();
       } catch {
-        console.warn("[Upload] ESPM client not available, skipping sync");
+        logger.warn("Upload pipeline ESPM client not available, skipping sync");
       }
       const pipelineResult = await runIngestionPipeline({
-        buildingId,
-        organizationId: tenant.organizationId,
-        uploadBatchId: result.uploadBatchId,
-        triggerType: "CSV_UPLOAD",
+        buildingId: envelope.buildingId,
+        organizationId: envelope.organizationId,
+        uploadBatchId: envelope.payload.uploadBatchId,
+        triggerType: envelope.payload.triggerType,
         tenantDb: tenant.tenantDb,
         espmClient,
       });
-      console.log("[Upload] Pipeline result:", pipelineResult.summary);
+      logger.info("Upload pipeline completed", {
+        summary: pipelineResult.summary,
+        organizationId: tenant.organizationId,
+        buildingId,
+      });
       if (pipelineResult.errors.length > 0) {
         result.warnings.push(...pipelineResult.errors.map(e => `Pipeline: ${e}`));
       }
     } catch (pipelineErr) {
-      console.error("[Upload] Pipeline failed:", pipelineErr);
+      logger.error("Upload pipeline failed", {
+        error: pipelineErr,
+        organizationId: tenant.organizationId,
+        buildingId,
+      });
       result.warnings.push(
         "Data saved but compliance snapshot could not be generated. Try refreshing.",
       );
@@ -109,7 +132,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result, { status: result.success ? 200 : 422 });
   } catch (error) {
-    console.error("[Upload] Error:", error);
+    logger.error("Upload processing failed", {
+      error,
+    });
     return NextResponse.json(
       { error: "Upload processing failed" },
       { status: 500 },

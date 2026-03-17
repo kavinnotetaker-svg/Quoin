@@ -68,14 +68,14 @@ export function BuildingHeader({
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">{name}</h1>
-          <p className="mt-1 text-[15px] font-medium text-zinc-600">{address}</p>
-          <p className="mt-1 text-[13px] text-zinc-500">{details}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{name}</h1>
+          <p className="mt-1 text-[15px] font-medium text-slate-600">{address}</p>
+          <p className="mt-1 text-[13px] text-slate-500">{details}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={onUpload}
-            className="rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+            className="rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
           >
             Upload Utility Data
           </button>
@@ -90,7 +90,7 @@ export function BuildingHeader({
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
-                className="px-3 py-2 text-[13px] font-medium text-zinc-500 transition-colors hover:text-zinc-700"
+                className="px-3 py-2 text-[13px] font-medium text-slate-500 transition-colors hover:text-slate-700"
               >
                 Cancel
               </button>
@@ -106,8 +106,8 @@ export function BuildingHeader({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-[13px]">
-        <span className="font-semibold text-zinc-700">Portfolio Manager Property:</span>
+      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-[13px]">
+        <span className="font-semibold text-slate-700">Portfolio Manager Property:</span>
         {editing ? (
           <div className="flex items-center gap-2">
             <input
@@ -116,7 +116,7 @@ export function BuildingHeader({
               value={espmId}
               onChange={(event) => setEspmId(event.target.value.replace(/[^0-9]/g, ""))}
               placeholder="e.g., 88762425"
-              className="w-36 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[13px] text-zinc-900 shadow-sm transition-all focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              className="w-36 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[13px] text-slate-900 shadow-sm transition-all focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
               autoFocus
             />
             <button
@@ -127,7 +127,7 @@ export function BuildingHeader({
                 })
               }
               disabled={updateBuilding.isPending}
-              className="rounded-md bg-zinc-900 px-3 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50"
+              className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-slate-800 disabled:opacity-50"
             >
               {updateBuilding.isPending ? "Saving..." : "Save"}
             </button>
@@ -136,7 +136,7 @@ export function BuildingHeader({
                 setEditing(false);
                 setEspmId(espmPropertyId ?? "");
               }}
-              className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-700"
+              className="text-xs font-medium text-slate-500 transition-colors hover:text-slate-700"
             >
               Cancel
             </button>
@@ -145,14 +145,14 @@ export function BuildingHeader({
           <div className="flex items-center gap-3">
             <span
               className={
-                espmPropertyId ? "font-medium text-zinc-900" : "italic text-zinc-400"
+                espmPropertyId ? "font-medium text-slate-900" : "italic text-slate-400"
               }
             >
               {espmPropertyId ?? "Not linked"}
             </span>
             <button
               onClick={() => setEditing(true)}
-              className="text-xs font-semibold text-zinc-600 underline decoration-zinc-300 underline-offset-2 transition-colors hover:text-zinc-900"
+              className="text-xs font-semibold text-slate-600 underline decoration-slate-300 underline-offset-2 transition-colors hover:text-slate-900"
             >
               {espmPropertyId ? "Edit" : "Link"}
             </button>

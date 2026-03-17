@@ -55,7 +55,7 @@ export function AlertsTab({ buildingId }: { buildingId: string }) {
   if (isLoading) {
     return (
       <div className="overflow-hidden">
-        <div className="loading-bar h-0.5 w-1/3 bg-zinc-300" />
+        <div className="loading-bar h-0.5 w-1/3 bg-slate-300" />
       </div>
     );
   }
@@ -65,7 +65,7 @@ export function AlertsTab({ buildingId }: { buildingId: string }) {
       {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-          <SummaryCard label="Active Alerts" value={summary.active} accent="text-zinc-900" />
+          <SummaryCard label="Active Alerts" value={summary.active} accent="text-slate-900" />
           <SummaryCard label="Critical" value={summary.critical} accent="text-red-600" />
           <SummaryCard label="High" value={summary.high} accent="text-orange-600" />
           <SummaryCard label="Medium" value={summary.medium} accent="text-amber-600" />
@@ -81,8 +81,8 @@ export function AlertsTab({ buildingId }: { buildingId: string }) {
             onClick={() => setFilter(f)}
             className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
               filter === f
-                ? "bg-zinc-900 text-white shadow-sm"
-                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
             }`}
           >
             {f === "ALL" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
@@ -92,11 +92,11 @@ export function AlertsTab({ buildingId }: { buildingId: string }) {
 
       {/* Alert List */}
       {!alerts || alerts.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-          <svg className="mx-auto h-12 w-12 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+          <svg className="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p className="mt-3 text-sm text-zinc-500">
+          <p className="mt-3 text-sm text-slate-500">
             {filter === "ALL"
               ? "No drift alerts detected. Your building is performing within expected ranges."
               : `No ${filter.toLowerCase()} alerts.`}
@@ -120,21 +120,21 @@ export function AlertsTab({ buildingId }: { buildingId: string }) {
                       <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${sev.color} ${sev.bg} ring-1 ring-inset ring-current/20`}>
                         {sev.label}
                       </span>
-                      <span className="text-zinc-300 font-normal">|</span>
-                      <span className="text-xs font-medium text-zinc-600">
+                      <span className="text-slate-300 font-normal">|</span>
+                      <span className="text-xs font-medium text-slate-600">
                         {RULE_LABELS[alert.ruleId] ?? alert.ruleId}
                       </span>
-                      <span className="text-zinc-300 font-normal">|</span>
-                      <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-600">
+                      <span className="text-slate-300 font-normal">|</span>
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                         <span className={`inline-block h-2 w-2 rounded-full ${statusInfo.dot} shadow-sm ring-1 ring-white/50`} />
                         {statusInfo.text}
                       </span>
                     </div>
 
-                    <h4 className="mt-3 text-[15px] font-semibold tracking-tight text-zinc-900">
+                    <h4 className="mt-3 text-[15px] font-semibold tracking-tight text-slate-900">
                       {alert.title}
                     </h4>
-                    <p className="mt-1 text-sm text-zinc-700 leading-relaxed">
+                    <p className="mt-1 text-sm text-slate-700 leading-relaxed">
                       {alert.description}
                     </p>
 
@@ -145,7 +145,7 @@ export function AlertsTab({ buildingId }: { buildingId: string }) {
                       </div>
                     )}
 
-                    <p className="mt-4 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+                    <p className="mt-4 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
                       Detected {detectedDate.toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -162,7 +162,7 @@ export function AlertsTab({ buildingId }: { buildingId: string }) {
                       <button
                         onClick={() => acknowledgeMutation.mutate({ alertId: alert.id })}
                         disabled={acknowledgeMutation.isPending}
-                        className="flex-1 sm:flex-none rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-zinc-700 shadow-sm ring-1 ring-inset ring-zinc-200 hover:bg-zinc-50 transition-colors disabled:opacity-50"
+                        className="flex-1 sm:flex-none rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-50"
                       >
                         Acknowledge
                       </button>
@@ -198,8 +198,8 @@ export function AlertsTab({ buildingId }: { buildingId: string }) {
 
 function SummaryCard({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
-      <p className="text-[12px] font-semibold text-zinc-500 uppercase tracking-wider">{label}</p>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+      <p className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">{label}</p>
       <p className={`mt-2 text-3xl font-bold tracking-tight ${accent}`}>{value}</p>
     </div>
   );

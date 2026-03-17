@@ -4,6 +4,7 @@ import type {
   ESPIReadingType,
   GreenButtonReading,
 } from "./types";
+import { createNonRetryableIntegrationError } from "@/server/lib/errors";
 
 const espiParser = new XMLParser({
   ignoreAttributes: false,
@@ -38,7 +39,12 @@ const THERMS_TO_KWH = 29.3001;
 export function parseESPIXml(xml: string): GreenButtonReading[] {
   const parsed = espiParser.parse(xml) as Record<string, unknown>;
   const feed = parsed["feed"] as Record<string, unknown> | undefined;
-  if (!feed) throw new Error("Invalid ESPI XML: no <feed> element");
+  if (!feed) {
+    throw createNonRetryableIntegrationError(
+      "GREEN_BUTTON",
+      "Invalid ESPI XML payload: missing feed element.",
+    );
+  }
 
   const entries = (feed["entry"] ?? []) as Record<string, unknown>[];
 

@@ -12,7 +12,7 @@ export default async function DashboardLayout({
   if (!user) redirect("/sign-in");
 
   return (
-    <div className="min-h-screen bg-zinc-50/50">
+    <div className="min-h-screen bg-background">
       <Sidebar />
       <div className="lg:pl-[220px]">
         <Topbar />
