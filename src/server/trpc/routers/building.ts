@@ -96,6 +96,35 @@ export const buildingRouter = router({
               orderBy: LATEST_SNAPSHOT_ORDER,
               take: 1,
             },
+            benchmarkSubmissions: {
+              orderBy: [{ reportingYear: "desc" }, { updatedAt: "desc" }],
+              take: 1,
+              include: {
+                complianceRun: {
+                  select: {
+                    id: true,
+                    executedAt: true,
+                    status: true,
+                  },
+                },
+              },
+            },
+            filingRecords: {
+              where: {
+                filingType: "BEPS_COMPLIANCE",
+              },
+              orderBy: [{ filingYear: "desc" }, { updatedAt: "desc" }],
+              take: 1,
+              include: {
+                complianceRun: {
+                  select: {
+                    id: true,
+                    executedAt: true,
+                    status: true,
+                  },
+                },
+              },
+            },
           },
         }),
         ctx.tenantDb.building.count({ where }),
@@ -105,6 +134,8 @@ export const buildingRouter = router({
         buildings: buildings.map((b) => ({
           ...b,
           latestSnapshot: b.complianceSnapshots[0] ?? null,
+          latestBenchmarkSubmission: b.benchmarkSubmissions[0] ?? null,
+          latestBepsFiling: b.filingRecords[0] ?? null,
         })),
         pagination: {
           page,
@@ -126,6 +157,42 @@ export const buildingRouter = router({
               orderBy: LATEST_SNAPSHOT_ORDER,
               take: 1,
             },
+            benchmarkSubmissions: {
+              orderBy: [{ reportingYear: "desc" }, { updatedAt: "desc" }],
+              take: 1,
+              include: {
+                complianceRun: {
+                  include: {
+                    calculationManifest: true,
+                  },
+                },
+              },
+            },
+            filingRecords: {
+              where: {
+                filingType: "BEPS_COMPLIANCE",
+              },
+              orderBy: [{ filingYear: "desc" }, { updatedAt: "desc" }],
+              take: 1,
+              include: {
+                complianceRun: {
+                  include: {
+                    calculationManifest: true,
+                  },
+                },
+              },
+            },
+            auditLogs: {
+              orderBy: { timestamp: "desc" },
+              take: 8,
+              select: {
+                id: true,
+                timestamp: true,
+                action: true,
+                errorCode: true,
+                requestId: true,
+              },
+            },
           },
         }),
         getBuildingWorkflowSummary({
@@ -144,6 +211,9 @@ export const buildingRouter = router({
       return {
         ...building,
         latestSnapshot: building.complianceSnapshots[0] ?? null,
+        latestBenchmarkSubmission: building.benchmarkSubmissions[0] ?? null,
+        latestBepsFiling: building.filingRecords[0] ?? null,
+        recentAuditLogs: building.auditLogs,
         workflowSummary,
       };
     }),

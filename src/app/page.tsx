@@ -5,7 +5,7 @@ import { Zap } from "lucide-react";
 
 export default async function HomePage() {
   const { userId } = await auth();
-  if (userId) redirect("/dashboard");
+  if (userId) redirect("/buildings");
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 selection:bg-slate-200 overflow-hidden relative">

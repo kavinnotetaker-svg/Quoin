@@ -1,6 +1,8 @@
 import PDFDocument from "pdfkit";
 import { PacketRenderError } from "@/server/lib/errors";
 
+type PdfDocumentInstance = InstanceType<typeof PDFDocument>;
+
 export type PacketDocumentTone = "success" | "warning" | "danger" | "info" | "muted";
 
 export type PacketDocumentEntry = {
@@ -273,7 +275,7 @@ export function renderPacketDocumentHtml(document: PacketRenderDocument) {
   ].join("");
 }
 
-function ensurePdfSpace(doc: PDFKit.PDFDocument, height: number) {
+function ensurePdfSpace(doc: PdfDocumentInstance, height: number) {
   const limit = doc.page.height - doc.page.margins.bottom;
   if (doc.y + height > limit) {
     doc.addPage();
@@ -295,7 +297,7 @@ function toneColors(tone: PacketDocumentTone) {
   }
 }
 
-function renderPdfEntries(doc: PDFKit.PDFDocument, entries: PacketDocumentEntry[]) {
+function renderPdfEntries(doc: PdfDocumentInstance, entries: PacketDocumentEntry[]) {
   for (const entry of entries) {
     ensurePdfSpace(doc, 28);
     doc
@@ -315,7 +317,7 @@ function renderPdfEntries(doc: PDFKit.PDFDocument, entries: PacketDocumentEntry[
   }
 }
 
-function renderPdfBullets(doc: PDFKit.PDFDocument, bullets: string[]) {
+function renderPdfBullets(doc: PdfDocumentInstance, bullets: string[]) {
   for (const bullet of bullets) {
     ensurePdfSpace(doc, 20);
     doc
@@ -330,7 +332,7 @@ function renderPdfBullets(doc: PDFKit.PDFDocument, bullets: string[]) {
   doc.moveDown(0.5);
 }
 
-function renderPdfTable(doc: PDFKit.PDFDocument, table: PacketDocumentTable) {
+function renderPdfTable(doc: PdfDocumentInstance, table: PacketDocumentTable) {
   const startX = doc.page.margins.left;
   const availableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const gap = 10;
@@ -425,10 +427,10 @@ export async function renderPacketDocumentPdfBase64(document: PacketRenderDocume
 
       const chunks: Buffer[] = [];
 
-      doc.on("data", (chunk) => {
+      doc.on("data", (chunk: Buffer | string) => {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       });
-      doc.on("error", (error) =>
+      doc.on("error", (error: Error) =>
         reject(
           new PacketRenderError("Packet PDF rendering failed.", {
             cause: error,

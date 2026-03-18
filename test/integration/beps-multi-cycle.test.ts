@@ -448,6 +448,11 @@ describe("BEPS multi-cycle engine", () => {
     });
   }
 
+  function requirePresent<T>(value: T | null) {
+    expect(value).not.toBeNull();
+    return value as T;
+  }
+
   it("evaluates cycle 2 using the registry-backed trajectory pathway", async () => {
     const caller = createCaller();
 
@@ -455,12 +460,14 @@ describe("BEPS multi-cycle engine", () => {
       buildingId: building.id,
       cycle: "CYCLE_2",
     });
+    const evaluation = requirePresent(result.evaluation);
+    const filingRecord = requirePresent(result.filingRecord);
 
-    expect(result.evaluation.selectedPathway).toBe("TRAJECTORY");
-    expect(result.evaluation.pathwayResults.trajectory?.evaluationStatus).toBe("COMPLIANT");
-    expect(result.evaluation.governance?.cycleId).toBe("BEPS_CYCLE_2");
+    expect(evaluation.selectedPathway).toBe("TRAJECTORY");
+    expect(evaluation.pathwayResults.trajectory?.evaluationStatus).toBe("COMPLIANT");
+    expect(evaluation.governance?.cycleId).toBe("BEPS_CYCLE_2");
     expect(result.factorSetVersion.key).toBe("DC_BEPS_CYCLE_2_FACTORS_V1");
-    expect(result.filingRecord.complianceCycle).toBe("CYCLE_2");
+    expect(filingRecord.complianceCycle).toBe("CYCLE_2");
   });
 
   it("still evaluates cycle 2 when the building default cycle remains cycle 1", async () => {
@@ -477,10 +484,12 @@ describe("BEPS multi-cycle engine", () => {
       buildingId: building.id,
       cycle: "CYCLE_2",
     });
+    const evaluation = requirePresent(result.evaluation);
+    const filingRecord = requirePresent(result.filingRecord);
 
-    expect(result.evaluation.selectedPathway).toBe("TRAJECTORY");
-    expect(result.evaluation.pathwayResults.trajectory?.evaluationStatus).toBe("COMPLIANT");
-    expect(result.filingRecord.complianceCycle).toBe("CYCLE_2");
+    expect(evaluation.selectedPathway).toBe("TRAJECTORY");
+    expect(evaluation.pathwayResults.trajectory?.evaluationStatus).toBe("COMPLIANT");
+    expect(filingRecord.complianceCycle).toBe("CYCLE_2");
   });
 
   it("applies cycle 2 to private buildings starting at 25k square feet through the router", async () => {
@@ -551,11 +560,12 @@ describe("BEPS multi-cycle engine", () => {
         buildingId: smallerBuilding.id,
         cycle: "CYCLE_2",
       });
+      const evaluation = requirePresent(result.evaluation);
 
-      expect(result.evaluation.applicability.applicable).toBe(true);
-      expect(result.evaluation.governedConfig.applicability.minGrossSquareFeetPrivate).toBe(25000);
-      expect(result.evaluation.governedConfig.applicability.cycleStartYear).toBe(2028);
-      expect(result.evaluation.governedConfig.trajectory.targetYears).toEqual([2028]);
+      expect(evaluation.applicability.applicable).toBe(true);
+      expect(evaluation.governedConfig.applicability.minGrossSquareFeetPrivate).toBe(25000);
+      expect(evaluation.governedConfig.applicability.cycleStartYear).toBe(2028);
+      expect(evaluation.governedConfig.trajectory.targetYears).toEqual([2028]);
     } finally {
       const smallerRunIds = (
         await prisma.complianceRun.findMany({

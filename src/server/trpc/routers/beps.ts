@@ -1,10 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { NotFoundError } from "@/server/lib/errors";
+import { evaluateBepsComplianceForBuilding } from "@/server/compliance/compliance-engine";
 import {
   attachEvidenceToBepsFilingRecord,
   getCanonicalBepsInputState,
-  evaluateBepsForBuilding,
   type BepsFactorConfig,
   exportBepsFilingPacket,
   finalizeBepsFilingPacket,
@@ -17,6 +17,7 @@ import {
   type BepsRuleConfig,
   refreshDerivedBepsMetricInput,
   transitionBepsFilingRecord,
+  upsertBepsFilingRecordFromEvaluation,
   upsertBepsRequestItem,
   upsertBepsAlternativeComplianceAgreementRecord,
   upsertBepsMetricInputRecord,
@@ -178,15 +179,43 @@ export const bepsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
-
-      return evaluateBepsForBuilding({
+      const evaluation = await evaluateBepsComplianceForBuilding({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         cycle: input.cycle,
+        reportingYear: input.overrides?.filingYear ?? null,
         overrides: toOverrides(input.overrides),
         producedByType: "USER",
         producedById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
+
+      const filingRecord =
+        evaluation.evaluation == null
+          ? null
+          : await upsertBepsFilingRecordFromEvaluation({
+              organizationId: ctx.organizationId,
+              buildingId: input.buildingId,
+              filingYear: evaluation.filingYear,
+              complianceCycle: input.cycle,
+              complianceRunId: evaluation.provenance.complianceRun.id,
+              filingPayload: {
+                bepsEvaluation: evaluation.evaluation,
+                complianceEngine: evaluation.engineResult,
+              },
+              packetUri: null,
+              createdByType: "USER",
+              createdById: ctx.clerkUserId ?? null,
+            });
+
+      return {
+        evaluation: evaluation.evaluation,
+        provenance: evaluation.provenance,
+        filingRecord,
+        ruleVersion: evaluation.ruleVersion,
+        factorSetVersion: evaluation.factorSetVersion,
+        engineResult: evaluation.engineResult,
+      };
     }),
 
   inputState: tenantProcedure

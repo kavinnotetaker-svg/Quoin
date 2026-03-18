@@ -1388,6 +1388,7 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
           null,
         producedByType: params.producedByType,
         producedById: params.producedById ?? null,
+        requestId: params.requestId ?? null,
         additionalSubmissionPayload: {
           autopilot: {
             sourceSystem: PM_SYNC_SYSTEM,

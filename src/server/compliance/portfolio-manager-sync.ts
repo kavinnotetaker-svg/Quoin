@@ -490,6 +490,7 @@ async function syncPortfolioManagerForBuildingLegacy(params: {
   espmClient: PortfolioManagerSyncClient;
   producedByType: ActorType;
   producedById?: string | null;
+  requestId?: string | null;
   now?: Date;
 }) {
   const now = params.now ?? new Date();
@@ -957,6 +958,7 @@ async function syncPortfolioManagerForBuildingLegacy(params: {
           (existingSubmission?.status as BenchmarkSubmissionStatus | null | undefined) ?? null,
         producedByType: params.producedByType,
         producedById: params.producedById ?? null,
+        requestId: params.requestId ?? null,
         additionalSubmissionPayload: {
           autopilot: {
             sourceSystem: PM_SYNC_SYSTEM,

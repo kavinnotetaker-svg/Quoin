@@ -1,6 +1,11 @@
 import React, { type ReactNode } from "react";
 
 export type StatusTone = "success" | "warning" | "danger" | "muted" | "info";
+export type PrimaryComplianceSurfaceStatus =
+  | "DATA_INCOMPLETE"
+  | "READY"
+  | "COMPLIANT"
+  | "NON_COMPLIANT";
 
 export function toneClasses(tone: StatusTone) {
   switch (tone) {
@@ -135,6 +140,23 @@ export function getVerificationStatusDisplay(status: string | null | undefined) 
       return { label: "Fail", tone: "danger" as const };
     case "NEEDS_REVIEW":
       return { label: "Needs review", tone: "warning" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
+export function getPrimaryComplianceStatusDisplay(
+  status: PrimaryComplianceSurfaceStatus | string | null | undefined,
+) {
+  switch (status) {
+    case "DATA_INCOMPLETE":
+      return { label: "Data incomplete", tone: "warning" as const };
+    case "READY":
+      return { label: "Ready", tone: "info" as const };
+    case "COMPLIANT":
+      return { label: "Compliant", tone: "success" as const };
+    case "NON_COMPLIANT":
+      return { label: "Non-compliant", tone: "danger" as const };
     default:
       return { label: humanizeToken(status), tone: "muted" as const };
   }

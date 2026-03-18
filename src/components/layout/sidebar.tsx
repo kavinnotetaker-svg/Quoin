@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   Building2,
   FileText,
-  Settings,
   Menu,
   X,
   Zap
@@ -16,22 +14,16 @@ import { useState } from "react";
 interface NavItem {
   href: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: typeof Building2;
   disabled?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+export const NAV_ITEMS: NavItem[] = [
   { href: "/buildings", label: "Buildings", icon: Building2 },
   {
     href: "/reports",
     label: "Reports",
     icon: FileText,
-  },
-  {
-    href: "/settings",
-    label: "Settings",
-    icon: Settings,
   },
 ];
 
@@ -67,7 +59,7 @@ export function Sidebar() {
         <div className="border-b border-slate-200/60 px-5">
           <div className="flex h-14 items-center justify-between">
             <Link
-              href="/dashboard"
+              href="/buildings"
               className="flex items-center gap-2.5 text-sm font-bold tracking-tight text-slate-900 transition-opacity hover:opacity-80"
             >
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-400 shadow-[0_2px_8px_-2px_rgba(6,182,212,0.5)]">
@@ -114,12 +106,8 @@ export function Sidebar() {
           })}
         </nav>
         
-        {/* Footer Area inside Sidebar (Optional placeholder for bottom items) */}
-        <div className="p-4 border-t border-slate-200/60">
-          <div className="rounded-lg bg-slate-50 p-3 flex flex-col gap-1 text-xs border border-slate-100">
-            <span className="font-medium text-slate-800">Enterprise Plan</span>
-            <span className="text-emerald-600 font-medium">All systems operational</span>
-          </div>
+        <div className="border-t border-slate-200/60 px-4 py-3 text-xs text-slate-400">
+          Focused compliance workflow
         </div>
       </aside>
     </>

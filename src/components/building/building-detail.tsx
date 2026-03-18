@@ -3,49 +3,44 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { BuildingHeader } from "./building-header";
-import { ScoreSection } from "./score-section";
-import { WorkflowPanel } from "./workflow-panel";
-import { EnergyTab } from "./energy-tab";
+import { ComplianceOverviewTab } from "./compliance-overview-tab";
 import { BenchmarkingTab } from "./benchmarking-tab";
 import { VerificationRequestsTab } from "./verification-requests-tab";
 import { BepsTab } from "./beps-tab";
-import { ComplianceTab } from "./compliance-tab";
-import { CapitalTab } from "./capital-tab";
-import { AlertsTab } from "./alerts-tab";
-import { OperationsTab } from "./operations-tab";
-import { ProvenanceTab } from "./provenance-tab";
-import { RetrofitTab } from "./retrofit-tab";
-import { FinancingTab } from "./financing-tab";
 import { UploadModal } from "./upload-modal";
 
 interface Tab {
   key: string;
   label: string;
-  disabled?: boolean;
 }
 
 const TABS: Tab[] = [
-  { key: "energy", label: "Energy Data" },
+  { key: "overview", label: "Overview" },
   { key: "benchmarking", label: "Benchmarking" },
-  { key: "verification", label: "Verification & Requests" },
-  { key: "beps", label: "BEPS & Filing" },
-  { key: "retrofit", label: "Retrofit Plan" },
-  { key: "financing", label: "Financing" },
-  { key: "operations", label: "Operations" },
-  { key: "provenance", label: "Provenance" },
-  { key: "compliance", label: "Compliance" },
-  { key: "capital", label: "Capital" },
-  { key: "alerts", label: "Alerts" },
+  { key: "beps", label: "BEPS" },
 ];
 
+function defaultReportingYear() {
+  return new Date().getUTCFullYear() - 1;
+}
+
 export function BuildingDetail({ buildingId }: { buildingId: string }) {
-  const [activeTab, setActiveTab] = useState("energy");
+  const [activeTab, setActiveTab] = useState("overview");
   const [showUpload, setShowUpload] = useState(false);
 
   const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.building.get.useQuery({
     id: buildingId,
   });
+
+  const reportingYear = data?.latestBenchmarkSubmission?.reportingYear ?? defaultReportingYear();
+  const verificationChecklist = trpc.benchmarking.getVerificationChecklist.useQuery(
+    { buildingId, reportingYear },
+    {
+      retry: false,
+      enabled: !!data,
+    },
+  );
 
   useEffect(() => {
     const applyHash = () => {
@@ -85,10 +80,8 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
 
   if (!data) return null;
 
-  const snap = data.latestSnapshot;
-
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8">
       <BuildingHeader
         buildingId={buildingId}
         name={data.name}
@@ -100,75 +93,55 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
         onUpload={() => setShowUpload(true)}
       />
 
-      <ScoreSection
-        energyStarScore={snap?.energyStarScore ?? null}
-        complianceStatus={snap?.complianceStatus ?? "PENDING_DATA"}
-        estimatedPenalty={snap?.estimatedPenalty ?? null}
-        bepsTargetScore={data.bepsTargetScore}
-        grossSquareFeet={data.grossSquareFeet}
-        snapshotDate={snap?.snapshotDate ?? null}
-      />
-
-      {data.workflowSummary ? (
-        <WorkflowPanel
-          nextAction={data.workflowSummary.nextAction}
-          stages={data.workflowSummary.stages}
-        />
-      ) : null}
-
       <div className="flex flex-wrap gap-6 border-b border-slate-200 text-[13px] font-medium">
         {TABS.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => !tab.disabled && handleTabChange(tab.key)}
-            className={`border-b-2 pb-2.5 transition-colors duration-200 ${tab.disabled
-              ? "pointer-events-none border-transparent text-slate-300"
-              : activeTab === tab.key
+            onClick={() => handleTabChange(tab.key)}
+            className={`border-b-2 pb-2.5 transition-colors duration-200 ${
+              activeTab === tab.key
                 ? "border-slate-900 text-slate-900"
-                : "border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300"
-              }`}
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900"
+            }`}
           >
             {tab.label}
-            {tab.disabled && (
-              <span className="ml-1.5 inline-flex items-center rounded-sm bg-slate-100 px-1 py-0.5 text-[10px] font-semibold text-slate-500">
-                SOON
-              </span>
-            )}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
       <div className="pt-2">
-        {activeTab === "energy" && <EnergyTab buildingId={buildingId} />}
-        {activeTab === "benchmarking" && <BenchmarkingTab buildingId={buildingId} />}
-        {activeTab === "verification" && (
-          <VerificationRequestsTab buildingId={buildingId} />
-        )}
-        {activeTab === "beps" && <BepsTab buildingId={buildingId} />}
-        {activeTab === "retrofit" && <RetrofitTab buildingId={buildingId} />}
-        {activeTab === "financing" && <FinancingTab buildingId={buildingId} />}
-        {activeTab === "operations" && <OperationsTab buildingId={buildingId} />}
-        {activeTab === "provenance" && <ProvenanceTab buildingId={buildingId} />}
-        {activeTab === "compliance" && (
-          <ComplianceTab buildingId={buildingId} />
-        )}
-        {activeTab === "capital" && <CapitalTab buildingId={buildingId} />}
-        {activeTab === "alerts" && <AlertsTab buildingId={buildingId} />}
+        {activeTab === "overview" ? (
+          <ComplianceOverviewTab
+            building={data}
+            verificationChecklist={verificationChecklist.data}
+          />
+        ) : null}
+
+        {activeTab === "benchmarking" ? (
+          <div className="space-y-6">
+            <BenchmarkingTab buildingId={buildingId} />
+            <VerificationRequestsTab buildingId={buildingId} />
+          </div>
+        ) : null}
+
+        {activeTab === "beps" ? <BepsTab buildingId={buildingId} /> : null}
       </div>
 
-      {/* Upload modal */}
-      {showUpload && (
+      {showUpload ? (
         <UploadModal
           buildingId={buildingId}
           onClose={() => setShowUpload(false)}
           onSuccess={() => {
             utils.building.get.invalidate({ id: buildingId });
-            utils.building.energyReadings.invalidate({ buildingId });
+            utils.building.list.invalidate();
             utils.building.complianceHistory.invalidate({ buildingId });
+            utils.benchmarking.getVerificationChecklist.invalidate({
+              buildingId,
+              reportingYear,
+            });
           }}
         />
-      )}
+      ) : null}
     </div>
   );
 }

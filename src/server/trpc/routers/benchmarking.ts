@@ -216,6 +216,7 @@ export const benchmarkingRouter = router({
         },
         producedByType: "USER",
         producedById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
         evidenceArtifacts: input.evidenceArtifacts,
       });
     }),
@@ -352,6 +353,7 @@ export const benchmarkingRouter = router({
         submittedAt: input.submittedAt ? new Date(input.submittedAt) : null,
         producedByType: "USER",
         producedById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
         additionalSubmissionPayload: {
           ...existingPayload,
           ...(input.submissionPayload ?? {}),

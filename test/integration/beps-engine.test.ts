@@ -694,6 +694,11 @@ describe("BEPS engine", () => {
     });
   }
 
+  function requirePresent<T>(value: T | null) {
+    expect(value).not.toBeNull();
+    return value as T;
+  }
+
   it("creates and updates the canonical BEPS filing record through the governed workflow", async () => {
     const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
 
@@ -701,17 +706,19 @@ describe("BEPS engine", () => {
       buildingId: buildingA.id,
       cycle: "CYCLE_1",
     });
+    const firstEvaluation = requirePresent(first.evaluation);
+    const firstFilingRecord = requirePresent(first.filingRecord);
 
-    expect(first.evaluation.overallStatus).toBe("NON_COMPLIANT");
-    expect(first.evaluation.governance?.factorSetKey).toBe(bepsFactorSetKey);
-    expect(first.evaluation.governedConfig.performance.requiredReductionFraction).toBe(0.2);
-    expect(first.evaluation.inputSummary.sources.currentScore).toBe("CANONICAL_METRIC_INPUT");
-    expect(first.filingRecord.filingType).toBe("BEPS_COMPLIANCE");
-    expect(first.filingRecord.complianceRunId).toBe(first.provenance.complianceRun.id);
+    expect(firstEvaluation.overallStatus).toBe("NON_COMPLIANT");
+    expect(firstEvaluation.governance?.factorSetKey).toBe(bepsFactorSetKey);
+    expect(firstEvaluation.governedConfig.performance.requiredReductionFraction).toBe(0.2);
+    expect(firstEvaluation.inputSummary.sources.currentScore).toBe("CANONICAL_METRIC_INPUT");
+    expect(firstFilingRecord.filingType).toBe("BEPS_COMPLIANCE");
+    expect(firstFilingRecord.complianceRunId).toBe(first.provenance.complianceRun.id);
     expect(first.provenance.complianceRun.factorSetVersionId).toBe(first.factorSetVersion.id);
     expect(first.factorSetVersion.key).toBe(bepsFactorSetKey);
-    expect(first.evaluation.inputSummary.canonicalRefs.metricInputId).toBeTruthy();
-    expect(first.evaluation.inputSummary.canonicalRefs.alternativeComplianceAgreementId).toBeTruthy();
+    expect(firstEvaluation.inputSummary.canonicalRefs.metricInputId).toBeTruthy();
+    expect(firstEvaluation.inputSummary.canonicalRefs.alternativeComplianceAgreementId).toBeTruthy();
 
     await caller.beps.upsertPrescriptiveItem({
       buildingId: buildingA.id,
@@ -738,15 +745,17 @@ describe("BEPS engine", () => {
       buildingId: buildingA.id,
       cycle: "CYCLE_1",
     });
+    const secondEvaluation = requirePresent(second.evaluation);
+    const secondFilingRecord = requirePresent(second.filingRecord);
 
-    expect(second.evaluation.overallStatus).toBe("COMPLIANT");
-    expect(second.filingRecord.id).toBe(first.filingRecord.id);
-    expect(second.filingRecord.complianceRunId).toBe(second.provenance.complianceRun.id);
-    expect(second.evaluation.governance?.rulePackageKey).toBe("DC_BEPS_CYCLE_1");
-    expect(second.evaluation.inputSummary.alternativeComplianceAgreementMultiplier).toBe(
+    expect(secondEvaluation.overallStatus).toBe("COMPLIANT");
+    expect(secondFilingRecord.id).toBe(firstFilingRecord.id);
+    expect(secondFilingRecord.complianceRunId).toBe(second.provenance.complianceRun.id);
+    expect(secondEvaluation.governance?.rulePackageKey).toBe("DC_BEPS_CYCLE_1");
+    expect(secondEvaluation.inputSummary.alternativeComplianceAgreementMultiplier).toBe(
       0.6,
     );
-    expect(second.evaluation.pathwayResults.standardTarget?.calculation.formulaKey).toBe(
+    expect(secondEvaluation.pathwayResults.standardTarget?.calculation.formulaKey).toBe(
       "DC_BEPS_CYCLE_1_STANDARD_TARGET_ADJUSTMENT",
     );
 
@@ -781,12 +790,13 @@ describe("BEPS engine", () => {
         currentScore: 10,
       },
     });
+    const evaluated = requirePresent(evaluation.evaluation);
 
-    expect(evaluation.evaluation.inputSummary.baselineAdjustedSiteEui).toBe(110);
-    expect(evaluation.evaluation.inputSummary.currentAdjustedSiteEui).toBe(70);
-    expect(evaluation.evaluation.inputSummary.baselineScore).toBe(52);
-    expect(evaluation.evaluation.inputSummary.currentScore).toBe(75);
-    expect(evaluation.evaluation.inputSummary.sources.baselineAdjustedSiteEui).toBe(
+    expect(evaluated.inputSummary.baselineAdjustedSiteEui).toBe(110);
+    expect(evaluated.inputSummary.currentAdjustedSiteEui).toBe(70);
+    expect(evaluated.inputSummary.baselineScore).toBe(52);
+    expect(evaluated.inputSummary.currentScore).toBe(75);
+    expect(evaluated.inputSummary.sources.baselineAdjustedSiteEui).toBe(
       "CANONICAL_METRIC_INPUT",
     );
 
@@ -837,10 +847,11 @@ describe("BEPS engine", () => {
       buildingId: buildingA.id,
       cycle: "CYCLE_1",
     });
+    const filingRecord = requirePresent(evaluation.filingRecord);
 
     const filed = await caller.beps.transitionFiling({
       buildingId: buildingA.id,
-      filingRecordId: evaluation.filingRecord.id,
+      filingRecordId: filingRecord.id,
       nextStatus: "FILED",
       notes: "Submitted to DOEE",
     });
@@ -849,7 +860,7 @@ describe("BEPS engine", () => {
 
     const accepted = await caller.beps.transitionFiling({
       buildingId: buildingA.id,
-      filingRecordId: evaluation.filingRecord.id,
+      filingRecordId: filingRecord.id,
       nextStatus: "ACCEPTED",
       notes: "Accepted by regulator",
     });
@@ -858,7 +869,7 @@ describe("BEPS engine", () => {
     await expect(
       caller.beps.transitionFiling({
         buildingId: buildingA.id,
-        filingRecordId: evaluation.filingRecord.id,
+        filingRecordId: filingRecord.id,
         nextStatus: "GENERATED",
       }),
     ).rejects.toBeInstanceOf(TRPCError);
@@ -871,10 +882,11 @@ describe("BEPS engine", () => {
       buildingId: buildingA.id,
       cycle: "CYCLE_1",
     });
+    const filingRecord = requirePresent(evaluation.filingRecord);
 
     const evidence = await callerA.beps.attachFilingEvidence({
       buildingId: buildingA.id,
-      filingRecordId: evaluation.filingRecord.id,
+      filingRecordId: filingRecord.id,
       artifactType: "OWNER_ATTESTATION",
       name: "Performance pathway support packet",
       bepsEvidenceKind: "PATHWAY_SUPPORT",
@@ -883,7 +895,7 @@ describe("BEPS engine", () => {
         scope,
       },
     });
-    expect(evidence.filingRecordId).toBe(evaluation.filingRecord.id);
+    expect(evidence.filingRecordId).toBe(filingRecord.id);
 
     const latest = await callerA.beps.latestRun({
       buildingId: buildingA.id,
@@ -904,7 +916,7 @@ describe("BEPS engine", () => {
     await expect(
       callerB.beps.attachFilingEvidence({
         buildingId: buildingA.id,
-        filingRecordId: evaluation.filingRecord.id,
+        filingRecordId: filingRecord.id,
         artifactType: "OTHER",
         name: "Cross-tenant evidence attempt",
         bepsEvidenceKind: "ACP_SUPPORT",

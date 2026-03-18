@@ -539,16 +539,22 @@ describe("BEPS filing packets", () => {
     });
   }
 
+  function requirePresent<T>(value: T | null) {
+    expect(value).not.toBeNull();
+    return value as T;
+  }
+
   it("generates a canonical packet from a governed BEPS filing and includes governance data", async () => {
     const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
     const evaluation = await caller.beps.evaluate({
       buildingId: buildingA.id,
       cycle: "CYCLE_1",
     });
+    const filingRecord = requirePresent(evaluation.filingRecord);
 
     const packet = await caller.beps.generatePacket({
       buildingId: buildingA.id,
-      filingRecordId: evaluation.filingRecord.id,
+      filingRecordId: filingRecord.id,
     });
     const payload = packet.packetPayload as Record<string, unknown>;
     const filingSummary = payload["filingSummary"] as Record<string, unknown>;
@@ -557,14 +563,14 @@ describe("BEPS filing packets", () => {
 
     expect(packet.version).toBe(1);
     expect(packet.status).toBe("GENERATED");
-    expect(filingSummary["filingRecordId"]).toBe(evaluation.filingRecord.id);
+    expect(filingSummary["filingRecordId"]).toBe(filingRecord.id);
     expect(governance["rulePackageKey"]).toBe("DC_BEPS_CYCLE_1");
     expect(governance["factorSetKey"]).toBe(bepsFactorSetKey);
     expect(warnings.some((warning) => warning["code"] === "MISSING_PATHWAY_SUPPORT_EVIDENCE")).toBe(true);
 
     const manifest = await caller.beps.packetManifest({
       buildingId: buildingA.id,
-      filingRecordId: evaluation.filingRecord.id,
+      filingRecordId: filingRecord.id,
     });
     expect(manifest.evidenceManifest).toEqual([]);
   });

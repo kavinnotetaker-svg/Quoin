@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BuildingTable } from "@/components/dashboard/building-table";
-import { WorkflowPanel } from "@/components/building/workflow-panel";
+import { ComplianceOverviewTab } from "@/components/building/compliance-overview-tab";
+import { NAV_ITEMS } from "@/components/layout/sidebar";
 import {
-  getComplianceStatusDisplay,
+  getPrimaryComplianceStatusDisplay,
   getPacketStatusDisplay,
   getSyncStatusDisplay,
 } from "@/components/internal/status-helpers";
 
 describe("consultant-facing status copy", () => {
   it("uses plain language for key compliance and sync states", () => {
-    expect(getComplianceStatusDisplay("PENDING_DATA")).toMatchObject({
-      label: "Needs data",
-      tone: "muted",
+    expect(getPrimaryComplianceStatusDisplay("DATA_INCOMPLETE")).toMatchObject({
+      label: "Data incomplete",
+      tone: "warning",
     });
     expect(getSyncStatusDisplay("PARTIAL")).toMatchObject({
       label: "Partial import",
@@ -27,56 +27,105 @@ describe("consultant-facing status copy", () => {
 });
 
 describe("consultant-facing screens", () => {
-  it("renders the portfolio table safely when snapshot data is sparse", () => {
+  it("renders the compliance overview with engine result fields", () => {
     const markup = renderToStaticMarkup(
-      createElement(BuildingTable, {
-        buildings: [
-          {
-            id: "building-1",
-            name: "Sparse Tower",
-            propertyType: "OFFICE",
-            latestSnapshot: null,
-            updatedAt: "2026-03-16T12:00:00.000Z",
+      createElement(ComplianceOverviewTab, {
+        building: {
+          complianceCycle: "CYCLE_1",
+          workflowSummary: {
+            nextAction: {
+              title: "Run BEPS evaluation",
+              reason: "The latest benchmarking result is ready for BEPS review.",
+            },
           },
-        ],
+          latestBenchmarkSubmission: {
+            reportingYear: 2025,
+            status: "READY",
+            readinessEvaluatedAt: "2026-03-16T12:00:00.000Z",
+            submissionPayload: {
+              complianceEngine: {
+                status: "COMPUTED",
+                ruleVersion: "engine-test-v1",
+                metricUsed: "ANNUAL_BENCHMARKING_READINESS",
+                qa: { verdict: "PASS" },
+                reasonCodes: ["BENCHMARKING_READY"],
+                decision: {
+                  meetsStandard: true,
+                  blocked: false,
+                  insufficientData: false,
+                },
+              },
+              readiness: {
+                summary: {
+                  scopeState: "IN_SCOPE",
+                },
+              },
+            },
+            complianceRun: {
+              executedAt: "2026-03-16T12:00:00.000Z",
+            },
+          },
+          latestBepsFiling: {
+            filingYear: 2026,
+            complianceCycle: "CYCLE_1",
+            status: "IN_REVIEW",
+            filingPayload: {
+              complianceEngine: {
+                status: "COMPUTED",
+                ruleVersion: "engine-test-v1",
+                metricUsed: "ENERGY_STAR_SCORE",
+                qa: { verdict: "WARN" },
+                reasonCodes: ["STANDARD_TARGET"],
+                decision: {
+                  meetsStandard: false,
+                  blocked: false,
+                  insufficientData: false,
+                },
+              },
+              evaluation: {
+                overallStatus: "NON_COMPLIANT",
+              },
+            },
+            complianceRun: {
+              executedAt: "2026-03-17T12:00:00.000Z",
+            },
+          },
+          recentAuditLogs: [
+            {
+              id: "audit-1",
+              timestamp: "2026-03-17T12:00:00.000Z",
+              action: "COMPLIANCE_ENGINE_BEPS_SUCCEEDED",
+              errorCode: null,
+              requestId: "req-1",
+            },
+          ],
+        },
+        verificationChecklist: {
+          summary: {
+            passedCount: 5,
+            failedCount: 0,
+            needsReviewCount: 1,
+          },
+          items: [
+            {
+              key: "DATA_COVERAGE",
+              status: "PASS",
+              explanation: "Annual coverage is complete.",
+              evidenceRefs: [],
+            },
+          ],
+        },
       }),
     );
 
-    expect(markup).toContain("Needs usable benchmark data");
-    expect(markup).toContain("Connect or refresh data");
-    expect(markup).toContain("No current penalty estimate");
+    expect(markup).toContain("Compliance decision");
+    expect(markup).toContain("Run BEPS evaluation");
+    expect(markup).toContain("engine-test-v1");
+    expect(markup).toContain("ENERGY STAR SCORE");
+    expect(markup).toContain("Audit trace summary");
   });
 
-  it("renders the workflow panel with explicit stage language", () => {
-    const markup = renderToStaticMarkup(
-      createElement(WorkflowPanel, {
-        nextAction: {
-          title: "Run BEPS evaluation",
-          reason: "No governed BEPS run exists for the active cycle.",
-          href: "/buildings/building-1#beps",
-        },
-        stages: [
-          {
-            key: "data-connected",
-            label: "Data Connected",
-            status: "COMPLETE",
-            reason: "Portfolio Manager data is connected and recent.",
-            href: "/buildings/building-1#benchmarking",
-          },
-          {
-            key: "beps-evaluated",
-            label: "BEPS Evaluated",
-            status: "NOT_STARTED",
-            reason: "No governed BEPS run exists yet.",
-            href: "/buildings/building-1#beps",
-          },
-        ],
-      }),
-    );
-
-    expect(markup).toContain("Next best action");
-    expect(markup).toContain("Run BEPS evaluation");
-    expect(markup).toContain("Complete");
-    expect(markup).toContain("Not started");
+  it("hides non-essential routes from the primary navigation", () => {
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["Buildings", "Reports"]);
   });
 });

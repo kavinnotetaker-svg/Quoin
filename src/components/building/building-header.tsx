@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 
 const PROPERTY_LABELS: Record<string, string> = {
@@ -33,26 +32,13 @@ export function BuildingHeader({
   onUpload,
 }: BuildingHeaderProps) {
   const [editing, setEditing] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [espmId, setEspmId] = useState(espmPropertyId ?? "");
   const utils = trpc.useUtils();
-  const router = useRouter();
 
   const updateBuilding = trpc.building.update.useMutation({
     onSuccess: () => {
       utils.building.get.invalidate({ id: buildingId });
       setEditing(false);
-    },
-  });
-
-  const deleteBuilding = trpc.building.delete.useMutation({
-    onSuccess: () => {
-      router.push("/dashboard");
-    },
-    onError: (err) => {
-      console.error("[Delete] Failed:", err);
-      alert(`Delete failed: ${err.message}`);
-      setConfirmDelete(false);
     },
   });
 
@@ -79,30 +65,6 @@ export function BuildingHeader({
           >
             Upload Utility Data
           </button>
-          {confirmDelete ? (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => deleteBuilding.mutate({ id: buildingId })}
-                disabled={deleteBuilding.isPending}
-                className="rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleteBuilding.isPending ? "Deleting..." : "Confirm"}
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="px-3 py-2 text-[13px] font-medium text-slate-500 transition-colors hover:text-slate-700"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-medium text-red-700 shadow-sm transition-colors hover:bg-red-100"
-            >
-              Delete
-            </button>
-          )}
         </div>
       </div>
 
