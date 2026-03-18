@@ -6,6 +6,11 @@ export type PrimaryComplianceSurfaceStatus =
   | "READY"
   | "COMPLIANT"
   | "NON_COMPLIANT";
+export type SubmissionReadinessSurfaceStatus =
+  | "DATA_INCOMPLETE"
+  | "READY_FOR_REVIEW"
+  | "READY_TO_SUBMIT"
+  | "SUBMITTED";
 
 export function toneClasses(tone: StatusTone) {
   switch (tone) {
@@ -140,6 +145,49 @@ export function getVerificationStatusDisplay(status: string | null | undefined) 
       return { label: "Fail", tone: "danger" as const };
     case "NEEDS_REVIEW":
       return { label: "Needs review", tone: "warning" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
+export function getDataIssueSeverityDisplay(severity: string | null | undefined) {
+  switch (severity) {
+    case "BLOCKING":
+      return { label: "Blocking", tone: "danger" as const };
+    case "WARNING":
+      return { label: "Warning", tone: "warning" as const };
+    default:
+      return { label: humanizeToken(severity), tone: "muted" as const };
+  }
+}
+
+export function getDataIssueStatusDisplay(status: string | null | undefined) {
+  switch (status) {
+    case "OPEN":
+      return { label: "Open", tone: "danger" as const };
+    case "IN_PROGRESS":
+      return { label: "In progress", tone: "warning" as const };
+    case "RESOLVED":
+      return { label: "Resolved", tone: "success" as const };
+    case "DISMISSED":
+      return { label: "Dismissed", tone: "muted" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
+export function getSubmissionReadinessDisplay(
+  status: SubmissionReadinessSurfaceStatus | string | null | undefined,
+) {
+  switch (status) {
+    case "DATA_INCOMPLETE":
+      return { label: "Data incomplete", tone: "warning" as const };
+    case "READY_FOR_REVIEW":
+      return { label: "Ready for review", tone: "info" as const };
+    case "READY_TO_SUBMIT":
+      return { label: "Ready to submit", tone: "success" as const };
+    case "SUBMITTED":
+      return { label: "Submitted", tone: "muted" as const };
     default:
       return { label: humanizeToken(status), tone: "muted" as const };
   }

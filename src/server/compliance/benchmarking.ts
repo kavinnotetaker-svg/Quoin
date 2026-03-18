@@ -4,6 +4,7 @@ import type {
 } from "@/generated/prisma/client";
 import { createLogger } from "@/server/lib/logger";
 import { evaluateBenchmarkingComplianceForBuilding } from "./compliance-engine";
+import { refreshBenchmarkingDataIssues } from "./data-issues";
 import {
   type EvidenceArtifactDraft,
   upsertBenchmarkSubmissionRecord,
@@ -76,7 +77,10 @@ export async function evaluateAndUpsertBenchmarkSubmission(params: {
     requestId: params.requestId ?? null,
   });
 
-  const derivedStatus = evaluation.readiness.status === "READY" ? "READY" : "BLOCKED";
+  const derivedStatus =
+    evaluation.engineResult.status === "BLOCKED" || evaluation.readiness.status !== "READY"
+      ? "BLOCKED"
+      : "READY";
   const status = params.explicitStatus ?? derivedStatus;
   const submissionPayload = {
     readiness: evaluation.readiness,
@@ -107,10 +111,21 @@ export async function evaluateAndUpsertBenchmarkSubmission(params: {
     evidenceArtifacts: params.evidenceArtifacts,
   });
 
-  await evaluateVerification({
+  const verification = await evaluateVerification({
     organizationId: params.organizationId,
     buildingId: params.buildingId,
     reportingYear: params.reportingYear,
+  });
+
+  const readinessSummary = await refreshBenchmarkingDataIssues({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    reportingYear: params.reportingYear,
+    engineResult: evaluation.engineResult,
+    verification,
+    actorType: params.producedByType,
+    actorId: params.producedById ?? null,
+    requestId: params.requestId ?? null,
   });
 
   logger.info("Benchmark submission refreshed", {
@@ -119,6 +134,7 @@ export async function evaluateAndUpsertBenchmarkSubmission(params: {
     readinessStatus: evaluation.readiness.status,
     benchmarkSubmissionId: benchmarkSubmission.id,
     complianceRunId: evaluation.provenance.complianceRun.id,
+    submissionReadinessState: readinessSummary.state,
   });
 
   return {

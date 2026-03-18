@@ -223,6 +223,38 @@ enum VerificationItemStatus {
   NEEDS_REVIEW
 }
 
+enum DataIssueType {
+  MISSING_MONTHS
+  OVERLAPPING_PERIODS
+  INCOMPLETE_TWELVE_MONTH_COVERAGE
+  DIRECT_READINGS_MISSING
+  METER_MAPPING_MISSING
+  PM_SYNC_REQUIRED
+  BUILDING_METADATA_INCOMPLETE
+  GFA_SUPPORT_MISSING
+  METRIC_AVAILABILITY_MISSING
+  DQC_SUPPORT_MISSING
+}
+
+enum DataIssueSeverity {
+  BLOCKING
+  WARNING
+}
+
+enum DataIssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
+
+enum DataIssueSource {
+  QA
+  COMPLIANCE_ENGINE
+  SYSTEM
+  USER
+}
+
 enum BepsRequestItemCategory {
   PATHWAY_SELECTION_SUPPORT
   COMPLETED_ACTIONS_EVIDENCE
@@ -425,6 +457,7 @@ model Organization {
   benchmarkRequestItems               BenchmarkRequestItem[]
   benchmarkPackets                    BenchmarkPacket[]
   verificationItemResults             VerificationItemResult[]
+  dataIssues                          DataIssue[]
   bepsRequestItems                    BepsRequestItem[]
   bepsMetricInputs                    BepsMetricInput[]
   bepsPrescriptiveItems               BepsPrescriptiveItem[]
@@ -518,6 +551,7 @@ model Building {
   benchmarkRequestItems               BenchmarkRequestItem[]
   benchmarkPackets                    BenchmarkPacket[]
   verificationItemResults             VerificationItemResult[]
+  dataIssues                          DataIssue[]
   bepsRequestItems                    BepsRequestItem[]
   bepsMetricInputs                    BepsMetricInput[]
   bepsPrescriptiveItems               BepsPrescriptiveItem[]
@@ -1016,7 +1050,7 @@ model FilingRecordEvent {
   createdAt      DateTime                @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id])
-  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
   filingRecord FilingRecord @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, buildingId, createdAt(sort: Desc)])
@@ -1169,6 +1203,35 @@ model VerificationItemResult {
   @@unique([buildingId, reportingYear, key])
   @@index([organizationId, buildingId, reportingYear, createdAt(sort: Desc)])
   @@map("verification_item_results")
+}
+
+model DataIssue {
+  id             String            @id @default(cuid())
+  organizationId String            @map("organization_id")
+  buildingId     String            @map("building_id")
+  reportingYear  Int?              @map("reporting_year")
+  issueKey       String            @map("issue_key")
+  issueType      DataIssueType     @map("issue_type")
+  severity       DataIssueSeverity
+  status         DataIssueStatus   @default(OPEN)
+  title          String
+  description    String            @db.Text
+  requiredAction String            @map("required_action") @db.Text
+  source         DataIssueSource
+  metadata       Json              @default("{}")
+  detectedAt     DateTime          @default(now()) @map("detected_at")
+  resolvedAt     DateTime?         @map("resolved_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+
+  @@unique([buildingId, issueKey])
+  @@index([organizationId, status, severity, detectedAt(sort: Desc)])
+  @@index([organizationId, buildingId, status, severity, detectedAt(sort: Desc)])
+  @@index([buildingId, status, detectedAt(sort: Desc)])
+  @@map("data_issues")
 }
 
 model BepsMetricInput {

@@ -14,6 +14,13 @@ import {
   getBuildingWorkflowSummary,
   listPortfolioWorkflowSummaries,
 } from "@/server/compliance/building-workflow";
+import {
+  deriveBuildingReadinessSummary,
+  getBuildingIssueSummary,
+  listBuildingDataIssues,
+  listPortfolioDataIssues,
+  updateDataIssueStatus,
+} from "@/server/compliance/data-issues";
 
 const createBuildingInput = z.object({
   name: z.string().min(1).max(200),
@@ -40,6 +47,32 @@ const listBuildingsInput = z.object({
     .optional(),
   search: z.string().max(200).optional(),
 });
+
+const dataIssueActionStatusSchema = z.enum([
+  "IN_PROGRESS",
+  "RESOLVED",
+  "DISMISSED",
+]);
+
+async function ensureTenantBuilding(
+  tenantDb: {
+    building: {
+      findUnique: (args: { where: { id: string } }) => Promise<{ id: string } | null>;
+    };
+  },
+  buildingId: string,
+) {
+  const building = await tenantDb.building.findUnique({
+    where: { id: buildingId },
+  });
+
+  if (!building) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Building not found",
+    });
+  }
+}
 
 export const buildingRouter = router({
   onboardingStatus: protectedProcedure.query(async ({ ctx }) => {
@@ -123,6 +156,13 @@ export const buildingRouter = router({
                     status: true,
                   },
                 },
+                packets: {
+                  orderBy: [{ generatedAt: "desc" }, { version: "desc" }],
+                  take: 1,
+                  select: {
+                    status: true,
+                  },
+                },
               },
             },
           },
@@ -130,12 +170,74 @@ export const buildingRouter = router({
         ctx.tenantDb.building.count({ where }),
       ]);
 
+      const buildingIds = buildings.map((building) => building.id);
+      const activeIssues = buildingIds.length
+        ? await prisma.dataIssue.findMany({
+            where: {
+              organizationId: ctx.organizationId,
+              buildingId: {
+                in: buildingIds,
+              },
+              status: {
+                in: ["OPEN", "IN_PROGRESS"],
+              },
+            },
+            select: {
+              id: true,
+              buildingId: true,
+              issueType: true,
+              severity: true,
+              status: true,
+              title: true,
+              description: true,
+              requiredAction: true,
+            },
+            orderBy: [{ severity: "desc" }, { detectedAt: "asc" }],
+          })
+        : [];
+
+      const issuesByBuildingId = new Map<string, typeof activeIssues>();
+      for (const issue of activeIssues) {
+        const existing = issuesByBuildingId.get(issue.buildingId) ?? [];
+        existing.push(issue);
+        issuesByBuildingId.set(issue.buildingId, existing);
+      }
+
       return {
         buildings: buildings.map((b) => ({
           ...b,
           latestSnapshot: b.complianceSnapshots[0] ?? null,
           latestBenchmarkSubmission: b.benchmarkSubmissions[0] ?? null,
           latestBepsFiling: b.filingRecords[0] ?? null,
+          readinessSummary: deriveBuildingReadinessSummary({
+            buildingId: b.id,
+            openIssues: issuesByBuildingId.get(b.id) ?? [],
+            latestBenchmarkSubmission: b.benchmarkSubmissions[0]
+              ? {
+                  id: b.benchmarkSubmissions[0].id,
+                  status: b.benchmarkSubmissions[0].status,
+                  reportingYear: b.benchmarkSubmissions[0].reportingYear,
+                  complianceRunId: b.benchmarkSubmissions[0].complianceRunId,
+                }
+              : null,
+            latestBepsFiling: b.filingRecords[0]
+              ? {
+                  id: b.filingRecords[0].id,
+                  status: b.filingRecords[0].status,
+                  filingYear: b.filingRecords[0].filingYear,
+                  complianceRunId: b.filingRecords[0].complianceRunId,
+                }
+              : null,
+            latestBepsPacketStatus: b.filingRecords[0]?.packets[0]?.status ?? null,
+          }),
+          activeIssueCounts: {
+            blocking: (issuesByBuildingId.get(b.id) ?? []).filter(
+              (issue) => issue.severity === "BLOCKING",
+            ).length,
+            warning: (issuesByBuildingId.get(b.id) ?? []).filter(
+              (issue) => issue.severity === "WARNING",
+            ).length,
+          },
         })),
         pagination: {
           page,
@@ -180,6 +282,13 @@ export const buildingRouter = router({
                     calculationManifest: true,
                   },
                 },
+                packets: {
+                  orderBy: [{ generatedAt: "desc" }, { version: "desc" }],
+                  take: 1,
+                  select: {
+                    status: true,
+                  },
+                },
               },
             },
             auditLogs: {
@@ -215,7 +324,63 @@ export const buildingRouter = router({
         latestBepsFiling: building.filingRecords[0] ?? null,
         recentAuditLogs: building.auditLogs,
         workflowSummary,
+        issueSummary: await getBuildingIssueSummary({
+          organizationId: ctx.organizationId,
+          buildingId: input.id,
+        }),
       };
+    }),
+
+  listIssues: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        status: z.enum(["ACTIVE", "ALL"]).default("ACTIVE"),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return listBuildingDataIssues({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        status: input.status,
+      });
+    }),
+
+  portfolioIssues: tenantProcedure
+    .input(
+      z.object({
+        status: z.enum(["ACTIVE", "ALL"]).default("ACTIVE"),
+        limit: z.number().int().min(1).max(500).default(200),
+      }),
+    )
+    .query(async ({ ctx, input }) =>
+      listPortfolioDataIssues({
+        organizationId: ctx.organizationId,
+        status: input.status,
+        limit: input.limit,
+      }),
+    ),
+
+  updateIssueStatus: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        issueId: z.string(),
+        nextStatus: dataIssueActionStatusSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return updateDataIssueStatus({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        issueId: input.issueId,
+        nextStatus: input.nextStatus,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
     }),
 
   workflowSummary: tenantProcedure
@@ -328,6 +493,7 @@ export const buildingRouter = router({
         await tx.benchmarkPacket.deleteMany({ where: childScope });
         await tx.financingPacket.deleteMany({ where: childScope });
         await tx.financingCaseCandidate.deleteMany({ where: childScope });
+        await tx.dataIssue.deleteMany({ where: childScope });
         await tx.benchmarkRequestItem.deleteMany({ where: childScope });
         await tx.bepsRequestItem.deleteMany({ where: childScope });
         await tx.evidenceArtifact.deleteMany({ where: childScope });

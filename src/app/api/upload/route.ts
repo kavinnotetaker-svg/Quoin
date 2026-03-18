@@ -8,6 +8,7 @@ import {
 } from "@/server/lib/tenant-access";
 import { createLogger } from "@/server/lib/logger";
 import { buildCsvUploadIngestionEnvelope } from "@/server/pipelines/data-ingestion/envelope";
+import { refreshBuildingIssuesAfterDataChange } from "@/server/compliance/data-issues";
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -116,6 +117,21 @@ export async function POST(req: NextRequest) {
         organizationId: tenant.organizationId,
         buildingId,
       });
+      try {
+        await refreshBuildingIssuesAfterDataChange({
+          organizationId: tenant.organizationId,
+          buildingId,
+          actorType: "SYSTEM",
+          actorId: null,
+          requestId,
+        });
+      } catch (issueRefreshError) {
+        logger.warn("Upload issue refresh failed", {
+          error: issueRefreshError,
+          organizationId: tenant.organizationId,
+          buildingId,
+        });
+      }
       if (pipelineResult.errors.length > 0) {
         result.warnings.push(...pipelineResult.errors.map(e => `Pipeline: ${e}`));
       }

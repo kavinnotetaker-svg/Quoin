@@ -17,6 +17,7 @@ import {
 import {
   StatusBadge,
   getPrimaryComplianceStatusDisplay,
+  getSubmissionReadinessDisplay,
   getVerificationStatusDisplay,
 } from "@/components/internal/status-helpers";
 
@@ -49,16 +50,11 @@ export function ComplianceQueue() {
     page: 1,
     pageSize: 100,
   });
-  const workflow = trpc.building.portfolioWorkflow.useQuery({ limit: 200 });
 
   const rows = useMemo(() => {
-    if (!buildingList.data || !workflow.data) {
+    if (!buildingList.data) {
       return [];
     }
-
-    const workflowByBuildingId = new Map(
-      workflow.data.items.map((item) => [item.buildingId, item]),
-    );
 
     return buildingList.data.buildings.map((building) => {
       const latestBenchmarkSubmission = building.latestBenchmarkSubmission;
@@ -73,7 +69,6 @@ export function ComplianceQueue() {
         benchmark: benchmarkEngine,
         beps: bepsEngine,
       });
-      const workflowSummary = workflowByBuildingId.get(building.id) ?? null;
       const reasonCodes = bepsEngine?.reasonCodes.length
         ? bepsEngine.reasonCodes
         : benchmarkEngine?.reasonCodes ?? [];
@@ -87,35 +82,62 @@ export function ComplianceQueue() {
         name: building.name,
         qaVerdict: benchmarkEngine?.qaVerdict ?? "FAIL",
         primaryStatus,
+        readinessState: building.readinessSummary.state,
+        blockingIssueCount: building.activeIssueCounts.blocking,
+        warningIssueCount: building.activeIssueCounts.warning,
         reasonSummary: summarizeReasonCodes(reasonCodes),
         lastEvaluationAt,
-        nextActionTitle: workflowSummary?.nextAction.title ?? "Refresh compliance data",
-        nextActionReason:
-          workflowSummary?.nextAction.reason ??
-          "Run or refresh the governed compliance evaluation for this building.",
+        nextActionTitle: building.readinessSummary.nextAction.title,
+        nextActionReason: building.readinessSummary.nextAction.reason,
       };
     });
-  }, [buildingList.data, workflow.data]);
+  }, [buildingList.data]);
 
-  const statusCounts = rows.reduce(
+  const orderedRows = [...rows].sort((left, right) => {
+    const rank = {
+      DATA_INCOMPLETE: 0,
+      READY_FOR_REVIEW: 1,
+      READY_TO_SUBMIT: 2,
+      SUBMITTED: 3,
+    } as const;
+
+    const readinessDelta = rank[left.readinessState] - rank[right.readinessState];
+    if (readinessDelta !== 0) {
+      return readinessDelta;
+    }
+
+    const blockingDelta = right.blockingIssueCount - left.blockingIssueCount;
+    if (blockingDelta !== 0) {
+      return blockingDelta;
+    }
+
+    const warningDelta = right.warningIssueCount - left.warningIssueCount;
+    if (warningDelta !== 0) {
+      return warningDelta;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+
+  const readinessCounts = rows.reduce(
     (acc, row) => {
-      acc[row.primaryStatus] += 1;
+      acc[row.readinessState] += 1;
       return acc;
     },
     {
       DATA_INCOMPLETE: 0,
-      READY: 0,
-      COMPLIANT: 0,
-      NON_COMPLIANT: 0,
+      READY_FOR_REVIEW: 0,
+      READY_TO_SUBMIT: 0,
+      SUBMITTED: 0,
     },
   );
 
-  if (buildingList.isLoading || workflow.isLoading) {
+  if (buildingList.isLoading) {
     return <LoadingState />;
   }
 
-  if (buildingList.error || workflow.error) {
-    const error = buildingList.error ?? workflow.error;
+  if (buildingList.error) {
+    const error = buildingList.error;
     return (
       <ErrorState
         message="Compliance queue could not load."
@@ -133,10 +155,10 @@ export function ComplianceQueue() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Data incomplete", value: statusCounts.DATA_INCOMPLETE },
-          { label: "Ready to evaluate", value: statusCounts.READY },
-          { label: "Compliant", value: statusCounts.COMPLIANT },
-          { label: "Needs improvement", value: statusCounts.NON_COMPLIANT },
+          { label: "Data incomplete", value: readinessCounts.DATA_INCOMPLETE },
+          { label: "Ready for review", value: readinessCounts.READY_FOR_REVIEW },
+          { label: "Ready to submit", value: readinessCounts.READY_TO_SUBMIT },
+          { label: "Submitted", value: readinessCounts.SUBMITTED },
         ].map((item) => (
           <div
             key={item.label}
@@ -163,7 +185,7 @@ export function ComplianceQueue() {
         <div className="text-sm text-slate-500">Reporting year {reportingYear}</div>
       </div>
 
-      {rows.length === 0 ? (
+      {orderedRows.length === 0 ? (
         <EmptyState message="No buildings match the current filter." />
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -172,16 +194,19 @@ export function ComplianceQueue() {
               <thead className="bg-slate-50">
                 <tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500">
                   <th className="px-5 py-3 font-semibold">Building</th>
+                  <th className="px-5 py-3 font-semibold">Readiness</th>
                   <th className="px-5 py-3 font-semibold">QA</th>
-                  <th className="px-5 py-3 font-semibold">Status</th>
+                  <th className="px-5 py-3 font-semibold">Compliance</th>
+                  <th className="px-5 py-3 font-semibold">Issues</th>
                   <th className="px-5 py-3 font-semibold">Reason</th>
                   <th className="px-5 py-3 font-semibold">Last evaluation</th>
                   <th className="px-5 py-3 font-semibold">Next action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rows.map((row) => {
+                {orderedRows.map((row) => {
                   const qa = getVerificationStatusDisplay(row.qaVerdict);
+                  const readiness = getSubmissionReadinessDisplay(row.readinessState);
                   const status = getPrimaryComplianceStatusDisplay(row.primaryStatus);
 
                   return (
@@ -195,10 +220,16 @@ export function ComplianceQueue() {
                         </Link>
                       </td>
                       <td className="px-5 py-4">
+                        <StatusBadge label={readiness.label} tone={readiness.tone} />
+                      </td>
+                      <td className="px-5 py-4">
                         <StatusBadge label={qa.label} tone={qa.tone} />
                       </td>
                       <td className="px-5 py-4">
                         <StatusBadge label={status.label} tone={status.tone} />
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {row.blockingIssueCount} blocking / {row.warningIssueCount} warning
                       </td>
                       <td className="px-5 py-4 text-slate-600">{row.reasonSummary}</td>
                       <td className="px-5 py-4 text-slate-600">

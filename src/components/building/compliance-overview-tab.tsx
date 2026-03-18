@@ -1,13 +1,17 @@
 "use client";
 
 import React from "react";
+import { trpc } from "@/lib/trpc";
 import {
   Panel,
   formatDate,
 } from "@/components/internal/admin-primitives";
 import {
   StatusBadge,
+  getDataIssueSeverityDisplay,
+  getDataIssueStatusDisplay,
   getPrimaryComplianceStatusDisplay,
+  getSubmissionReadinessDisplay,
   getVerificationStatusDisplay,
 } from "@/components/internal/status-helpers";
 import {
@@ -66,13 +70,28 @@ export function ComplianceOverviewTab({
   verificationChecklist,
 }: {
   building: {
+    id: string;
     complianceCycle: string;
-    workflowSummary: {
+    issueSummary: {
+      state: string;
+      blockingIssueCount: number;
+      warningIssueCount: number;
       nextAction: {
         title: string;
         reason: string;
       };
-    } | null;
+      openIssues: Array<{
+        id: string;
+        reportingYear: number | null;
+        issueType: string;
+        severity: string;
+        status: string;
+        title: string;
+        description: string;
+        requiredAction: string;
+        source: string;
+      }>;
+    };
     latestBenchmarkSubmission: {
       reportingYear: number;
       status: string;
@@ -122,11 +141,29 @@ export function ComplianceOverviewTab({
   const bepsEngine = extractComplianceEngineResult(
     building.latestBepsFiling?.filingPayload,
   );
+  const utils = trpc.useUtils();
+  const updateIssueStatus = trpc.building.updateIssueStatus.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.building.get.invalidate({ id: building.id }),
+        building.latestBenchmarkSubmission
+          ? utils.benchmarking.getVerificationChecklist.invalidate({
+              buildingId: building.id,
+              reportingYear: building.latestBenchmarkSubmission.reportingYear,
+            })
+          : Promise.resolve(),
+      ]);
+    },
+  });
+  const activeIssues = building.issueSummary.openIssues.filter(
+    (issue) => issue.status === "OPEN" || issue.status === "IN_PROGRESS",
+  );
   const primaryStatus = derivePrimaryComplianceStatus({
     benchmark: benchmarkEngine,
     beps: bepsEngine,
   });
   const primaryDisplay = getPrimaryComplianceStatusDisplay(primaryStatus);
+  const readinessDisplay = getSubmissionReadinessDisplay(building.issueSummary.state);
   const qaDisplay = getVerificationStatusDisplay(benchmarkEngine?.qaVerdict ?? "FAIL");
   const benchmarkInput = extractInputSummary(
     building.latestBenchmarkSubmission?.submissionPayload,
@@ -142,14 +179,13 @@ export function ComplianceOverviewTab({
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Product status
+              Submission readiness
             </div>
             <div className="mt-2">
-              <StatusBadge label={primaryDisplay.label} tone={primaryDisplay.tone} />
+              <StatusBadge label={readinessDisplay.label} tone={readinessDisplay.tone} />
             </div>
             <div className="mt-2 text-sm text-slate-600">
-              {building.workflowSummary?.nextAction.reason ??
-                "Refresh data and run the latest governed evaluation to update compliance state."}
+              {building.issueSummary.nextAction.reason}
             </div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -167,17 +203,119 @@ export function ComplianceOverviewTab({
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Next action
+              Compliance result
             </div>
-            <div className="mt-2 text-base font-semibold text-slate-900">
-              {building.workflowSummary?.nextAction.title ?? "Refresh compliance state"}
+            <div className="mt-2">
+              <StatusBadge label={primaryDisplay.label} tone={primaryDisplay.tone} />
             </div>
             <div className="mt-2 text-sm text-slate-600">
-              {building.workflowSummary?.nextAction.reason ??
-                "Run the next governed workflow step for this building."}
+              {building.issueSummary.blockingIssueCount > 0
+                ? `${building.issueSummary.blockingIssueCount} blocking issue(s) must be resolved before the compliance result is submission-ready.`
+                : "The latest governed compliance result is available below."}
             </div>
           </div>
         </div>
+      </Panel>
+
+      <Panel
+        title="Open data issues"
+        subtitle="These are the persistent issues currently blocking or slowing this building’s path to review and submission."
+      >
+        {activeIssues.length === 0 ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            No open data issues remain. This building is ready to move through review based on the latest records.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activeIssues.map((issue) => {
+              const severity = getDataIssueSeverityDisplay(issue.severity);
+              const status = getDataIssueStatusDisplay(issue.status);
+              const isBlocking = issue.severity === "BLOCKING";
+              const isBusy =
+                updateIssueStatus.isPending &&
+                updateIssueStatus.variables?.issueId === issue.id;
+
+              return (
+                <div
+                  key={issue.id}
+                  className="rounded-lg border border-slate-200 bg-white p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium text-slate-900">{issue.title}</div>
+                      <div className="mt-1 text-sm text-slate-500">
+                        {issue.reportingYear ? `Reporting year ${issue.reportingYear}` : "Current building state"}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge label={severity.label} tone={severity.tone} />
+                      <StatusBadge label={status.label} tone={status.tone} />
+                    </div>
+                  </div>
+                  <div className="mt-3 text-sm text-slate-600">{issue.description}</div>
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Required action:</span>{" "}
+                    {issue.requiredAction}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {issue.status === "OPEN" ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateIssueStatus.mutate({
+                            buildingId: building.id,
+                            issueId: issue.id,
+                            nextStatus: "IN_PROGRESS",
+                          })
+                        }
+                        disabled={isBusy}
+                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-900 disabled:opacity-50"
+                      >
+                        Mark in progress
+                      </button>
+                    ) : null}
+                    {!isBlocking ? (
+                      <>
+                        {issue.status !== "RESOLVED" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateIssueStatus.mutate({
+                                buildingId: building.id,
+                                issueId: issue.id,
+                                nextStatus: "RESOLVED",
+                              })
+                            }
+                            disabled={isBusy}
+                            className="rounded-md border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:border-emerald-400 hover:text-emerald-800 disabled:opacity-50"
+                          >
+                            Mark resolved
+                          </button>
+                        ) : null}
+                        {issue.status !== "DISMISSED" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateIssueStatus.mutate({
+                                buildingId: building.id,
+                                issueId: issue.id,
+                                nextStatus: "DISMISSED",
+                              })
+                            }
+                            disabled={isBusy}
+                            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-900 disabled:opacity-50"
+                          >
+                            Dismiss warning
+                          </button>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Panel>
 
       <div className="grid gap-6 xl:grid-cols-2">

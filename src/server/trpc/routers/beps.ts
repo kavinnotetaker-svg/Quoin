@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { NotFoundError } from "@/server/lib/errors";
 import { evaluateBepsComplianceForBuilding } from "@/server/compliance/compliance-engine";
+import { refreshBepsDataIssues } from "@/server/compliance/data-issues";
 import {
   attachEvidenceToBepsFilingRecord,
   getCanonicalBepsInputState,
@@ -208,6 +209,16 @@ export const bepsRouter = router({
               createdById: ctx.clerkUserId ?? null,
             });
 
+      const readinessSummary = await refreshBepsDataIssues({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        filingYear: evaluation.filingYear,
+        engineResult: evaluation.engineResult,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
+
       return {
         evaluation: evaluation.evaluation,
         provenance: evaluation.provenance,
@@ -215,6 +226,7 @@ export const bepsRouter = router({
         ruleVersion: evaluation.ruleVersion,
         factorSetVersion: evaluation.factorSetVersion,
         engineResult: evaluation.engineResult,
+        readinessSummary,
       };
     }),
 

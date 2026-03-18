@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ComplianceOverviewTab } from "@/components/building/compliance-overview-tab";
@@ -8,6 +8,32 @@ import {
   getPacketStatusDisplay,
   getSyncStatusDisplay,
 } from "@/components/internal/status-helpers";
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    useUtils: () => ({
+      building: {
+        get: {
+          invalidate: vi.fn().mockResolvedValue(undefined),
+        },
+      },
+      benchmarking: {
+        getVerificationChecklist: {
+          invalidate: vi.fn().mockResolvedValue(undefined),
+        },
+      },
+    }),
+    building: {
+      updateIssueStatus: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          isPending: false,
+          variables: undefined,
+        }),
+      },
+    },
+  },
+}));
 
 describe("consultant-facing status copy", () => {
   it("uses plain language for key compliance and sync states", () => {
@@ -31,12 +57,29 @@ describe("consultant-facing screens", () => {
     const markup = renderToStaticMarkup(
       createElement(ComplianceOverviewTab, {
         building: {
+          id: "building-1",
           complianceCycle: "CYCLE_1",
-          workflowSummary: {
+          issueSummary: {
+            state: "READY_FOR_REVIEW",
+            blockingIssueCount: 0,
+            warningIssueCount: 1,
             nextAction: {
-              title: "Run BEPS evaluation",
-              reason: "The latest benchmarking result is ready for BEPS review.",
+              title: "Review the latest compliance result",
+              reason: "No blocking issues remain. Review the latest governed result before submission.",
             },
+            openIssues: [
+              {
+                id: "issue-1",
+                reportingYear: 2025,
+                issueType: "DQC_SUPPORT_MISSING",
+                severity: "WARNING",
+                status: "OPEN",
+                title: "Data Quality Checker support is missing",
+                description: "Attach Data Quality Checker support or document verifier follow-up.",
+                requiredAction: "Attach Data Quality Checker support or document verifier follow-up.",
+                source: "QA",
+              },
+            ],
           },
           latestBenchmarkSubmission: {
             reportingYear: 2025,
@@ -119,7 +162,10 @@ describe("consultant-facing screens", () => {
     );
 
     expect(markup).toContain("Compliance decision");
-    expect(markup).toContain("Run BEPS evaluation");
+    expect(markup).toContain(
+      "No blocking issues remain. Review the latest governed result before submission.",
+    );
+    expect(markup).toContain("Open data issues");
     expect(markup).toContain("engine-test-v1");
     expect(markup).toContain("ENERGY STAR SCORE");
     expect(markup).toContain("Audit trace summary");
