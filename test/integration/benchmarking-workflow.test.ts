@@ -5,6 +5,7 @@ import { appRouter } from "@/server/trpc/routers";
 
 describe("benchmarking workflow", () => {
   const scope = `${Date.now()}`;
+  const activeEffectiveFrom = new Date(Date.now() - 60_000);
   const freshDqcCheckedAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
   const benchmarkingApplicabilityBands = [
     {
@@ -120,7 +121,7 @@ describe("benchmarking workflow", () => {
         sourceArtifactId: sourceArtifact.id,
         version: "test-v1",
         status: "ACTIVE",
-        effectiveFrom: new Date("2025-01-01T00:00:00.000Z"),
+        effectiveFrom: activeEffectiveFrom,
         implementationKey: "benchmarking/readiness-v1",
         sourceMetadata: {
           authority: {
@@ -154,6 +155,7 @@ describe("benchmarking workflow", () => {
       update: {
         sourceArtifactId: guidanceArtifact.id,
         status: "ACTIVE",
+        effectiveFrom: activeEffectiveFrom,
         sourceMetadata: { scope },
         factorsJson: {
           benchmarking: {
@@ -200,7 +202,7 @@ describe("benchmarking workflow", () => {
         sourceArtifactId: guidanceArtifact.id,
         version: "test-v1",
         status: "ACTIVE",
-        effectiveFrom: new Date("2025-01-01T00:00:00.000Z"),
+        effectiveFrom: activeEffectiveFrom,
         sourceMetadata: { scope },
         factorsJson: {
           benchmarking: {
@@ -744,6 +746,7 @@ describe("benchmarking workflow", () => {
         ownershipTypeUsed: "PRIVATE",
         applicabilityBandLabel: "PRIVATE_10K_TO_24_999",
         minimumGrossSquareFeet: 10000,
+        manualSubmissionAllowedWhenNotBenchmarkable: false,
       });
 
       expect(districtResult.readiness.summary.applicabilityBandLabel).toBe(
@@ -762,6 +765,7 @@ describe("benchmarking workflow", () => {
         ownershipTypeUsed: "DISTRICT",
         applicabilityBandLabel: "DISTRICT_10K_PLUS",
         deadlineType: "WITHIN_DAYS_OF_BENCHMARK_GENERATION",
+        manualSubmissionAllowedWhenNotBenchmarkable: true,
       });
     } finally {
       await prisma.evidenceArtifact.deleteMany({

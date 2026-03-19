@@ -129,7 +129,10 @@ async function querySeededCounts(connectionString) {
               '[]'::jsonb
             )
           ) band
-          WHERE band->>'label' = 'PRIVATE_25K_TO_49_999') AS benchmarking_private_25k_band,
+          WHERE band->>'label' = 'PRIVATE_10K_TO_24_999'
+            AND band->>'deadlineType' = 'MAY_1_FOLLOWING_YEAR'
+            AND band->'verificationYears' = '[2027]'::jsonb
+            AND band->>'verificationCadenceYears' = '6') AS benchmarking_private_10k_band,
         (SELECT COUNT(*)
           FROM jsonb_array_elements(
             COALESCE(
@@ -143,7 +146,44 @@ async function querySeededCounts(connectionString) {
               '[]'::jsonb
             )
           ) band
-          WHERE band->>'label' = 'DISTRICT_10K_PLUS') AS benchmarking_district_band,
+          WHERE band->>'label' = 'PRIVATE_25K_TO_49_999'
+            AND band->>'deadlineType' = 'MAY_1_FOLLOWING_YEAR'
+            AND band->'verificationYears' = '[2024, 2027]'::jsonb
+            AND band->>'verificationCadenceYears' = '6') AS benchmarking_private_25k_band,
+        (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+            COALESCE(
+              (
+                SELECT factors_json->'benchmarking'->'applicabilityBands'
+                FROM factor_set_versions
+                WHERE key = 'DC_CURRENT_STANDARDS' AND status = 'ACTIVE'
+                ORDER BY effective_from DESC, created_at DESC
+                LIMIT 1
+              ),
+              '[]'::jsonb
+            )
+          ) band
+          WHERE band->>'label' = 'PRIVATE_50K_PLUS'
+            AND band->>'deadlineType' = 'MAY_1_FOLLOWING_YEAR'
+            AND band->'verificationYears' = '[2024, 2027]'::jsonb
+            AND band->>'verificationCadenceYears' = '6') AS benchmarking_private_50k_band,
+        (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+            COALESCE(
+              (
+                SELECT factors_json->'benchmarking'->'applicabilityBands'
+                FROM factor_set_versions
+                WHERE key = 'DC_CURRENT_STANDARDS' AND status = 'ACTIVE'
+                ORDER BY effective_from DESC, created_at DESC
+                LIMIT 1
+              ),
+              '[]'::jsonb
+            )
+          ) band
+          WHERE band->>'label' = 'DISTRICT_10K_PLUS'
+            AND band->>'deadlineType' = 'WITHIN_DAYS_OF_BENCHMARK_GENERATION'
+            AND band->>'deadlineDaysFromGeneration' = '60'
+            AND band->>'manualSubmissionAllowedWhenNotBenchmarkable' = 'true') AS benchmarking_district_band,
         (SELECT COUNT(*) FROM organizations) AS organizations,
         (SELECT COUNT(*) FROM users) AS users,
         (SELECT COUNT(*) FROM organization_memberships) AS memberships,
@@ -231,7 +271,9 @@ async function main() {
       Number(seededCounts.beps_cycle_2_trajectory_2027_rows) !== 0 ||
       Number(seededCounts.beps_cycle_2_trajectory_2028_rows) < 1 ||
       Number(seededCounts.benchmarking_applicability_bands) < 4 ||
+      Number(seededCounts.benchmarking_private_10k_band) !== 1 ||
       Number(seededCounts.benchmarking_private_25k_band) !== 1 ||
+      Number(seededCounts.benchmarking_private_50k_band) !== 1 ||
       Number(seededCounts.benchmarking_district_band) !== 1 ||
       Number(seededCounts.beps_cycles) < 2 ||
       Number(seededCounts.beps_metric_inputs) < 1 ||

@@ -292,6 +292,38 @@ describe("benchmarking workflow", () => {
     expect(result2027.summary.submissionDueDate).toBe("2028-05-01T00:00:00.000Z");
   });
 
+  it("surfaces manual-path governance metadata only for district/manual benchmarking bands", () => {
+    const privateResult = evaluateBenchmarkReadinessData({
+      building: {
+        ...baseBuilding,
+        grossSquareFeet: 30000,
+      },
+      readings: monthReadings(2027),
+      evidenceArtifacts: [freshEvidence("DQC_REPORT", 2027), freshEvidence("VERIFICATION", 2027)],
+      reportingYear: 2027,
+      ruleConfig: baseRuleConfig,
+      factorConfig: baseFactorConfig,
+      evaluatedAt: new Date("2028-01-15T00:00:00.000Z"),
+    });
+
+    const districtResult = evaluateBenchmarkReadinessData({
+      building: {
+        ...baseBuilding,
+        ownershipType: "DISTRICT",
+        grossSquareFeet: 15000,
+      },
+      readings: monthReadings(2027),
+      evidenceArtifacts: [freshEvidence("DQC_REPORT", 2027)],
+      reportingYear: 2027,
+      ruleConfig: baseRuleConfig,
+      factorConfig: baseFactorConfig,
+      evaluatedAt: new Date("2028-01-15T00:00:00.000Z"),
+    });
+
+    expect(privateResult.summary.manualSubmissionAllowedWhenNotBenchmarkable).toBe(false);
+    expect(districtResult.summary.manualSubmissionAllowedWhenNotBenchmarkable).toBe(true);
+  });
+
   it("uses the district/public 60-day relative deadline rule", () => {
     const result = evaluateBenchmarkReadinessData({
       building: {

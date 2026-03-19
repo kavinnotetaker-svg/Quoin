@@ -125,6 +125,7 @@ export interface BenchmarkReadinessResult {
       | null;
     submissionDueDate: string | null;
     deadlineDaysFromGeneration: number | null;
+    manualSubmissionAllowedWhenNotBenchmarkable: boolean;
   };
   summary: {
     scopeState: "IN_SCOPE" | "OUT_OF_SCOPE";

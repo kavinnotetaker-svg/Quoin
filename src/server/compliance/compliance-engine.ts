@@ -403,6 +403,8 @@ async function evaluateBenchmarkingCompliance(
         deadlineType: baseReadiness.summary.deadlineType,
         submissionDueDate: baseReadiness.summary.submissionDueDate,
         deadlineDaysFromGeneration: baseReadiness.summary.deadlineDaysFromGeneration,
+        manualSubmissionAllowedWhenNotBenchmarkable:
+          baseReadiness.summary.manualSubmissionAllowedWhenNotBenchmarkable,
       },
     };
 
