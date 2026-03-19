@@ -85,12 +85,12 @@ export function UploadModal({
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
       <div className="relative w-full max-w-md rounded bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium text-slate-900">
+          <h2 className="text-lg font-medium text-zinc-900">
             Upload utility data
           </h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
+            className="text-zinc-400 hover:text-zinc-600"
           >
             <X size={18} />
           </button>
@@ -115,19 +115,19 @@ export function UploadModal({
                 onClick={() => inputRef.current?.click()}
                 className={`cursor-pointer rounded border border-dashed px-4 py-8 text-center text-sm ${
                   dragOver
-                    ? "border-slate-400 bg-slate-50"
-                    : "border-slate-300"
+                    ? "border-zinc-400 bg-zinc-50"
+                    : "border-zinc-300"
                 }`}
               >
                 {file ? (
-                  <p className="text-slate-700">
+                  <p className="text-zinc-700">
                     {file.name}{" "}
-                    <span className="text-slate-400">
+                    <span className="text-zinc-400">
                       ({(file.size / 1024).toFixed(0)} KB)
                     </span>
                   </p>
                 ) : (
-                  <p className="text-slate-500">
+                  <p className="text-zinc-500">
                     Drop CSV file here or click to browse
                   </p>
                 )}
@@ -150,14 +150,14 @@ export function UploadModal({
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   onClick={onClose}
-                  className="px-3 py-1.5 text-[13px] text-slate-500 hover:text-slate-700"
+                  className="px-3 py-1.5 text-[13px] text-zinc-500 hover:text-zinc-700"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpload}
                   disabled={!file || uploading}
-                  className="rounded bg-slate-900 px-3 py-1.5 text-[13px] text-white disabled:opacity-40"
+                  className="rounded bg-zinc-900 px-3 py-1.5 text-[13px] text-white disabled:opacity-40"
                 >
                   {uploading ? "Uploading..." : "Upload"}
                 </button>
@@ -168,7 +168,7 @@ export function UploadModal({
               {/* Result */}
               <div className="space-y-2 text-[13px]">
                 {result.success ? (
-                  <p className="text-slate-900">
+                  <p className="text-zinc-900">
                     {result.readingsCreated} readings created
                     {result.readingsRejected > 0 &&
                       `, ${result.readingsRejected} rejected`}
@@ -178,7 +178,7 @@ export function UploadModal({
                 )}
 
                 {result.warnings.length > 0 && (
-                  <div className="text-slate-500">
+                  <div className="text-zinc-500">
                     {result.warnings.map((w, i) => (
                       <p key={i}>{w}</p>
                     ))}
@@ -196,7 +196,7 @@ export function UploadModal({
               <div className="mt-4 flex justify-end">
                 <button
                   onClick={onClose}
-                  className="px-3 py-1.5 text-[13px] text-slate-500 hover:text-slate-700"
+                  className="px-3 py-1.5 text-[13px] text-zinc-500 hover:text-zinc-700"
                 >
                   Done
                 </button>

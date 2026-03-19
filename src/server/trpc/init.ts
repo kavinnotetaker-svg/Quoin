@@ -14,6 +14,7 @@ import { createLogger } from "@/server/lib/logger";
 import {
   requireTenantContext,
 } from "@/server/lib/tenant-access";
+import type { AppRole } from "@/server/lib/organization-membership";
 
 export interface Context {
   requestId?: string;
@@ -113,3 +114,31 @@ const enforceTenant = t.middleware(async ({ ctx, next }) => {
 });
 
 export const tenantProcedure = publicProcedure.use(enforceTenant);
+
+const OPERATOR_ROLES: AppRole[] = ["ADMIN", "MANAGER"];
+
+const enforceOperator = t.middleware(async ({ ctx, next }) => {
+  const maybeAppRole = "appRole" in ctx ? ctx.appRole : null;
+  const appRole =
+    maybeAppRole === "ADMIN" || maybeAppRole === "MANAGER" || maybeAppRole === "ENGINEER" || maybeAppRole === "VIEWER"
+      ? maybeAppRole
+      : null;
+
+  if (!appRole || !OPERATOR_ROLES.includes(appRole)) {
+    throw new AuthorizationError("Operator access is required for this action.", {
+      httpStatus: 403,
+      details: {
+        requiredRoles: OPERATOR_ROLES,
+      },
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      appRole,
+    },
+  });
+});
+
+export const operatorProcedure = tenantProcedure.use(enforceOperator);

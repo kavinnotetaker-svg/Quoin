@@ -119,6 +119,11 @@ describe("operations anomaly detection", () => {
   it("detects unusual consumption spikes and estimates site-eui impact", () => {
     const anomalies = detectOperationalAnomaliesData({
       ...buildBaseInput(),
+      penaltySummary: {
+        status: "ESTIMATED",
+        currentEstimatedPenalty: 100000,
+        calculatedAt: "2026-03-01T00:00:00.000Z",
+      },
       readings: [
         createReading({ id: "r1", meterId: "meter-1", monthIndex: 8, dailyKbtu: 100 }),
         createReading({ id: "r2", meterId: "meter-1", monthIndex: 9, dailyKbtu: 100 }),
@@ -138,6 +143,8 @@ describe("operations anomaly detection", () => {
     expect(anomaly?.attribution.likelyBepsImpact).toBe(
       "LIKELY_HIGHER_EUI_AND_WORSE_TRAJECTORY",
     );
+    expect(anomaly?.attribution.penaltyImpactStatus).toBe("ESTIMATED");
+    expect(anomaly?.attribution.estimatedPenaltyImpactUsd).toBeGreaterThan(0);
   });
 
   it("detects missing or suspect meter data from gaps and zero-usage readings", () => {
@@ -170,6 +177,7 @@ describe("operations anomaly detection", () => {
     expect(anomaly?.reasonCodes).toContain(OPERATIONAL_ANOMALY_REASON_CODES.coverageGap);
     expect(anomaly?.reasonCodes).toContain(OPERATIONAL_ANOMALY_REASON_CODES.suspectZeroUsage);
     expect(anomaly?.attribution.likelyBenchmarkingImpact).toBe("LIKELY_READINESS_BLOCKER");
+    expect(anomaly?.attribution.penaltyImpactStatus).toBe("INSUFFICIENT_CONTEXT");
   });
 
   it("detects inconsistent meter behavior when a meter diverges from a stable building trend", () => {

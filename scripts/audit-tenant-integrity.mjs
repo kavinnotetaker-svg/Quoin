@@ -402,6 +402,52 @@ const CHECKS = [
     `,
   },
   {
+    name: "building_source_reconciliations_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM building_source_reconciliations bsr
+      LEFT JOIN buildings b
+        ON b.id = bsr.building_id
+       AND b.organization_id = bsr.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "meter_source_reconciliations_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM meter_source_reconciliations msr
+      LEFT JOIN buildings b
+        ON b.id = msr.building_id
+       AND b.organization_id = msr.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "meter_source_reconciliations_meter_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM meter_source_reconciliations msr
+      LEFT JOIN meters m
+        ON m.id = msr.meter_id
+      WHERE m.id IS NULL
+         OR m.organization_id <> msr.organization_id
+         OR m.building_id <> msr.building_id
+    `,
+  },
+  {
+    name: "meter_source_reconciliations_parent_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM meter_source_reconciliations msr
+      LEFT JOIN building_source_reconciliations bsr
+        ON bsr.id = msr.building_source_reconciliation_id
+      WHERE bsr.id IS NULL
+         OR bsr.organization_id <> msr.organization_id
+         OR bsr.building_id <> msr.building_id
+    `,
+  },
+  {
     name: "submission_workflows_building_org_mismatch",
     query: `
       SELECT COUNT(*)::int AS violating_rows

@@ -8,6 +8,7 @@ import { BenchmarkingTab } from "./benchmarking-tab";
 import { VerificationRequestsTab } from "./verification-requests-tab";
 import { BepsTab } from "./beps-tab";
 import { UploadModal } from "./upload-modal";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Tab {
   key: string;
@@ -66,14 +67,14 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
   if (isLoading) {
     return (
       <div className="overflow-hidden">
-        <div className="loading-bar h-0.5 w-1/3 bg-slate-300" />
+        <div className="loading-bar h-0.5 w-1/3 bg-zinc-300" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <p className="py-12 text-center text-sm text-slate-500">
+      <p className="py-12 text-center text-sm text-zinc-500">
         {error.data?.code === "NOT_FOUND"
           ? "Building not found."
           : "Something went wrong. Try refreshing."}
@@ -96,41 +97,61 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
         onUpload={() => setShowUpload(true)}
       />
 
-      <div className="flex flex-wrap gap-6 border-b border-slate-200 text-[13px] font-medium">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => handleTabChange(tab.key)}
-            className={`border-b-2 pb-2.5 transition-colors duration-200 ${
-              activeTab === tab.key
-                ? "border-slate-900 text-slate-900"
-                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-6 border-b border-zinc-200 text-[13px] font-medium relative">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => handleTabChange(tab.key)}
+              className={`relative pb-2.5 transition-colors duration-200 ${
+                isActive
+                  ? "text-zinc-900"
+                  : "text-zinc-500 hover:text-zinc-900"
+              }`}
+            >
+              {tab.label}
+              {isActive && (
+                <motion.div 
+                  layoutId="activeTab"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900"
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="pt-2">
-        {activeTab === "overview" ? (
-          <ComplianceOverviewTab
-            building={data}
-            verificationChecklist={verificationChecklist.data}
-          />
-        ) : null}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            {activeTab === "overview" && (
+              <ComplianceOverviewTab
+                building={data}
+                verificationChecklist={verificationChecklist.data}
+              />
+            )}
 
-        {activeTab === "benchmarking" ? (
-          <div className="space-y-6">
-            <BenchmarkingTab buildingId={buildingId} />
-            <VerificationRequestsTab buildingId={buildingId} />
-          </div>
-        ) : null}
+            {activeTab === "benchmarking" && (
+              <div className="space-y-6">
+                <BenchmarkingTab buildingId={buildingId} />
+                <VerificationRequestsTab buildingId={buildingId} />
+              </div>
+            )}
 
-        {activeTab === "beps" ? <BepsTab buildingId={buildingId} /> : null}
+            {activeTab === "beps" && <BepsTab buildingId={buildingId} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {showUpload ? (
+      {showUpload && (
         <UploadModal
           buildingId={buildingId}
           onClose={() => setShowUpload(false)}
@@ -146,7 +167,7 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
             });
           }}
         />
-      ) : null}
+      )}
     </div>
   );
 }

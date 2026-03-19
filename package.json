@@ -24,6 +24,7 @@
     "test:watch": "vitest",
     "eval": "tsx test/eval/runner.ts",
     "eval:verbose": "tsx test/eval/runner.ts --verbose",
+    "rules:regress": "tsx scripts/run-governed-regressions.ts",
     "worker": "tsx src/server/worker-entrypoint.ts",
     "worker:build": "tsc --project tsconfig.worker.json",
     "worker:prod": "node dist/server/worker-entrypoint.js"

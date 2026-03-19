@@ -26,7 +26,7 @@ export function ComplianceTab({ buildingId }: { buildingId: string }) {
   if (isLoading) {
     return (
       <div className="overflow-hidden rounded-md">
-        <div className="loading-bar h-1 w-1/3 bg-slate-300" />
+        <div className="loading-bar h-1 w-1/3 bg-zinc-300" />
       </div>
     );
   }

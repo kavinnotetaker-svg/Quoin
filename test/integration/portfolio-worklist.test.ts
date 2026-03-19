@@ -677,6 +677,7 @@ describe("portfolio worklist", () => {
     expect(result.aggregate.readyForReview).toBe(1);
     expect(result.aggregate.readyToSubmit).toBe(1);
     expect(result.aggregate.withPenaltyExposure).toBe(2);
+    expect(result.aggregate.withSyncAttention).toBe(0);
     expect(result.aggregate.withDraftArtifacts).toBe(0);
     expect(result.aggregate.finalizedAwaitingNextAction).toBe(1);
 
@@ -733,6 +734,12 @@ describe("portfolio worklist", () => {
     expect(row?.penaltySummary?.currentEstimatedPenalty).toBe(250000);
     expect(buildingDetail.governedSummary.penaltySummary?.currentEstimatedPenalty).toBe(
       row?.penaltySummary?.currentEstimatedPenalty ?? null,
+    );
+    expect(row?.runtime.portfolioManager.currentState).toBe(
+      buildingDetail.governedSummary.runtimeSummary.portfolioManager.currentState,
+    );
+    expect(row?.runtime.greenButton.currentState).toBe(
+      buildingDetail.governedSummary.runtimeSummary.greenButton.currentState,
     );
   });
 

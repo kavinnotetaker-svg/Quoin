@@ -16,6 +16,7 @@ import {
   markRunning,
 } from "@/server/lib/jobs";
 import { createLogger } from "@/server/lib/logger";
+import { refreshBuildingIssuesAfterDataChange } from "@/server/compliance/data-issues";
 import { runIngestionPipeline } from "./logic";
 import {
   INGESTION_JOB_TYPE,
@@ -25,6 +26,11 @@ import {
 } from "./envelope";
 import { createESPMClient } from "@/server/integrations/espm";
 import { processGreenButtonNotificationEnvelope } from "./green-button";
+import {
+  markGreenButtonIngestionFailed,
+  markGreenButtonIngestionRunning,
+  markGreenButtonIngestionSucceeded,
+} from "@/server/compliance/integration-runtime";
 
 function shouldRetryJob(error: ReturnType<typeof toAppError>, attemptsMade: number, maxAttempts: number) {
   return error.retryable && attemptsMade < maxAttempts;
@@ -164,6 +170,10 @@ export async function processDataIngestionQueueJob(job: QueueJob) {
         pipelineRunId: result.pipelineRunId,
       };
     } else if (envelope.jobType === INGESTION_JOB_TYPE.GREEN_BUTTON_NOTIFICATION) {
+      await markGreenButtonIngestionRunning({
+        connectionId: envelope.payload.connectionId,
+        jobId: operationalJob.id,
+      });
       result = await processGreenButtonNotificationEnvelope({
         envelope,
         tenantDb,
@@ -192,11 +202,30 @@ export async function processDataIngestionQueueJob(job: QueueJob) {
         pipelineSummary: result.pipelineResult?.summary ?? null,
         pipelineRunId: result.pipelineResult?.pipelineRunId ?? null,
       };
+      await markGreenButtonIngestionSucceeded({
+        connectionId: envelope.payload.connectionId,
+        jobId: operationalJob.id,
+      });
     } else {
       throw new ContractValidationError("Unsupported ingestion job type.", {
         details: {
           jobType: (envelope as { jobType: string }).jobType,
         },
+      });
+    }
+
+    try {
+      await refreshBuildingIssuesAfterDataChange({
+        organizationId: envelope.organizationId,
+        buildingId: envelope.buildingId,
+        actorType: "SYSTEM",
+        actorId: null,
+        requestId: envelope.requestId,
+      });
+    } catch (refreshError) {
+      scopedLogger.warn("Post-ingestion issue refresh failed", {
+        error: refreshError,
+        jobType: envelope.jobType,
       });
     }
 
@@ -221,6 +250,22 @@ export async function processDataIngestionQueueJob(job: QueueJob) {
       runningJob.attempts,
       runningJob.maxAttempts,
     );
+
+    if (envelope.jobType === INGESTION_JOB_TYPE.GREEN_BUTTON_NOTIFICATION) {
+      try {
+        await markGreenButtonIngestionFailed({
+          connectionId: envelope.payload.connectionId,
+          jobId: operationalJob.id,
+          errorCode: appError.code,
+          errorMessage: appError.message,
+          retryScheduled: retryable,
+        });
+      } catch (runtimeError) {
+        scopedLogger.warn("Green Button runtime state persistence failed", {
+          error: runtimeError,
+        });
+      }
+    }
 
     if (!finalizedStatus) {
       if (retryable) {

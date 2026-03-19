@@ -5,6 +5,7 @@ import {
   listBuildingGovernedOperationalSummaries,
   type BuildingGovernedOperationalSummary,
 } from "@/server/compliance/governed-operational-summary";
+import { type BuildingIntegrationRuntimeSummary } from "@/server/compliance/integration-runtime";
 import { type PenaltySummary } from "@/server/compliance/penalties";
 import { type SubmissionWorkflowSummary } from "@/server/compliance/submission-workflows";
 
@@ -22,6 +23,7 @@ export type PortfolioWorklistSort =
 
 export type PortfolioWorklistNextActionCode =
   | "RESOLVE_BLOCKING_ISSUES"
+  | "REFRESH_INTEGRATION"
   | "REGENERATE_ARTIFACT"
   | "FINALIZE_ARTIFACT"
   | "REVIEW_COMPLIANCE_RESULT"
@@ -64,10 +66,19 @@ export interface PortfolioWorklistItem {
     PenaltySummary,
     "id" | "status" | "currentEstimatedPenalty" | "calculatedAt"
   > | null;
+  anomalySummary: {
+    activeCount: number;
+    highSeverityCount: number;
+    totalEstimatedEnergyImpactKbtu: number | null;
+    totalEstimatedPenaltyImpactUsd: number | null;
+    penaltyImpactStatus: "ESTIMATED" | "INSUFFICIENT_CONTEXT" | "NOT_APPLICABLE";
+    needsAttention: boolean;
+  };
   artifacts: {
     benchmark: PortfolioWorklistArtifactSummary;
     beps: PortfolioWorklistArtifactSummary;
   };
+  runtime: BuildingIntegrationRuntimeSummary;
   submission: {
     benchmark: PortfolioWorklistSubmissionSummary;
     beps: PortfolioWorklistSubmissionSummary;
@@ -87,6 +98,8 @@ export interface PortfolioWorklistItem {
     submitted: boolean;
     hasPenaltyExposure: boolean;
     needsCorrection: boolean;
+    needsSyncAttention: boolean;
+    needsAnomalyAttention: boolean;
   };
 }
 
@@ -98,6 +111,8 @@ export interface PortfolioWorklistAggregate {
   submitted: number;
   needsCorrection: number;
   withPenaltyExposure: number;
+  withSyncAttention: number;
+  withOperationalRisk: number;
   withDraftArtifacts: number;
   finalizedAwaitingNextAction: number;
 }
@@ -188,6 +203,14 @@ function deriveNextAction(
       code: "RESOLVE_BLOCKING_ISSUES",
       title: readiness.nextAction.title,
       reason: readiness.nextAction.reason,
+    };
+  }
+
+  if (summary.runtimeSummary.nextAction) {
+    return {
+      code: "REFRESH_INTEGRATION",
+      title: summary.runtimeSummary.nextAction.title,
+      reason: summary.runtimeSummary.nextAction.reason,
     };
   }
 
@@ -327,6 +350,12 @@ function toAggregate(items: PortfolioWorklistItem[]): PortfolioWorklistAggregate
       if (item.flags.hasPenaltyExposure) {
         acc.withPenaltyExposure += 1;
       }
+      if (item.flags.needsSyncAttention) {
+        acc.withSyncAttention += 1;
+      }
+      if (item.flags.needsAnomalyAttention) {
+        acc.withOperationalRisk += 1;
+      }
       if (
         item.artifacts.benchmark.status === "GENERATED" ||
         item.artifacts.benchmark.status === "STALE" ||
@@ -354,6 +383,8 @@ function toAggregate(items: PortfolioWorklistItem[]): PortfolioWorklistAggregate
       submitted: 0,
       needsCorrection: 0,
       withPenaltyExposure: 0,
+      withSyncAttention: 0,
+      withOperationalRisk: 0,
       withDraftArtifacts: 0,
       finalizedAwaitingNextAction: 0,
     },
@@ -441,10 +472,21 @@ export async function getPortfolioWorklist(
             calculatedAt: penaltySummary.calculatedAt,
           }
         : null,
+      anomalySummary: {
+        activeCount: governedSummary.anomalySummary.activeCount,
+        highSeverityCount: governedSummary.anomalySummary.highSeverityCount,
+        totalEstimatedEnergyImpactKbtu:
+          governedSummary.anomalySummary.totalEstimatedEnergyImpactKbtu,
+        totalEstimatedPenaltyImpactUsd:
+          governedSummary.anomalySummary.totalEstimatedPenaltyImpactUsd,
+        penaltyImpactStatus: governedSummary.anomalySummary.penaltyImpactStatus,
+        needsAttention: governedSummary.anomalySummary.needsAttention,
+      },
       artifacts: {
         benchmark: benchmarkArtifact,
         beps: bepsArtifact,
       },
+      runtime: governedSummary.runtimeSummary,
       submission: {
         benchmark: {
           state: governedSummary.submissionSummary.benchmark?.state ?? "NOT_STARTED",
@@ -478,6 +520,8 @@ export async function getPortfolioWorklist(
         needsCorrection:
           governedSummary.submissionSummary.benchmark?.state === "NEEDS_CORRECTION" ||
           governedSummary.submissionSummary.beps?.state === "NEEDS_CORRECTION",
+        needsSyncAttention: governedSummary.runtimeSummary.needsAttention,
+        needsAnomalyAttention: governedSummary.anomalySummary.needsAttention,
       },
     };
   });

@@ -336,6 +336,41 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
   });
 
   afterAll(async () => {
+    await prisma.meterSourceReconciliation.deleteMany({
+      where: {
+        buildingId: {
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
+        },
+      },
+    });
+    await prisma.buildingSourceReconciliation.deleteMany({
+      where: {
+        buildingId: {
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
+        },
+      },
+    });
+    await prisma.greenButtonConnection.deleteMany({
+      where: {
+        buildingId: {
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
+        },
+      },
+    });
+    await prisma.dataIssue.deleteMany({
+      where: {
+        buildingId: {
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
+        },
+      },
+    });
+    await prisma.auditLog.deleteMany({
+      where: {
+        buildingId: {
+          in: [buildingReady.id, buildingFailure.id, buildingQa.id, buildingPush.id],
+        },
+      },
+    });
     await prisma.portfolioManagerSyncState.deleteMany({
       where: {
         buildingId: {
@@ -513,6 +548,10 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
     });
 
     expect(result.syncState.status).toBe("SUCCEEDED");
+    expect(result.syncState.attemptCount).toBe(1);
+    expect(result.syncState.retryCount).toBe(0);
+    expect(result.syncState.latestJobId).toBeTruthy();
+    expect(result.syncState.latestErrorCode).toBeNull();
     expect(result.benchmarkSubmission?.status).toBe("READY");
     expect(result.benchmarkSubmission?.complianceRunId).toBeTruthy();
 
@@ -537,6 +576,16 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
       },
     });
     expect(snapshots.length).toBeGreaterThan(0);
+
+    const buildingSourceReconciliation =
+      await prisma.buildingSourceReconciliation.findUnique({
+        where: { buildingId: buildingReady.id },
+      });
+    expect(buildingSourceReconciliation).toMatchObject({
+      status: "CLEAN",
+      canonicalSource: "PORTFOLIO_MANAGER",
+      referenceYear: 2025,
+    });
   });
 
   it("does not duplicate meters or ESPM readings on repeat sync", async () => {
@@ -672,6 +721,8 @@ describe("Portfolio Manager sync and benchmarking autopilot", () => {
     const errorMetadata = persisted.lastErrorMetadata as Record<string, unknown>;
     const errors = (errorMetadata["errors"] as Array<Record<string, unknown>>) ?? [];
     expect(errors[0]?.["step"]).toBe("property");
+    expect(persisted.lastFailedSyncAt).toBeTruthy();
+    expect(persisted.latestErrorMessage).toContain("ESPM property fetch failed");
   });
 
   it("marks malformed property payloads as non-retryable property failures", async () => {

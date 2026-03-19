@@ -1,7 +1,5 @@
-import { prisma } from "@/server/lib/db";
 import { NotFoundError } from "@/server/lib/errors";
 import {
-  getBuildingOperationalState,
   listBuildingOperationalStates,
   type BuildingIssueSummary,
   type BuildingOperationalState,
@@ -15,6 +13,18 @@ import {
   listSubmissionWorkflowSummariesForArtifacts,
   type SubmissionWorkflowSummary,
 } from "@/server/compliance/submission-workflows";
+import {
+  listBuildingSourceReconciliationOverviews,
+  type BuildingSourceReconciliationOverview,
+} from "@/server/compliance/source-reconciliation";
+import {
+  listBuildingIntegrationRuntimeSummaries,
+  type BuildingIntegrationRuntimeSummary,
+} from "@/server/compliance/integration-runtime";
+import {
+  listBuildingOperationalAnomalySummaries,
+  type BuildingOperationalAnomalySummary,
+} from "@/server/compliance/operations-anomalies";
 
 export type GovernedArtifactStatus =
   | "NOT_STARTED"
@@ -72,9 +82,66 @@ export interface BuildingGovernedOperationalSummary {
     benchmark: GovernedArtifactSummary;
     beps: GovernedArtifactSummary;
   };
+  reconciliationSummary: BuildingSourceReconciliationOverview;
+  runtimeSummary: BuildingIntegrationRuntimeSummary;
+  anomalySummary: BuildingOperationalAnomalySummary;
   submissionSummary: GovernedSubmissionWorkflowSummary;
   timestamps: GovernedOperationalTimestamps;
 }
+
+const EMPTY_RECONCILIATION_SUMMARY: BuildingSourceReconciliationOverview = {
+  id: null,
+  status: null,
+  canonicalSource: null,
+  referenceYear: null,
+  conflictCount: 0,
+  incompleteCount: 0,
+  lastReconciledAt: null,
+};
+
+const EMPTY_RUNTIME_SUMMARY: BuildingIntegrationRuntimeSummary = {
+  portfolioManager: {
+    system: "PORTFOLIO_MANAGER",
+    currentState: "NOT_CONNECTED",
+    connectionStatus: null,
+    lastAttemptedAt: null,
+    lastSucceededAt: null,
+    lastFailedAt: null,
+    lastWebhookReceivedAt: null,
+    attemptCount: 0,
+    retryCount: 0,
+    latestJobId: null,
+    latestErrorCode: null,
+    latestErrorMessage: null,
+    isStale: false,
+    needsAttention: false,
+    attentionReason: null,
+    staleReason: null,
+    sourceRecordId: null,
+  },
+  greenButton: {
+    system: "GREEN_BUTTON",
+    currentState: "NOT_CONNECTED",
+    connectionStatus: null,
+    lastAttemptedAt: null,
+    lastSucceededAt: null,
+    lastFailedAt: null,
+    lastWebhookReceivedAt: null,
+    attemptCount: 0,
+    retryCount: 0,
+    latestJobId: null,
+    latestErrorCode: null,
+    latestErrorMessage: null,
+    isStale: false,
+    needsAttention: false,
+    attentionReason: null,
+    staleReason: null,
+    sourceRecordId: null,
+  },
+  needsAttention: false,
+  attentionCount: 0,
+  nextAction: null,
+};
 
 function toArtifactStatus(value: string | null | undefined): GovernedArtifactStatus {
   return value === "DRAFT" ||
@@ -144,6 +211,9 @@ function buildGovernedOperationalSummary(input: {
   penaltySummary: PenaltySummary | null;
   benchmarkWorkflow: SubmissionWorkflowSummary | null;
   bepsWorkflow: SubmissionWorkflowSummary | null;
+  reconciliationSummary: BuildingSourceReconciliationOverview;
+  runtimeSummary: BuildingIntegrationRuntimeSummary;
+  anomalySummary: BuildingOperationalAnomalySummary;
 }): BuildingGovernedOperationalSummary {
   const readiness = input.operationalState.readinessSummary;
   const benchmarkArtifact = buildArtifactSummary(readiness, "BENCHMARKING");
@@ -167,6 +237,9 @@ function buildGovernedOperationalSummary(input: {
       benchmark: benchmarkArtifact,
       beps: bepsArtifact,
     },
+    reconciliationSummary: input.reconciliationSummary,
+    runtimeSummary: input.runtimeSummary,
+    anomalySummary: input.anomalySummary,
     submissionSummary: {
       benchmark: input.benchmarkWorkflow,
       beps: input.bepsWorkflow,
@@ -201,16 +274,29 @@ export async function listBuildingGovernedOperationalSummaries(params: {
     return new Map<string, BuildingGovernedOperationalSummary>();
   }
 
-  const [operationalStates, penaltySummaries] = await Promise.all([
-    listBuildingOperationalStates({
-      organizationId: params.organizationId,
-      buildingIds,
-    }),
-    listStoredPenaltySummaries({
-      organizationId: params.organizationId,
-      buildingIds,
-    }),
-  ]);
+  const [operationalStates, penaltySummaries, runtimeSummaries, anomalySummaries] =
+    await Promise.all([
+      listBuildingOperationalStates({
+        organizationId: params.organizationId,
+        buildingIds,
+      }),
+      listStoredPenaltySummaries({
+        organizationId: params.organizationId,
+        buildingIds,
+      }),
+      listBuildingIntegrationRuntimeSummaries({
+        organizationId: params.organizationId,
+        buildingIds,
+      }),
+      listBuildingOperationalAnomalySummaries({
+        organizationId: params.organizationId,
+        buildingIds,
+      }),
+    ]);
+  const reconciliationSummaries = await listBuildingSourceReconciliationOverviews({
+    organizationId: params.organizationId,
+    buildingIds,
+  });
 
   const penaltyByBuildingId = new Map(
     penaltySummaries.map((entry) => [entry.buildingId, entry.summary]),
@@ -255,6 +341,20 @@ export async function listBuildingGovernedOperationalSummaries(params: {
               operationalState.readinessSummary.artifacts.bepsPacket.id,
             ) ?? null
           : null,
+        reconciliationSummary:
+          reconciliationSummaries.get(buildingId) ?? EMPTY_RECONCILIATION_SUMMARY,
+        runtimeSummary: runtimeSummaries.get(buildingId) ?? EMPTY_RUNTIME_SUMMARY,
+        anomalySummary: anomalySummaries.get(buildingId) ?? {
+          activeCount: 0,
+          highSeverityCount: 0,
+          totalEstimatedEnergyImpactKbtu: null,
+          totalEstimatedPenaltyImpactUsd: null,
+          penaltyImpactStatus: "INSUFFICIENT_CONTEXT",
+          highestPriority: null,
+          latestDetectedAt: null,
+          needsAttention: false,
+          topAnomalies: [],
+        },
       }),
     );
   }
@@ -266,51 +366,15 @@ export async function getBuildingGovernedOperationalSummary(params: {
   organizationId: string;
   buildingId: string;
 }) {
-  const building = await prisma.building.findFirst({
-    where: {
-      id: params.buildingId,
-      organizationId: params.organizationId,
-    },
-    select: { id: true },
+  const summaries = await listBuildingGovernedOperationalSummaries({
+    organizationId: params.organizationId,
+    buildingIds: [params.buildingId],
   });
 
-  if (!building) {
+  const summary = summaries.get(params.buildingId);
+  if (!summary) {
     throw new NotFoundError("Building not found");
   }
 
-  const [operationalState, penaltySummaries] = await Promise.all([
-    getBuildingOperationalState({
-      organizationId: params.organizationId,
-      buildingId: params.buildingId,
-    }),
-    listStoredPenaltySummaries({
-      organizationId: params.organizationId,
-      buildingIds: [params.buildingId],
-    }),
-  ]);
-
-  const workflowSummaries = await listSubmissionWorkflowSummariesForArtifacts({
-    organizationId: params.organizationId,
-    benchmarkPacketIds: operationalState.readinessSummary.artifacts.benchmarkPacket?.id
-      ? [operationalState.readinessSummary.artifacts.benchmarkPacket.id]
-      : [],
-    filingPacketIds: operationalState.readinessSummary.artifacts.bepsPacket?.id
-      ? [operationalState.readinessSummary.artifacts.bepsPacket.id]
-      : [],
-  });
-
-  return buildGovernedOperationalSummary({
-    operationalState,
-    penaltySummary: penaltySummaries[0]?.summary ?? null,
-    benchmarkWorkflow: operationalState.readinessSummary.artifacts.benchmarkPacket?.id
-      ? workflowSummaries.benchmarkByPacketId.get(
-          operationalState.readinessSummary.artifacts.benchmarkPacket.id,
-        ) ?? null
-      : null,
-    bepsWorkflow: operationalState.readinessSummary.artifacts.bepsPacket?.id
-      ? workflowSummaries.bepsByPacketId.get(
-          operationalState.readinessSummary.artifacts.bepsPacket.id,
-        ) ?? null
-      : null,
-  });
+  return summary;
 }

@@ -11,7 +11,7 @@ export function StatusDot({ status }: { status: string }) {
           ? "#dc2626"
           : "#9ca3af";
   return (
-    <span className="inline-flex items-center gap-1.5 text-[13px] text-slate-700">
+    <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-700">
       <span
         className="h-1.5 w-1.5 rounded-full"
         style={{ backgroundColor: color }}

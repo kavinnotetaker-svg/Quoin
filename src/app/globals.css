@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%; /* slate-50 */
+    --background: 0 0% 98.5%;
     --foreground: 240 10% 3.9%;
 
     --card: 0 0% 100%;
@@ -33,36 +33,11 @@
     --ring: 240 10% 3.9%;
 
     --radius: 0.5rem;
-  }
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    /* Semantic tokens */
+    --color-success: 160 84% 39%;
+    --color-warning: 38 92% 50%;
+    --color-danger: 0 84% 60%;
   }
 }
 
@@ -71,32 +46,26 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans tracking-tight;
+    @apply bg-background text-foreground font-sans tracking-tight antialiased;
     font-variant-numeric: tabular-nums;
   }
 }
 
 /* Loading bar animation */
 @keyframes loading-bar {
-  0% {
-    transform: translateX(-100%);
-  }
-  50% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
 }
 
 .loading-bar {
-  animation: loading-bar 1.5s ease-in-out infinite;
+  animation: loading-bar 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
-/* Base scrollbar styling for a cleaner look */
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -110,70 +79,57 @@
 }
 
 @layer components {
-  /* ── Machined Glass Card ── */
+  /* ── Machined Card ── */
   .card-machined {
-    @apply bg-white rounded-2xl border border-slate-200/80;
+    @apply bg-white rounded-2xl border border-zinc-200/60 transition-all duration-300;
     box-shadow:
-      0 1px 2px -1px rgba(0,0,0,0.04),
-      0 4px 12px -4px rgba(0,0,0,0.06),
-      0 0 0 1px rgba(148,163,184,0.08);
+      0 1px 2px -1px rgba(0,0,0,0.02),
+      0 4px 12px -4px rgba(0,0,0,0.04),
+      0 0 0 1px rgba(161,161,170,0.05);
+  }
+  .card-machined:hover {
+    @apply border-zinc-300/80;
+    box-shadow:
+      0 4px 20px -4px rgba(0,0,0,0.08),
+      0 0 0 1px rgba(161,161,170,0.1);
   }
 
   /* ── Recessed Input ── */
   .input-recessed {
-    @apply bg-slate-100/60 border border-slate-200/80 rounded-xl;
-    box-shadow: inset 0 2px 6px rgba(0,0,0,0.04);
+    @apply bg-zinc-100/40 border border-zinc-200/80 rounded-xl transition-all duration-200;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
   }
   .input-recessed:focus {
-    @apply border-cyan-400 ring-2 ring-cyan-400/20;
+    @apply bg-white border-zinc-400 ring-4 ring-zinc-400/10 outline-none;
   }
 
-  /* ── Luminous Gradient Button ── */
-  .btn-luminous {
-    @apply bg-gradient-to-r from-cyan-500 to-emerald-400 text-white font-semibold rounded-full px-5 py-2.5 transition-all duration-200;
-    box-shadow: 0 2px 8px -2px rgba(6,182,212,0.4), 0 1px 3px rgba(0,0,0,0.08);
+  /* ── Primary Action Button ── */
+  .btn-primary {
+    @apply bg-zinc-900 text-white font-semibold rounded-lg px-5 py-2.5 transition-all duration-200 flex items-center justify-center gap-2;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05);
   }
-  .btn-luminous:hover {
-    box-shadow: 0 4px 16px -4px rgba(6,182,212,0.5), 0 2px 6px rgba(0,0,0,0.1);
-    transform: translateY(-1px);
+  .btn-primary:hover {
+    @apply bg-zinc-800 -translate-y-0.5;
+    box-shadow: 0 8px 16px -4px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.1);
+  }
+  .btn-primary:active {
+    @apply translate-y-0 scale-[0.98];
   }
 
-  /* ── Eco-Tech Pill Badges (monospace) ── */
-  .badge-eco {
-    @apply rounded-full px-3 py-1 text-xs font-mono font-semibold tracking-tight border;
+  /* ── Status Pill Badges ── */
+  .badge-status {
+    @apply rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest border transition-all duration-200;
   }
-  .badge-eco-emerald {
-    @apply badge-eco bg-emerald-50 text-emerald-700 border-emerald-200/60;
-  }
-  .badge-eco-cyan {
-    @apply badge-eco bg-cyan-50 text-cyan-700 border-cyan-200/60;
-  }
-  .badge-eco-amber {
-    @apply badge-eco bg-amber-50 text-amber-700 border-amber-200/60;
-  }
-  .badge-eco-red {
-    @apply badge-eco bg-red-50 text-red-700 border-red-200/60;
-  }
+  .badge-status-success { @apply badge-status bg-emerald-50 text-emerald-700 border-emerald-200/50; }
+  .badge-status-info { @apply badge-status bg-sky-50 text-sky-700 border-sky-200/50; }
+  .badge-status-warning { @apply badge-status bg-amber-50 text-amber-700 border-amber-200/50; }
+  .badge-status-danger { @apply badge-status bg-red-50 text-red-700 border-red-200/50; }
 
   /* ── Data Value (monospace hero numbers) ── */
   .data-value {
-    @apply font-mono text-2xl font-bold tracking-tight text-slate-900;
+    @apply font-mono text-2xl font-bold tracking-tighter text-zinc-900;
   }
   .data-value-lg {
-    @apply font-mono text-3xl font-bold tracking-tight text-slate-900;
-  }
-
-  /* ── Accent gradient strip (for section dividers) ── */
-  .accent-strip {
-    @apply h-0.5 w-full rounded-full;
-    background: linear-gradient(90deg, #06b6d4, #10b981, #06b6d4);
-    background-size: 200% auto;
-  }
-
-  /* ── Section panel with accent top border ── */
-  .panel-eco {
-    @apply card-machined overflow-hidden;
-    border-top: 3px solid transparent;
-    border-image: linear-gradient(90deg, #06b6d4, #10b981) 1;
+    @apply font-mono text-3xl font-bold tracking-tighter text-zinc-900;
   }
 }

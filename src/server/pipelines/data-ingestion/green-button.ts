@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { EnergyUnit, MeterType } from "@/generated/prisma/client";
+import { createQueue, QUEUES } from "@/server/lib/queue";
 import {
   aggregateToMonthly,
   fetchNotificationData,
@@ -14,6 +15,7 @@ import { WorkflowStateError } from "@/server/lib/errors";
 import { createESPMClient } from "@/server/integrations/espm";
 import { runIngestionPipeline, type IngestionPipelineResult } from "./logic";
 import type { GreenButtonNotificationIngestionEnvelope } from "./envelope";
+import { buildGreenButtonNotificationEnvelope } from "./envelope";
 
 type AuditWriter = (input: {
   action: string;
@@ -32,13 +34,93 @@ function meterNameForType(meterType: MeterType) {
   return meterType === "GAS" ? "Green Button Gas" : "Green Button Electric";
 }
 
-function uploadBatchIdForNotification(notificationUri: string) {
+export function uploadBatchIdForGreenButtonNotification(notificationUri: string) {
   const hash = crypto
     .createHash("sha256")
     .update(notificationUri)
     .digest("hex")
     .slice(0, 16);
   return `gb_${hash}`;
+}
+
+function normalizeGreenButtonBatchUri(input: {
+  notificationUri?: string | null;
+  resourceUri?: string | null;
+  subscriptionId: string;
+}) {
+  if (input.notificationUri) {
+    return input.notificationUri;
+  }
+
+  if (!input.resourceUri) {
+    throw new WorkflowStateError(
+      "Green Button ingestion cannot be enqueued because no notification or resource URI is available.",
+      {
+        details: {
+          subscriptionId: input.subscriptionId,
+        },
+      },
+    );
+  }
+
+  const resourceUri = input.resourceUri.replace(/\/+$/, "");
+  return `${resourceUri}/Batch/Subscription/${input.subscriptionId}`;
+}
+
+export async function enqueueGreenButtonNotificationJob(input: {
+  requestId: string;
+  organizationId: string;
+  buildingId: string;
+  connectionId: string;
+  subscriptionId: string;
+  resourceUri?: string | null;
+  notificationUri?: string | null;
+  triggeredAt?: Date;
+}) {
+  const notificationUri = normalizeGreenButtonBatchUri({
+    notificationUri: input.notificationUri ?? null,
+    resourceUri: input.resourceUri ?? null,
+    subscriptionId: input.subscriptionId,
+  });
+  const envelope = buildGreenButtonNotificationEnvelope({
+    requestId: input.requestId,
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    connectionId: input.connectionId,
+    notificationUri,
+    subscriptionId: input.subscriptionId,
+    resourceUri: input.resourceUri ?? null,
+    triggeredAt: input.triggeredAt,
+  });
+  const queueJobId = `green-button:${input.connectionId}:${uploadBatchIdForGreenButtonNotification(
+    notificationUri,
+  )}`;
+  const queue = createQueue(QUEUES.DATA_INGESTION);
+  const existingJob = await queue.getJob(queueJobId);
+
+  if (existingJob) {
+    return {
+      queueJobId,
+      notificationUri,
+      deduplicated: true,
+      payloadVersion: envelope.payloadVersion,
+      jobType: envelope.jobType,
+      queueName: QUEUES.DATA_INGESTION,
+    };
+  }
+
+  await queue.add("green-button-webhook", envelope, {
+    jobId: queueJobId,
+  });
+
+  return {
+    queueJobId,
+    notificationUri,
+    deduplicated: false,
+    payloadVersion: envelope.payloadVersion,
+    jobType: envelope.jobType,
+    queueName: QUEUES.DATA_INGESTION,
+  };
 }
 
 async function getOrCreateGreenButtonMeters(input: {
@@ -212,14 +294,16 @@ export async function processGreenButtonNotificationEnvelope(input: {
       notificationUri: input.envelope.payload.notificationUri,
     });
     return {
-      uploadBatchId: uploadBatchIdForNotification(input.envelope.payload.notificationUri),
+      uploadBatchId: uploadBatchIdForGreenButtonNotification(
+        input.envelope.payload.notificationUri,
+      ),
       importedCount: 0,
       updatedCount: 0,
       pipelineResult: null,
     };
   }
 
-  const uploadBatchId = uploadBatchIdForNotification(
+  const uploadBatchId = uploadBatchIdForGreenButtonNotification(
     input.envelope.payload.notificationUri,
   );
   const meterTypes = Array.from(

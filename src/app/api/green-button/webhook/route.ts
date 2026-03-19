@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
-import { createQueue, QUEUES } from "@/server/lib/queue";
 import { createAuditLog } from "@/server/lib/audit-log";
 import { prisma } from "@/server/lib/db";
 import { toAppError } from "@/server/lib/errors";
@@ -14,7 +13,11 @@ import {
 } from "@/server/lib/jobs";
 import { createLogger } from "@/server/lib/logger";
 import { extractSubscriptionId } from "@/server/integrations/green-button";
-import { buildGreenButtonNotificationEnvelope } from "@/server/pipelines/data-ingestion/envelope";
+import { enqueueGreenButtonNotificationJob } from "@/server/pipelines/data-ingestion/green-button";
+import {
+  markGreenButtonIngestionFailed,
+  noteGreenButtonWebhookReceived,
+} from "@/server/compliance/integration-runtime";
 
 const webhookParser = new XMLParser({
   ignoreAttributes: false,
@@ -198,17 +201,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const envelope = buildGreenButtonNotificationEnvelope({
-      requestId,
-      organizationId: connection.organizationId,
-      buildingId: connection.buildingId,
-      connectionId: connection.id,
-      notificationUri,
-      subscriptionId: connection.subscriptionId ?? subscriptionId,
-      resourceUri: connection.resourceUri,
-    });
-
     try {
+      await noteGreenButtonWebhookReceived({
+        connectionId: connection.id,
+      });
       await writeAudit({
         action: "green_button.webhook.enqueue_attempted",
         inputSnapshot: {
@@ -219,13 +215,53 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const queue = createQueue(QUEUES.DATA_INGESTION);
-      await queue.add("green-button-webhook", envelope);
+      const enqueueResult = await enqueueGreenButtonNotificationJob({
+        requestId,
+        organizationId: connection.organizationId,
+        buildingId: connection.buildingId,
+        connectionId: connection.id,
+        notificationUri,
+        subscriptionId: connection.subscriptionId ?? subscriptionId,
+        resourceUri: connection.resourceUri,
+      });
+      if (enqueueResult.deduplicated) {
+        logger.info("Green Button webhook already queued", {
+          notificationUri,
+          subscriptionId,
+          queueJobId: enqueueResult.queueJobId,
+        });
+        await safelyPersist("job.completed", () => markCompleted(runningJob.id));
+        await writeAudit({
+          action: "green_button.webhook.enqueue_succeeded",
+          inputSnapshot: {
+            notificationUri,
+            subscriptionId,
+            organizationId: connection.organizationId,
+            buildingId: connection.buildingId,
+          },
+          outputSnapshot: {
+            queue: enqueueResult.queueName,
+            payloadVersion: enqueueResult.payloadVersion,
+            jobType: enqueueResult.jobType,
+            deduplicated: true,
+            queueJobId: enqueueResult.queueJobId,
+          },
+        });
+        await writeAudit({
+          action: "green_button.webhook.completed",
+          outputSnapshot: {
+            queue: enqueueResult.queueName,
+            deduplicated: true,
+          },
+        });
+        return NextResponse.json({ received: true });
+      }
       logger.info("Enqueued Green Button webhook job", {
         notificationUri,
         subscriptionId,
         organizationId: connection.organizationId,
         buildingId: connection.buildingId,
+        queueJobId: enqueueResult.queueJobId,
       });
 
       await safelyPersist("job.completed", () => markCompleted(runningJob.id));
@@ -238,19 +274,34 @@ export async function POST(req: NextRequest) {
           buildingId: connection.buildingId,
         },
         outputSnapshot: {
-          queue: QUEUES.DATA_INGESTION,
-          payloadVersion: envelope.payloadVersion,
-          jobType: envelope.jobType,
+          queue: enqueueResult.queueName,
+          payloadVersion: enqueueResult.payloadVersion,
+          jobType: enqueueResult.jobType,
+          queueJobId: enqueueResult.queueJobId,
         },
       });
       await writeAudit({
         action: "green_button.webhook.completed",
         outputSnapshot: {
-          queue: QUEUES.DATA_INGESTION,
+          queue: enqueueResult.queueName,
         },
       });
     } catch (queueErr) {
       const appError = toAppError(queueErr);
+      await markGreenButtonIngestionFailed({
+        connectionId: connection.id,
+        jobId: runningJob.id,
+        errorCode: appError.code,
+        errorMessage: appError.message,
+        retryScheduled:
+          appError.retryable && runningJob.attempts < runningJob.maxAttempts,
+      }).catch((runtimeError) => {
+        logger.error("Failed to persist Green Button enqueue runtime state", {
+          error: runtimeError,
+          notificationUri,
+          subscriptionId,
+        });
+      });
       logger.error("Failed to enqueue Green Button webhook job", {
         error: appError,
         notificationUri,

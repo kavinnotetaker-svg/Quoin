@@ -33,7 +33,7 @@ function resolveCodeVersion(explicitCodeVersion?: string) {
 export interface CreateRuleVersionInput {
   rulePackageId: string;
   version: string;
-  status?: "DRAFT" | "ACTIVE" | "SUPERSEDED";
+  status?: "DRAFT" | "CANDIDATE" | "ACTIVE" | "SUPERSEDED";
   effectiveFrom: Date;
   effectiveTo?: Date | null;
   implementationKey: string;
@@ -93,7 +93,7 @@ export async function createRuleVersion(input: CreateRuleVersionInput) {
 export interface CreateFactorSetVersionInput {
   key: string;
   version: string;
-  status?: "DRAFT" | "ACTIVE" | "SUPERSEDED";
+  status?: "DRAFT" | "CANDIDATE" | "ACTIVE" | "SUPERSEDED";
   effectiveFrom: Date;
   effectiveTo?: Date | null;
   sourceArtifactId?: string | null;

@@ -19,6 +19,10 @@ import {
   type ComplianceEngineSurfaceResult,
   type PrimaryComplianceSurfaceStatus,
 } from "@/server/compliance/compliance-surface";
+import {
+  refreshBuildingSourceReconciliation,
+  type BuildingSourceReconciliationSummary,
+} from "@/server/compliance/source-reconciliation";
 import { listSubmissionWorkflowSummariesForArtifacts, type SubmissionWorkflowSummary } from "@/server/compliance/submission-workflows";
 import type {
   ComplianceEngineQaIssue,
@@ -36,7 +40,7 @@ export type BuildingReadinessState =
   (typeof BUILDING_READINESS_STATE)[keyof typeof BUILDING_READINESS_STATE];
 
 type DataIssueStatusFilter = "ACTIVE" | "ALL";
-type IssueRefreshScope = "BENCHMARKING" | "BEPS";
+type IssueRefreshScope = "BENCHMARKING" | "BEPS" | "SYSTEM";
 
 type IssueCandidate = {
   issueKey: string;
@@ -383,6 +387,66 @@ function buildVerificationIssueCandidates(input: {
     .filter(isPresent);
 }
 
+function buildSourceReconciliationIssueCandidates(input: {
+  summary: BuildingSourceReconciliationSummary;
+}) {
+  const candidates: IssueCandidate[] = [];
+  const issueKeyPrefix =
+    input.summary.referenceYear != null
+      ? `system:${input.summary.referenceYear}:reconciliation`
+      : "system:reconciliation";
+  const blockingConflicts = input.summary.conflicts.filter(
+    (conflict) => conflict.severity === "BLOCKING",
+  );
+  const warningConflicts = input.summary.conflicts.filter(
+    (conflict) => conflict.severity === "WARNING",
+  );
+
+  if (blockingConflicts.length > 0) {
+    candidates.push({
+      issueKey: `${issueKeyPrefix}:conflict`,
+      reportingYear: input.summary.referenceYear,
+      issueType: "METER_MAPPING_MISSING",
+      severity: "BLOCKING",
+      title: "Canonical source conflicts require review",
+      description:
+        blockingConflicts[0]?.message ??
+        "Canonical source totals or meter mappings conflict across ingestion sources.",
+      requiredAction:
+        "Review the conflicting source records and resolve the affected meter mapping or consumption mismatch before moving forward.",
+      source: "SYSTEM",
+      metadata: {
+        reconciliationStatus: input.summary.status,
+        conflictCount: blockingConflicts.length,
+        conflictCodes: blockingConflicts.map((conflict) => conflict.code),
+      },
+    });
+  }
+
+  if (warningConflicts.length > 0) {
+    candidates.push({
+      issueKey: `${issueKeyPrefix}:incomplete`,
+      reportingYear: input.summary.referenceYear,
+      issueType: "PM_SYNC_REQUIRED",
+      severity: "WARNING",
+      title: "Canonical source linkage is incomplete",
+      description:
+        warningConflicts[0]?.message ??
+        "One or more source linkages are incomplete for the current canonical source summary.",
+      requiredAction:
+        "Complete the missing source linkage or rerun the affected sync before relying on the canonical source summary.",
+      source: "SYSTEM",
+      metadata: {
+        reconciliationStatus: input.summary.status,
+        incompleteCount: warningConflicts.length,
+        conflictCodes: warningConflicts.map((conflict) => conflict.code),
+      },
+    });
+  }
+
+  return candidates;
+}
+
 function isActiveIssue(status: DataIssueStatus) {
   return status === "OPEN" || status === "IN_PROGRESS";
 }
@@ -723,7 +787,7 @@ function deriveReadinessState(input: ReadinessInput): BuildingReadinessSummary {
 async function syncIssueCandidates(params: {
   organizationId: string;
   buildingId: string;
-  reportingYear: number;
+  reportingYear: number | null;
   scope: IssueRefreshScope;
   candidates: IssueCandidate[];
   actorType: ActorType;
@@ -731,7 +795,10 @@ async function syncIssueCandidates(params: {
   requestId?: string | null;
 }) {
   const now = new Date();
-  const scopePrefix = `${params.scope.toLowerCase()}:${params.reportingYear}:`;
+  const scopePrefix =
+    params.reportingYear != null
+      ? `${params.scope.toLowerCase()}:${params.reportingYear}:`
+      : `${params.scope.toLowerCase()}:`;
   const existing = await prisma.dataIssue.findMany({
     where: {
       organizationId: params.organizationId,
@@ -886,7 +953,12 @@ export async function listBuildingOperationalStates(params: {
           in: buildingIds,
         },
       },
-      orderBy: [{ reportingYear: "desc" }, { updatedAt: "desc" }],
+      distinct: ["buildingId"],
+      orderBy: [
+        { buildingId: "asc" },
+        { reportingYear: "desc" },
+        { updatedAt: "desc" },
+      ],
       select: {
         id: true,
         buildingId: true,
@@ -922,7 +994,12 @@ export async function listBuildingOperationalStates(params: {
         },
         filingType: "BEPS_COMPLIANCE",
       },
-      orderBy: [{ filingYear: "desc" }, { updatedAt: "desc" }],
+      distinct: ["buildingId"],
+      orderBy: [
+        { buildingId: "asc" },
+        { filingYear: "desc" },
+        { updatedAt: "desc" },
+      ],
       select: {
         id: true,
         buildingId: true,
@@ -973,22 +1050,13 @@ export async function listBuildingOperationalStates(params: {
     issuesByBuildingId.set(issue.buildingId, existing);
   }
 
-  const latestBenchmarkByBuildingId = new Map<
-    string,
-    BenchmarkSubmissionSource
-  >();
-  for (const submission of benchmarkSubmissions) {
-    if (!latestBenchmarkByBuildingId.has(submission.buildingId)) {
-      latestBenchmarkByBuildingId.set(submission.buildingId, submission);
-    }
-  }
+  const latestBenchmarkByBuildingId = new Map(
+    benchmarkSubmissions.map((submission) => [submission.buildingId, submission]),
+  );
 
-  const latestBepsByBuildingId = new Map<string, BepsFilingSource>();
-  for (const filing of bepsFilings) {
-    if (!latestBepsByBuildingId.has(filing.buildingId)) {
-      latestBepsByBuildingId.set(filing.buildingId, filing);
-    }
-  }
+  const latestBepsByBuildingId = new Map(
+    bepsFilings.map((filing) => [filing.buildingId, filing]),
+  );
 
   const workflowSummaries = await listSubmissionWorkflowSummariesForArtifacts({
     organizationId: params.organizationId,
@@ -1297,6 +1365,83 @@ export async function refreshBepsDataIssues(params: {
   return next.readinessSummary;
 }
 
+export async function refreshSourceReconciliationDataIssues(params: {
+  organizationId: string;
+  buildingId: string;
+  actorType: ActorType;
+  actorId?: string | null;
+  requestId?: string | null;
+}) {
+  const logger = createLogger({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    requestId: params.requestId ?? null,
+    procedure: "dataIssues.refreshSourceReconciliation",
+  });
+
+  const previous = await getBuildingOperationalState({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+  });
+
+  const reconciliationSummary = await refreshBuildingSourceReconciliation({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    actorType: params.actorType,
+    actorId: params.actorId ?? null,
+    requestId: params.requestId ?? null,
+  });
+
+  const syncResult = await syncIssueCandidates({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    reportingYear: reconciliationSummary.referenceYear,
+    scope: "SYSTEM",
+    candidates: buildSourceReconciliationIssueCandidates({
+      summary: reconciliationSummary,
+    }),
+    actorType: params.actorType,
+    actorId: params.actorId ?? null,
+    requestId: params.requestId ?? null,
+  });
+
+  const next = await getBuildingOperationalState({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+  });
+
+  if (previous.readinessSummary.state !== next.readinessSummary.state) {
+    await createAuditLog({
+      actorType: params.actorType,
+      actorId: params.actorId ?? null,
+      organizationId: params.organizationId,
+      buildingId: params.buildingId,
+      action: "BUILDING_READINESS_CHANGED",
+      inputSnapshot: {
+        previousState: previous.readinessSummary.state,
+      },
+      outputSnapshot: {
+        nextState: next.readinessSummary.state,
+        reconciliationStatus: reconciliationSummary.status,
+      },
+      requestId: params.requestId ?? null,
+    });
+  }
+
+  logger.info("Source reconciliation issues refreshed", {
+    createdCount: syncResult.createdIssueIds.length,
+    reopenedCount: syncResult.reopenedIssueIds.length,
+    resolvedCount: syncResult.resolvedIssueIds.length,
+    readinessState: next.readinessSummary.state,
+    reconciliationStatus: reconciliationSummary.status,
+  });
+
+  return {
+    reconciliationSummary,
+    readinessSummary: next.readinessSummary,
+  };
+}
+
 export async function refreshBuildingIssuesAfterDataChange(params: {
   organizationId: string;
   buildingId: string;
@@ -1304,6 +1449,14 @@ export async function refreshBuildingIssuesAfterDataChange(params: {
   actorId?: string | null;
   requestId?: string | null;
 }) {
+  await refreshSourceReconciliationDataIssues({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    actorType: params.actorType,
+    actorId: params.actorId ?? null,
+    requestId: params.requestId ?? null,
+  });
+
   const [latestBenchmarkSubmission, latestBepsFiling] = await Promise.all([
     prisma.benchmarkSubmission.findFirst({
       where: {

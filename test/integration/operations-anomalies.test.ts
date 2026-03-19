@@ -284,10 +284,10 @@ describe("operations anomalies", () => {
     const detail = await caller.operations.detail({
       anomalyId: spike!.id,
     });
-    const attribution = detail.attributionJson as Record<string, unknown>;
-    expect(attribution["likelyBepsImpact"]).toBe(
+    expect(detail.attribution.likelyBepsImpact).toBe(
       "LIKELY_HIGHER_EUI_AND_WORSE_TRAJECTORY",
     );
+    expect(detail.penaltyImpactStatus).toBe("INSUFFICIENT_CONTEXT");
 
     const acknowledged = await caller.operations.acknowledge({
       anomalyId: spike!.id,
@@ -306,6 +306,15 @@ describe("operations anomalies", () => {
       includeDismissed: true,
     });
     expect(portfolioAnomalies.length).toBeGreaterThanOrEqual(2);
+
+    const buildingDetail = await caller.building.get({
+      id: buildingA.id,
+    });
+    expect(buildingDetail.governedSummary.anomalySummary.activeCount).toBeGreaterThanOrEqual(1);
+
+    const worklist = await caller.building.portfolioWorklist({});
+    const worklistItem = worklist.items.find((item) => item.buildingId === buildingA.id);
+    expect(worklistItem?.anomalySummary.activeCount).toBeGreaterThanOrEqual(1);
   });
 
   it("enforces tenant-safe retrieval of anomaly records", async () => {

@@ -22,6 +22,7 @@ import {
   getGreenButtonEncryptionKey,
   getOptionalGreenButtonConfig,
 } from "@/server/lib/config";
+import { refreshSourceReconciliationDataIssues } from "@/server/compliance/data-issues";
 
 /**
  * GET /api/green-button/callback?code=xxx&state=xxx
@@ -225,16 +226,20 @@ export async function GET(req: NextRequest) {
       where: { buildingId },
       update: {
         status: "ACTIVE",
+        runtimeStatus: "IDLE",
         accessToken: encryptToken(tokens.accessToken, encryptionKey),
         refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
         tokenExpiresAt: tokens.expiresAt,
         subscriptionId: tokens.subscriptionId,
         resourceUri: tokens.resourceUri,
+        latestErrorCode: null,
+        latestErrorMessage: null,
       },
       create: {
         buildingId,
         organizationId: tenant.organizationId,
         status: "ACTIVE",
+        runtimeStatus: "IDLE",
         accessToken: encryptToken(tokens.accessToken, encryptionKey),
         refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
         tokenExpiresAt: tokens.expiresAt,
@@ -250,6 +255,20 @@ export async function GET(req: NextRequest) {
         dataIngestionMethod: "GREEN_BUTTON",
       },
     });
+
+    try {
+      await refreshSourceReconciliationDataIssues({
+        organizationId: tenant.organizationId,
+        buildingId,
+        actorType: "USER",
+        actorId: tenant.clerkUserId,
+        requestId,
+      });
+    } catch (reconciliationError) {
+      jobLogger.warn("Green Button callback reconciliation refresh failed", {
+        error: reconciliationError,
+      });
+    }
 
     await safelyPersist("job.completed", () => markCompleted(runningJob.id));
     await writeAudit({
@@ -308,6 +327,31 @@ export async function GET(req: NextRequest) {
       where: { id: buildingId },
       data: { greenButtonStatus: "FAILED" },
     });
+    await tenant.tenantDb.greenButtonConnection.updateMany({
+      where: {
+        buildingId,
+        organizationId: tenant.organizationId,
+      },
+      data: {
+        status: "FAILED",
+        latestErrorCode: appError.code,
+        latestErrorMessage: appError.message,
+      },
+    });
+
+    try {
+      await refreshSourceReconciliationDataIssues({
+        organizationId: tenant.organizationId,
+        buildingId,
+        actorType: "USER",
+        actorId: tenant.clerkUserId,
+        requestId,
+      });
+    } catch (reconciliationError) {
+      jobLogger.warn("Green Button callback reconciliation refresh failed", {
+        error: reconciliationError,
+      });
+    }
 
     return NextResponse.redirect(
       new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),

@@ -88,7 +88,7 @@ export function FinancingTab({ buildingId }: { buildingId: string }) {
     return <ErrorState message="Financing packets are unavailable." detail={error?.message} />;
   }
 
-  const btnClass = "rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50";
+  const btnClass = "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors disabled:opacity-50";
 
   return (
     <div className="space-y-6">
@@ -98,11 +98,11 @@ export function FinancingTab({ buildingId }: { buildingId: string }) {
         ) : (
           <>
             <label className="block text-sm">
-              <span className="mb-1.5 block text-[13px] font-medium text-slate-700">Case name</span>
+              <span className="mb-1.5 block text-[13px] font-medium text-zinc-700">Case name</span>
               <input
                 value={caseName}
                 onChange={(event) => setCaseName(event.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 transition-colors"
+                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors"
                 placeholder="e.g., HVAC upgrade and lighting replacement"
               />
             </label>
@@ -111,7 +111,7 @@ export function FinancingTab({ buildingId }: { buildingId: string }) {
                 const checked = selectedCandidateIds.includes(candidate.id);
                 return (
                   <label key={candidate.id} className={`flex items-start gap-3 rounded-lg border p-4 text-sm cursor-pointer transition-all ${
-                    checked ? "border-slate-900 bg-slate-50/50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+                    checked ? "border-zinc-900 bg-zinc-50/50 shadow-sm" : "border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm"
                   }`}>
                     <input
                       type="checkbox"
@@ -123,22 +123,22 @@ export function FinancingTab({ buildingId }: { buildingId: string }) {
                             : [...current, candidate.id],
                         )
                       }
-                      className="mt-1 flex-shrink-0 appearance-none h-4 w-4 bg-white border border-slate-300 rounded-sm checked:bg-slate-900 checked:border-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-900 relative
+                      className="mt-1 flex-shrink-0 appearance-none h-4 w-4 bg-white border border-zinc-300 rounded-sm checked:bg-zinc-900 checked:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-zinc-900 relative
                       before:content-[''] before:hidden checked:before:block before:absolute before:left-[5px] before:top-[1px] before:w-[5px] before:h-[10px] before:border-r-2 before:border-b-2 before:border-white before:rotate-45"
                     />
                     <div>
-                      <div className="font-semibold text-slate-900 tracking-tight">{candidate.name}</div>
-                      <div className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{candidate.projectType}</div>
-                      <div className="mt-2 text-[13px] text-slate-600 font-medium">
-                        Capex <span className="text-slate-900">{formatMoney(candidate.estimatedCapex)}</span> • 
-                        Savings <span className="text-slate-900">{formatMoney(candidate.estimatedAnnualSavingsUsd)}</span>
+                      <div className="font-semibold text-zinc-900 tracking-tight">{candidate.name}</div>
+                      <div className="mt-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500">{candidate.projectType}</div>
+                      <div className="mt-2 text-[13px] text-zinc-600 font-medium">
+                        Capex <span className="text-zinc-900">{formatMoney(candidate.estimatedCapex)}</span> • 
+                        Savings <span className="text-zinc-900">{formatMoney(candidate.estimatedAnnualSavingsUsd)}</span>
                       </div>
                     </div>
                   </label>
                 );
               })}
             </div>
-            <div className="mt-5 pt-5 border-t border-slate-100 flex justify-end">
+            <div className="mt-5 pt-5 border-t border-zinc-100 flex justify-end">
               <button
                 onClick={() =>
                   upsertCase.mutate({
@@ -148,7 +148,7 @@ export function FinancingTab({ buildingId }: { buildingId: string }) {
                   })
                 }
                 disabled={upsertCase.isPending || selectedCandidateIds.length === 0}
-                className="rounded-md bg-slate-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-slate-800 transition-colors disabled:opacity-50"
+                className="rounded-md bg-zinc-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-zinc-800 transition-colors disabled:opacity-50"
               >
                 {upsertCase.isPending ? "Saving..." : "Create financing case"}
               </button>
@@ -167,17 +167,17 @@ export function FinancingTab({ buildingId }: { buildingId: string }) {
                 <button
                   key={item.id}
                   onClick={() => setSelectedCaseId(item.id)}
-                  className={`w-full rounded-xl border p-5 text-left transition-all ${selectedCaseId === item.id ? "border-slate-900 bg-slate-50/80 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"}`}
+                  className={`w-full rounded-xl border p-5 text-left transition-all ${selectedCaseId === item.id ? "border-zinc-900 bg-zinc-50/80 shadow-sm" : "border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm"}`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="font-semibold text-[15px] tracking-tight text-slate-900">{item.name}</div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider bg-white border border-slate-200 shadow-sm px-2 py-0.5 rounded-md text-slate-600">{item.caseType}</div>
+                    <div className="font-semibold text-[15px] tracking-tight text-zinc-900">{item.name}</div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider bg-white border border-zinc-200 shadow-sm px-2 py-0.5 rounded-md text-zinc-600">{item.caseType}</div>
                   </div>
-                  <div className="mt-4 grid gap-3 text-[13px] text-slate-500 font-medium sm:grid-cols-2">
-                    <div>Capex: <span className="text-slate-900">{formatMoney(item.estimatedCapex)}</span></div>
-                    <div>Savings: <span className="text-slate-900">{formatMoney(item.estimatedAnnualSavingsUsd)}</span></div>
-                    <div>Avoided penalty: <span className="text-slate-900">{formatMoney(item.estimatedAvoidedPenalty)}</span></div>
-                    <div>Compliance uplift: <span className="text-slate-900">{formatNumber(item.estimatedComplianceImprovementPct)}%</span></div>
+                  <div className="mt-4 grid gap-3 text-[13px] text-zinc-500 font-medium sm:grid-cols-2">
+                    <div>Capex: <span className="text-zinc-900">{formatMoney(item.estimatedCapex)}</span></div>
+                    <div>Savings: <span className="text-zinc-900">{formatMoney(item.estimatedAnnualSavingsUsd)}</span></div>
+                    <div>Avoided penalty: <span className="text-zinc-900">{formatMoney(item.estimatedAvoidedPenalty)}</span></div>
+                    <div>Compliance uplift: <span className="text-zinc-900">{formatNumber(item.estimatedComplianceImprovementPct)}%</span></div>
                   </div>
                 </button>
               ))}
@@ -232,22 +232,22 @@ export function FinancingTab({ buildingId }: { buildingId: string }) {
             <EmptyState message="No financing packet exists for the selected case yet." />
           ) : (
             <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <div className="flex justify-between items-center flex-wrap gap-2">
-                  <div className="font-semibold text-lg tracking-tight text-slate-900">
+                  <div className="font-semibold text-lg tracking-tight text-zinc-900">
                     Packet v{packet.data.version}
                   </div>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md">
                     {packet.data.status}
                   </div>
                 </div>
-                <div className="mt-3 text-[13px] font-medium text-slate-500 break-all bg-slate-50 border border-slate-100 p-2 rounded-md font-mono">
+                <div className="mt-3 text-[13px] font-medium text-zinc-500 break-all bg-zinc-50 border border-zinc-100 p-2 rounded-md font-mono">
                   {packet.data.packetHash}
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm text-sm text-slate-700">
-                <div className="font-semibold text-slate-900 tracking-tight">Diagnostics & Warnings</div>
+              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm text-sm text-zinc-700">
+                <div className="font-semibold text-zinc-900 tracking-tight">Diagnostics & Warnings</div>
                 {manifest.data && manifest.data.warnings.length > 0 ? (
                   <ul className="mt-3 list-disc space-y-1.5 pl-5 text-[13px] leading-relaxed font-medium text-amber-700">
                     {manifest.data.warnings.map((warning, index) => {
@@ -259,7 +259,7 @@ export function FinancingTab({ buildingId }: { buildingId: string }) {
                     })}
                   </ul>
                 ) : (
-                  <div className="mt-3 flex items-center gap-2 text-[13px] text-slate-500 font-medium bg-slate-50 border border-slate-100 p-3 rounded-lg">
+                  <div className="mt-3 flex items-center gap-2 text-[13px] text-zinc-500 font-medium bg-zinc-50 border border-zinc-100 p-3 rounded-lg">
                     <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>

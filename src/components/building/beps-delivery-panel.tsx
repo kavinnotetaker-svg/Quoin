@@ -211,7 +211,7 @@ export function BepsDeliveryPanel({
   }
 
   if (requestItems.isLoading || packets.isLoading) {
-    return <div className="text-sm text-slate-500">Loading BEPS delivery workspace...</div>;
+    return <div className="text-sm text-zinc-500">Loading BEPS delivery workspace...</div>;
   }
 
   if (requestItems.error || packets.error) {
@@ -225,9 +225,9 @@ export function BepsDeliveryPanel({
   }
 
   const btnClass =
-    "rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50";
+    "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50";
   const inputClass =
-    "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-900 shadow-sm";
+    "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm";
 
   return (
     <div className="space-y-6">
@@ -241,7 +241,7 @@ export function BepsDeliveryPanel({
               onChange={(event) =>
                 setPacketType(event.target.value as (typeof PACKET_TYPES)[number]["value"])
               }
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-900 shadow-sm"
+              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] font-medium text-zinc-900 shadow-sm"
             >
               {PACKET_TYPES.map((entry) => (
                 <option key={entry.value} value={entry.value}>
@@ -314,9 +314,9 @@ export function BepsDeliveryPanel({
         />
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-5 text-sm">
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-5 text-sm">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-900">Current deliverable state</span>
+              <span className="font-semibold text-zinc-900">Current deliverable state</span>
               <StatusBadge
                 label={packetStatusDisplay.label}
                 tone={packetStatusDisplay.tone}
@@ -326,21 +326,21 @@ export function BepsDeliveryPanel({
                 tone={dispositionDisplay.tone}
               />
             </div>
-            <p className="mt-2 text-[13px] text-slate-600">
+            <p className="mt-2 text-[13px] text-zinc-600">
               {latestPacket
                 ? `${getPacketTypeLabel(packetType)} was last generated ${formatDate(latestPacket.generatedAt)}. Finalize only when required support is verified and blockers are cleared.`
                 : `No ${getPacketTypeLabel(packetType).toLowerCase()} packet exists yet for this filing.`}
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-5 text-sm">
-            <div className="font-semibold text-slate-900">What still needs attention</div>
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-5 text-sm">
+            <div className="font-semibold text-zinc-900">What still needs attention</div>
             {blockers.length === 0 && warnings.length === 0 ? (
-              <p className="mt-2 text-[13px] text-slate-600">
+              <p className="mt-2 text-[13px] text-zinc-600">
                 No current blockers or warnings are recorded for this deliverable.
               </p>
             ) : (
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-slate-700">
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-zinc-700">
                 {blockers.map((item, index) => (
                   <li key={`blocker-${index}`} className="text-red-700">
                     {String(item)}
@@ -359,7 +359,7 @@ export function BepsDeliveryPanel({
         </div>
 
         {requestSummary ? (
-          <div className="mt-4 text-[13px] text-slate-600">
+          <div className="mt-4 text-[13px] text-zinc-600">
             {`Required items verified: ${String(requestSummary["verified"] ?? 0)} of ${String(
               requestSummary["required"] ?? 0,
             )}.`}
@@ -377,11 +377,11 @@ export function BepsDeliveryPanel({
               {requestItems.data.map((item) => {
                 const statusDisplay = getRequestItemStatusDisplay(item.status);
                 return (
-                  <div key={item.id} className="rounded-xl border border-slate-200 p-4">
+                  <div key={item.id} className="rounded-xl border border-zinc-200 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-slate-900">{item.title}</div>
-                        <div className="mt-1 text-[13px] text-slate-500">
+                        <div className="font-semibold text-zinc-900">{item.title}</div>
+                        <div className="mt-1 text-[13px] text-zinc-500">
                           {REQUEST_CATEGORIES.find((entry) => entry.value === item.category)?.label ??
                             item.category}
                           {item.isRequired ? " • Required" : " • Optional"}
@@ -393,7 +393,7 @@ export function BepsDeliveryPanel({
                           tone={statusDisplay.tone}
                         />
                         <button
-                          className="text-[12px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-4"
+                          className="text-[12px] font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-4"
                           onClick={() => hydrateEditor(item)}
                         >
                           Edit
@@ -401,7 +401,7 @@ export function BepsDeliveryPanel({
                       </div>
                     </div>
 
-                    <div className="mt-3 grid gap-2 text-[13px] text-slate-600 sm:grid-cols-2">
+                    <div className="mt-3 grid gap-2 text-[13px] text-zinc-600 sm:grid-cols-2">
                       <div>{`Requested from: ${item.requestedFrom ?? "Not set"}`}</div>
                       <div>{`Assigned to: ${item.assignedTo ?? "Not set"}`}</div>
                       <div>{`Due date: ${item.dueDate ? formatDate(item.dueDate) : "Not set"}`}</div>
@@ -409,7 +409,7 @@ export function BepsDeliveryPanel({
                     </div>
 
                     {item.notes ? (
-                      <p className="mt-3 text-[13px] text-slate-600">{item.notes}</p>
+                      <p className="mt-3 text-[13px] text-zinc-600">{item.notes}</p>
                     ) : null}
                   </div>
                 );
@@ -426,7 +426,7 @@ export function BepsDeliveryPanel({
         >
           <div className="space-y-4">
             <label className="block text-sm">
-              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                 Category
               </span>
               <select
@@ -450,7 +450,7 @@ export function BepsDeliveryPanel({
             </label>
 
             <label className="block text-sm">
-              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                 Title
               </span>
               <input value={title} onChange={(event) => setTitle(event.target.value)} className={inputClass} />
@@ -458,7 +458,7 @@ export function BepsDeliveryPanel({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm">
-                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                   Status
                 </span>
                 <select value={status} onChange={(event) => setStatus(event.target.value as (typeof REQUEST_STATUSES)[number])} className={inputClass}>
@@ -471,7 +471,7 @@ export function BepsDeliveryPanel({
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                   Due date
                 </span>
                 <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={inputClass} />
@@ -480,14 +480,14 @@ export function BepsDeliveryPanel({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm">
-                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                   Requested from
                 </span>
                 <input value={requestedFrom} onChange={(event) => setRequestedFrom(event.target.value)} className={inputClass} />
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                   Assigned to
                 </span>
                 <input value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} className={inputClass} />
@@ -495,7 +495,7 @@ export function BepsDeliveryPanel({
             </div>
 
             <label className="block text-sm">
-              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                 Notes
               </span>
               <textarea
@@ -506,12 +506,12 @@ export function BepsDeliveryPanel({
               />
             </label>
 
-            <label className="flex items-center gap-3 text-[13px] text-slate-700">
+            <label className="flex items-center gap-3 text-[13px] text-zinc-700">
               <input
                 type="checkbox"
                 checked={isRequired}
                 onChange={(event) => setIsRequired(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                className="h-4 w-4 rounded border-zinc-300 text-zinc-900"
               />
               This item is required before the deliverable is truly ready.
             </label>
@@ -587,13 +587,13 @@ export function BepsDeliveryPanel({
               );
 
               return (
-                <div key={packet.id} className="rounded-xl border border-slate-200 p-4">
+                <div key={packet.id} className="rounded-xl border border-zinc-200 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-slate-900">
+                      <div className="font-semibold text-zinc-900">
                         {getPacketTypeLabel(packet.packetType)}
                       </div>
-                      <div className="mt-1 text-[13px] text-slate-500">
+                      <div className="mt-1 text-[13px] text-zinc-500">
                         {`Version ${packet.version} • Generated ${formatDate(packet.generatedAt)}`}
                       </div>
                     </div>

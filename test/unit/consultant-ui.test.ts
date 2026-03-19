@@ -25,6 +25,9 @@ vi.mock("@/lib/trpc", () => ({
         list: {
           invalidate: vi.fn().mockResolvedValue(undefined),
         },
+        portfolioWorklist: {
+          invalidate: vi.fn().mockResolvedValue(undefined),
+        },
       },
       benchmarking: {
         getVerificationChecklist: {
@@ -36,13 +39,78 @@ vi.mock("@/lib/trpc", () => ({
       updateIssueStatus: {
         useMutation: () => ({
           mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue({ message: "Issue updated." }),
           isPending: false,
           variables: undefined,
+        }),
+      },
+      retryPortfolioManagerSync: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue({
+            message: "Portfolio Manager sync was executed through the governed sync service.",
+          }),
+          isPending: false,
+        }),
+      },
+      reenqueueGreenButtonIngestion: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue({
+            message: "Green Button ingestion was re-enqueued.",
+          }),
+          isPending: false,
+        }),
+      },
+      rerunSourceReconciliation: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue({
+            message: "Source reconciliation and downstream issue state were refreshed.",
+          }),
+          isPending: false,
+        }),
+      },
+      refreshPenaltySummary: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue({
+            message: "The latest governed penalty run is already current for this building.",
+          }),
+          isPending: false,
+        }),
+      },
+      bulkOperatePortfolio: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue({
+            action: "RERUN_SOURCE_RECONCILIATION",
+            targetCount: 2,
+            succeededCount: 1,
+            failedCount: 0,
+            skippedCount: 1,
+            results: [
+              {
+                buildingId: "building-1",
+                buildingName: "1111 Example Plaza",
+                status: "SUCCEEDED",
+                message: "Source reconciliation and downstream issue state were refreshed.",
+              },
+              {
+                buildingId: "building-missing",
+                buildingName: "Unknown building",
+                status: "SKIPPED",
+                message: "Building was not found or is not accessible in this organization.",
+              },
+            ],
+          }),
+          isPending: false,
         }),
       },
       transitionSubmissionWorkflow: {
         useMutation: () => ({
           mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue(undefined),
           isPending: false,
         }),
       },
@@ -227,6 +295,10 @@ vi.mock("@/lib/trpc", () => ({
           isLoading: false,
           error: null,
           data: {
+            operatorAccess: {
+              canManage: true,
+              appRole: "ADMIN",
+            },
             aggregate: {
               totalBuildings: 2,
               blocked: 1,
@@ -235,6 +307,8 @@ vi.mock("@/lib/trpc", () => ({
               submitted: 0,
               needsCorrection: 0,
               withPenaltyExposure: 1,
+              withSyncAttention: 1,
+              withOperationalRisk: 1,
               withDraftArtifacts: 1,
               finalizedAwaitingNextAction: 0,
             },
@@ -259,6 +333,14 @@ vi.mock("@/lib/trpc", () => ({
                   reasonSummary: "Missing Months",
                 },
                 penaltySummary: null,
+                anomalySummary: {
+                  activeCount: 1,
+                  highSeverityCount: 1,
+                  totalEstimatedEnergyImpactKbtu: 12000,
+                  totalEstimatedPenaltyImpactUsd: null,
+                  penaltyImpactStatus: "INSUFFICIENT_CONTEXT",
+                  needsAttention: true,
+                },
                 artifacts: {
                   benchmark: {
                     status: "NOT_STARTED",
@@ -271,6 +353,14 @@ vi.mock("@/lib/trpc", () => ({
                     sourceRecordId: null,
                     generatedAt: null,
                     finalizedAt: null,
+                  },
+                },
+                runtime: {
+                  portfolioManager: {
+                    currentState: "STALE",
+                  },
+                  greenButton: {
+                    currentState: "NOT_CONNECTED",
                   },
                 },
                 submission: {
@@ -300,6 +390,8 @@ vi.mock("@/lib/trpc", () => ({
                   submitted: false,
                   hasPenaltyExposure: false,
                   needsCorrection: false,
+                  needsSyncAttention: true,
+                  needsAnomalyAttention: true,
                 },
               },
               {
@@ -327,6 +419,14 @@ vi.mock("@/lib/trpc", () => ({
                   currentEstimatedPenalty: 300000,
                   calculatedAt: "2026-03-17T16:00:00.000Z",
                 },
+                anomalySummary: {
+                  activeCount: 2,
+                  highSeverityCount: 1,
+                  totalEstimatedEnergyImpactKbtu: 22000,
+                  totalEstimatedPenaltyImpactUsd: 18000,
+                  penaltyImpactStatus: "ESTIMATED",
+                  needsAttention: true,
+                },
                 artifacts: {
                   benchmark: {
                     status: "NOT_STARTED",
@@ -339,6 +439,14 @@ vi.mock("@/lib/trpc", () => ({
                     sourceRecordId: "filing-record-1",
                     generatedAt: "2026-03-17T14:00:00.000Z",
                     finalizedAt: "2026-03-17T15:00:00.000Z",
+                  },
+                },
+                runtime: {
+                  portfolioManager: {
+                    currentState: "SUCCEEDED",
+                  },
+                  greenButton: {
+                    currentState: "IDLE",
                   },
                 },
                 submission: {
@@ -368,6 +476,8 @@ vi.mock("@/lib/trpc", () => ({
                   submitted: false,
                   hasPenaltyExposure: true,
                   needsCorrection: false,
+                  needsSyncAttention: false,
+                  needsAnomalyAttention: true,
                 },
               },
             ],
@@ -435,8 +545,12 @@ describe("consultant-facing screens", () => {
     expect(markup).toContain("Resolve missing utility months");
     expect(markup).toContain("2222 Filing Tower");
     expect(markup).toContain("$300,000");
+    expect(markup).toContain("Operational risk");
+    expect(markup).toContain("Sync attention");
     expect(markup).toContain("Draft artifacts");
     expect(markup).toContain("Approved");
+    expect(markup).toContain("Bulk operator actions");
+    expect(markup).toContain("Bulk retry PM sync");
   });
 
   it("renders the compliance overview with engine result fields", () => {
@@ -445,7 +559,38 @@ describe("consultant-facing screens", () => {
         building: {
           id: "building-1",
           complianceCycle: "CYCLE_1",
+          operatorAccess: {
+            canManage: true,
+            appRole: "ADMIN",
+          },
           governedSummary: {
+            timestamps: {
+              lastSubmissionTransitionAt: "2026-03-17T15:15:00.000Z",
+            },
+            anomalySummary: {
+              activeCount: 2,
+              highSeverityCount: 1,
+              totalEstimatedEnergyImpactKbtu: 22000,
+              totalEstimatedPenaltyImpactUsd: 18000,
+              penaltyImpactStatus: "ESTIMATED",
+              highestPriority: "HIGH",
+              latestDetectedAt: "2026-03-17T12:00:00.000Z",
+              needsAttention: true,
+              topAnomalies: [
+                {
+                  id: "anomaly-1",
+                  anomalyType: "ABNORMAL_BASELOAD",
+                  severity: "HIGH",
+                  confidenceBand: "MEDIUM",
+                  title: "Persistent baseload increased above prior operating pattern",
+                  explanation:
+                    "Recent low-load months sit materially above the prior six-month low-load baseline.",
+                  estimatedEnergyImpactKbtu: 12000,
+                  estimatedPenaltyImpactUsd: 18000,
+                  penaltyImpactStatus: "ESTIMATED",
+                },
+              ],
+            },
             penaltySummary: {
               id: "penalty-run-1",
               calculationMode: "CURRENT_BEPS_EXPOSURE",
@@ -487,6 +632,41 @@ describe("consultant-facing screens", () => {
                   metricChange: null,
                 },
               ],
+            },
+            runtimeSummary: {
+              needsAttention: true,
+              attentionCount: 1,
+              nextAction: {
+                title: "Refresh Portfolio Manager sync",
+                reason: "Portfolio Manager data is stale and should be refreshed.",
+              },
+              portfolioManager: {
+                currentState: "STALE",
+                lastAttemptedAt: "2026-03-17T10:00:00.000Z",
+                lastSucceededAt: "2026-02-01T10:00:00.000Z",
+                lastFailedAt: null,
+                attemptCount: 3,
+                retryCount: 1,
+                latestErrorCode: null,
+                latestErrorMessage: null,
+                isStale: true,
+                attentionReason:
+                  "Portfolio Manager data is stale and should be refreshed.",
+              },
+              greenButton: {
+                currentState: "SUCCEEDED",
+                connectionStatus: "ACTIVE",
+                lastWebhookReceivedAt: "2026-03-17T17:00:00.000Z",
+                lastAttemptedAt: "2026-03-17T17:05:00.000Z",
+                lastSucceededAt: "2026-03-17T17:06:00.000Z",
+                lastFailedAt: null,
+                attemptCount: 4,
+                retryCount: 0,
+                latestErrorCode: null,
+                latestErrorMessage: null,
+                isStale: false,
+                attentionReason: null,
+              },
             },
           },
           readinessSummary: {
@@ -581,6 +761,113 @@ describe("consultant-facing screens", () => {
               requestId: "req-1",
             },
           ],
+          sourceReconciliation: {
+            id: "reconciliation-1",
+            status: "CONFLICTED",
+            canonicalSource: "GREEN_BUTTON",
+            referenceYear: 2025,
+            conflictCount: 1,
+            incompleteCount: 1,
+            lastReconciledAt: "2026-03-17T18:00:00.000Z",
+            sourceRecords: [
+              {
+                sourceSystem: "GREEN_BUTTON",
+                state: "AVAILABLE",
+                linkedRecordId: "gb-connection-1",
+                externalRecordId: "sub-1",
+                readingCount: 12,
+                coverageMonthCount: 12,
+                coverageMonths: ["2025-01", "2025-02"],
+                totalConsumptionKbtu: 500000,
+                latestIngestedAt: "2026-03-17T17:00:00.000Z",
+              },
+              {
+                sourceSystem: "PORTFOLIO_MANAGER",
+                state: "AVAILABLE",
+                linkedRecordId: "pm-sync-1",
+                externalRecordId: "2001",
+                readingCount: 12,
+                coverageMonthCount: 12,
+                coverageMonths: ["2025-01", "2025-02"],
+                totalConsumptionKbtu: 430000,
+                latestIngestedAt: "2026-03-16T17:00:00.000Z",
+              },
+            ],
+            conflicts: [
+              {
+                code: "CONSUMPTION_TOTAL_MISMATCH",
+                severity: "BLOCKING",
+                message: "Meter totals differ materially between Green Button and Portfolio Manager.",
+                sourceSystems: ["GREEN_BUTTON", "PORTFOLIO_MANAGER"],
+                meterId: "meter-1",
+                meterName: "Main Electric",
+              },
+            ],
+            meters: [
+              {
+                meterId: "meter-1",
+                meterName: "Main Electric",
+                meterType: "ELECTRIC",
+                unit: "KWH",
+                status: "CONFLICTED",
+                canonicalSource: "GREEN_BUTTON",
+                coverageMonthCount: 12,
+                sourceRecords: [
+                  {
+                    sourceSystem: "GREEN_BUTTON",
+                    state: "AVAILABLE",
+                    externalRecordId: "sub-1",
+                    readingCount: 12,
+                    coverageMonthCount: 12,
+                    totalConsumptionKbtu: 500000,
+                    latestIngestedAt: "2026-03-17T17:00:00.000Z",
+                  },
+                  {
+                    sourceSystem: "PORTFOLIO_MANAGER",
+                    state: "AVAILABLE",
+                    externalRecordId: "2001",
+                    readingCount: 12,
+                    coverageMonthCount: 12,
+                    totalConsumptionKbtu: 430000,
+                    latestIngestedAt: "2026-03-16T17:00:00.000Z",
+                  },
+                ],
+                conflicts: [
+                  {
+                    code: "CONSUMPTION_TOTAL_MISMATCH",
+                    severity: "BLOCKING",
+                    message: "Meter totals differ materially between Green Button and Portfolio Manager.",
+                  },
+                ],
+              },
+            ],
+          },
+          operationalAnomalies: [
+            {
+              id: "anomaly-1",
+              anomalyType: "ABNORMAL_BASELOAD",
+              severity: "HIGH",
+              status: "ACTIVE",
+              confidenceBand: "MEDIUM",
+              confidenceScore: 0.72,
+              title: "Persistent baseload increased above prior operating pattern",
+              summary:
+                "Recent low-load months sit materially above the prior six-month low-load baseline, suggesting elevated persistent usage.",
+              explanation:
+                "This is a persistent-baseload proxy derived from monthly billing periods because interval telemetry is not available in the current data model.",
+              causeHypothesis:
+                "Persistent base load has risen relative to the prior operating pattern.",
+              detectionWindowEnd: "2026-03-17T12:00:00.000Z",
+              estimatedEnergyImpactKbtu: 12000,
+              estimatedPenaltyImpactUsd: 18000,
+              penaltyImpactStatus: "ESTIMATED",
+              attribution: {
+                penaltyImpactExplanation:
+                  "Estimated by scaling the latest governed BEPS penalty exposure by the anomaly's implied site-EUI share of the latest compliance snapshot.",
+              },
+              meter: null,
+            },
+          ],
         },
         verificationChecklist: {
           summary: {
@@ -615,9 +902,24 @@ describe("consultant-facing screens", () => {
     expect(markup).toContain("Penalty estimate");
     expect(markup).toContain("$300,000");
     expect(markup).toContain("Meet target");
+    expect(markup).toContain("Operational anomalies");
+    expect(markup).toContain("Persistent baseload increased above prior operating pattern");
+    expect(markup).toContain("Integration runtime health");
+    expect(markup).toContain("Operator controls");
+    expect(markup).toContain("Retry Portfolio Manager sync");
+    expect(markup).toContain("Re-enqueue Green Button ingestion");
+    expect(markup).toContain("Transition note (optional)");
+    expect(markup).toContain(
+      "Portfolio Manager data is stale and should be refreshed.",
+    );
+    expect(markup).toContain("Portfolio Manager");
     expect(markup).toContain("Last readiness evaluation");
     expect(markup).toContain("Last compliance evaluation");
     expect(markup).toContain("Audit trace summary");
+    expect(markup).toContain("Canonical source reconciliation");
+    expect(markup).toContain("Green Button");
+    expect(markup).toContain("Blocking conflicts");
+    expect(markup).toContain("Meter linkage and coverage");
   });
 
   it("hides non-essential routes from the primary navigation", () => {
@@ -684,6 +986,7 @@ describe("consultant-facing screens", () => {
     expect(reportSource).not.toContain("@/server/");
     expect(reportSource).toContain("governedOperationalSummary.penaltySummary");
     expect(reportSource).toContain("legacyStatutoryMaximum");
+    expect(reportSource).toContain("operatorAccess.canManage");
     expect(reportSource).not.toContain("complianceData.estimatedPenalty),");
     expect(scoreSectionSource).not.toContain("Math.min(grossSquareFeet * 10, 7_500_000)");
     expect(scoreSectionSource).toContain("legacyStatutoryMaximum");
@@ -700,5 +1003,6 @@ describe("consultant-facing screens", () => {
     expect(queueSource).not.toContain("submissionPayload");
     expect(queueSource).not.toContain("filingPayload");
     expect(queueSource).toContain("building.portfolioWorklist.useQuery");
+    expect(queueSource).toContain("building.bulkOperatePortfolio.useMutation");
   });
 });

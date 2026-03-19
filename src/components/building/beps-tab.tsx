@@ -139,9 +139,9 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
   const latestPacket = packets.data?.[0] ?? null;
   const latestFiling = latestRun.error?.data?.code === "NOT_FOUND" ? null : latestRun.data;
 
-  const btnClass = "rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50";
-  const inputClass = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 transition-colors";
-  const labelSpanClass = "mb-1.5 block text-[11px] font-semibold tracking-wider text-slate-500 uppercase";
+  const btnClass = "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors disabled:opacity-50";
+  const inputClass = "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors";
+  const labelSpanClass = "mb-1.5 block text-[11px] font-semibold tracking-wider text-zinc-500 uppercase";
 
   return (
     <div className="space-y-6">
@@ -153,7 +153,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
             <select
               value={cycle}
               onChange={(event) => setCycle(event.target.value as (typeof CYCLES)[number])}
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 transition-colors"
+              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] font-medium text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors"
             >
               {CYCLES.map((value) => (
                 <option key={value} value={value}>{value.replace("_", " ")}</option>
@@ -265,7 +265,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                 })
               }
               disabled={upsertMetricInput.isPending}
-              className="rounded-md border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-medium text-slate-900 shadow-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-[13px] font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 transition-colors disabled:opacity-50"
             >
               {upsertMetricInput.isPending ? "Saving..." : "Save Canonical Metrics"}
             </button>
@@ -276,7 +276,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
           {!latestFiling ? (
             <EmptyState message="No governed BEPS filing exists for this cycle yet." />
           ) : (
-            <div className="space-y-4 text-sm text-slate-700">
+            <div className="space-y-4 text-sm text-zinc-700">
               <MetricGrid
                 items={[
                   { label: "Filing Status", value: latestFiling.status },
@@ -291,10 +291,10 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                   },
                 ]}
               />
-              <details className="rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 shadow-sm transition-all group">
-                <summary className="cursor-pointer font-semibold tracking-tight text-slate-900 outline-none">Filing payload</summary>
-                <div className="mt-3 bg-white border border-slate-100 rounded-md p-3 max-h-48 overflow-y-auto">
-                    <pre className="text-xs text-slate-600 font-mono">
+              <details className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-3 shadow-sm transition-all group">
+                <summary className="cursor-pointer font-semibold tracking-tight text-zinc-900 outline-none">Filing payload</summary>
+                <div className="mt-3 bg-white border border-zinc-100 rounded-md p-3 max-h-48 overflow-y-auto">
+                    <pre className="text-xs text-zinc-600 font-mono">
                     {JSON.stringify(latestFiling.filingPayload, null, 2)}
                     </pre>
                 </div>
@@ -334,16 +334,16 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                 })
               }
               disabled={upsertPrescriptiveItem.isPending}
-              className="rounded-md border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-medium text-slate-900 shadow-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-[13px] font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 transition-colors disabled:opacity-50"
             >
               {upsertPrescriptiveItem.isPending ? "Saving..." : "Save Prescriptive Item"}
             </button>
           </div>
           <div className="mt-5 space-y-3">
             {canonical?.prescriptiveItems?.length ? canonical.prescriptiveItems.map((item) => (
-              <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm shadow-sm flex flex-col items-start gap-1">
-                <div className="font-semibold text-slate-900 tracking-tight">{item.name}</div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">{item.status}</div>
+              <div key={item.id} className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-3 text-sm shadow-sm flex flex-col items-start gap-1">
+                <div className="font-semibold text-zinc-900 tracking-tight">{item.name}</div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{item.status}</div>
               </div>
             )) : <EmptyState message="No canonical prescriptive items exist yet." />}
           </div>
@@ -374,26 +374,26 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                 })
               }
               disabled={upsertAgreement.isPending}
-              className="rounded-md border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-medium text-slate-900 shadow-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-[13px] font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 transition-colors disabled:opacity-50"
             >
               {upsertAgreement.isPending ? "Saving..." : "Save ACP Agreement"}
             </button>
           </div>
           {canonical?.alternativeComplianceAgreement ? (
-            <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-4 text-sm text-slate-700 shadow-sm relative overflow-hidden">
+            <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-4 text-sm text-zinc-700 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 p-2 opacity-10">
                 <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
               </div>
               <div className="relative z-10">
-                <div className="font-semibold text-lg tracking-tight text-slate-900">
+                <div className="font-semibold text-lg tracking-tight text-zinc-900">
                     {canonical.alternativeComplianceAgreement.agreementIdentifier}
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">{canonical.alternativeComplianceAgreement.status}</span>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">{canonical.alternativeComplianceAgreement.pathway}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{canonical.alternativeComplianceAgreement.status}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{canonical.alternativeComplianceAgreement.pathway}</span>
                 </div>
-                <div className="mt-3 text-[13px] font-medium text-slate-500">
-                    Multiplier: <span className="text-slate-900">{formatNumber(canonical.alternativeComplianceAgreement.multiplier, 2)}</span>
+                <div className="mt-3 text-[13px] font-medium text-zinc-500">
+                    Multiplier: <span className="text-zinc-900">{formatNumber(canonical.alternativeComplianceAgreement.multiplier, 2)}</span>
                 </div>
               </div>
             </div>
@@ -420,22 +420,22 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
         ) : (
           <div className="space-y-4">
             {outcomes.data.map((outcome) => (
-              <div key={outcome.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+              <div key={outcome.id} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="font-semibold tracking-tight text-slate-900 flex items-center gap-2">
+                  <div className="font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
                     {outcome.complianceCycle?.replace("_", " ") ?? "—"}
-                    <span className="text-slate-300 font-normal">|</span>
+                    <span className="text-zinc-300 font-normal">|</span>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">{outcome.status}</span>
                   </div>
-                  <div className="text-[13px] font-medium text-slate-500">Year {outcome.filingYear ?? "—"}</div>
+                  <div className="text-[13px] font-medium text-zinc-500">Year {outcome.filingYear ?? "—"}</div>
                 </div>
-                <div className="mt-3 text-[13px] font-medium text-slate-500">
-                  <span className="text-slate-900">{outcome.evidenceArtifacts.length}</span> artifacts • Created {formatDate(outcome.createdAt)}
+                <div className="mt-3 text-[13px] font-medium text-zinc-500">
+                  <span className="text-zinc-900">{outcome.evidenceArtifacts.length}</span> artifacts • Created {formatDate(outcome.createdAt)}
                 </div>
-                <details className="mt-4 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3 group outline-none">
-                  <summary className="cursor-pointer text-[13px] font-semibold tracking-tight text-slate-700 outline-none">Payload Data</summary>
-                  <div className="mt-3 bg-white border border-slate-100 rounded-md p-3 max-h-48 overflow-y-auto">
-                    <pre className="text-xs text-slate-600 font-mono">
+                <details className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50/50 px-4 py-3 group outline-none">
+                  <summary className="cursor-pointer text-[13px] font-semibold tracking-tight text-zinc-700 outline-none">Payload Data</summary>
+                  <div className="mt-3 bg-white border border-zinc-100 rounded-md p-3 max-h-48 overflow-y-auto">
+                    <pre className="text-xs text-zinc-600 font-mono">
                         {JSON.stringify(outcome.filingPayload, null, 2)}
                     </pre>
                   </div>

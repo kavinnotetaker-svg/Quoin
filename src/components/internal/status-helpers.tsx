@@ -15,15 +15,15 @@ export type SubmissionReadinessSurfaceStatus =
 export function toneClasses(tone: StatusTone) {
   switch (tone) {
     case "success":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      return "badge-status-success";
     case "warning":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "badge-status-warning";
     case "danger":
-      return "border-red-200 bg-red-50 text-red-700";
+      return "badge-status-danger";
     case "info":
-      return "border-sky-200 bg-sky-50 text-sky-700";
+      return "badge-status-info";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-600";
+      return "badge-status border-zinc-200 bg-zinc-50 text-zinc-600";
   }
 }
 
@@ -88,6 +88,27 @@ export function getSyncStatusDisplay(status: string | null | undefined) {
   }
 }
 
+export function getRuntimeStatusDisplay(status: string | null | undefined) {
+  switch (status) {
+    case "SUCCEEDED":
+      return { label: "Healthy", tone: "success" as const };
+    case "STALE":
+      return { label: "Stale", tone: "warning" as const };
+    case "FAILED":
+      return { label: "Failed", tone: "danger" as const };
+    case "RETRYING":
+      return { label: "Retrying", tone: "warning" as const };
+    case "RUNNING":
+      return { label: "Running", tone: "info" as const };
+    case "IDLE":
+      return { label: "Idle", tone: "muted" as const };
+    case "NOT_CONNECTED":
+      return { label: "Not connected", tone: "muted" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
 export function getPacketStatusDisplay(status: string | null | undefined) {
   switch (status) {
     case "FINALIZED":
@@ -115,6 +136,36 @@ export function getPenaltySummaryStatusDisplay(status: string | null | undefined
       return { label: "Not applicable", tone: "muted" as const };
     case "INSUFFICIENT_CONTEXT":
       return { label: "Insufficient context", tone: "muted" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
+export function getOperationalAnomalyConfidenceDisplay(
+  confidenceBand: string | null | undefined,
+) {
+  switch (confidenceBand) {
+    case "HIGH":
+      return { label: "High confidence", tone: "success" as const };
+    case "MEDIUM":
+      return { label: "Medium confidence", tone: "warning" as const };
+    case "LOW":
+      return { label: "Low confidence", tone: "muted" as const };
+    default:
+      return { label: humanizeToken(confidenceBand), tone: "muted" as const };
+  }
+}
+
+export function getOperationalAnomalyPenaltyImpactDisplay(
+  status: string | null | undefined,
+) {
+  switch (status) {
+    case "ESTIMATED":
+      return { label: "Penalty impact estimated", tone: "warning" as const };
+    case "NOT_APPLICABLE":
+      return { label: "No penalty context", tone: "muted" as const };
+    case "INSUFFICIENT_CONTEXT":
+      return { label: "Penalty impact unavailable", tone: "muted" as const };
     default:
       return { label: humanizeToken(status), tone: "muted" as const };
   }
@@ -191,6 +242,21 @@ export function getDataIssueStatusDisplay(status: string | null | undefined) {
   }
 }
 
+export function getSourceReconciliationStatusDisplay(
+  status: string | null | undefined,
+) {
+  switch (status) {
+    case "CLEAN":
+      return { label: "Clean", tone: "success" as const };
+    case "CONFLICTED":
+      return { label: "Conflicted", tone: "danger" as const };
+    case "INCOMPLETE":
+      return { label: "Incomplete", tone: "warning" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
 export function getSubmissionReadinessDisplay(
   status: SubmissionReadinessSurfaceStatus | string | null | undefined,
 ) {
@@ -236,9 +302,7 @@ export function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-mono font-semibold uppercase tracking-tight ${toneClasses(
-        tone,
-      )}`}
+      className={`items-center gap-1.5 ${toneClasses(tone)}`}
     >
       {icon}
       {label}

@@ -20,7 +20,7 @@ function urgencyClasses(level: string) {
   if (level === "CRITICAL") return "bg-red-50 text-red-700 ring-1 ring-red-600/20";
   if (level === "HIGH") return "bg-orange-50 text-orange-700 ring-1 ring-orange-600/20";
   if (level === "MEDIUM") return "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20";
-  return "bg-slate-100 text-slate-700 ring-1 ring-slate-500/20";
+  return "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-500/20";
 }
 
 export function PortfolioInsights({
@@ -127,17 +127,17 @@ export function PortfolioInsights({
           ) : (
             <div className="space-y-3">
               {actions.data.map((item) => (
-                <div key={`${item.buildingId}-${item.reasonCode}`} className="card-machined p-4 transition-all hover:shadow-md hover:border-slate-300">
+                <div key={`${item.buildingId}-${item.reasonCode}`} className="card-machined p-4 transition-all hover:shadow-md hover:border-zinc-300">
                   <div className="flex items-center justify-between gap-3">
-                    <Link href={`/buildings/${item.buildingId}`} className="font-semibold text-slate-900 hover:text-amber-600 transition-colors">
+                    <Link href={`/buildings/${item.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors">
                       {buildingNameById.get(item.buildingId) ?? item.buildingId}
                     </Link>
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-mono font-medium tracking-tight uppercase ${urgencyClasses(item.urgencyLevel)}`}>
                       {item.urgencyLevel}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-slate-700 font-medium">{item.message}</p>
-                  <p className="mt-1.5 text-xs text-slate-500">{item.recommendedNextAction}</p>
+                  <p className="mt-2 text-sm text-zinc-700 font-medium">{item.message}</p>
+                  <p className="mt-1.5 text-xs text-zinc-500">{item.recommendedNextAction}</p>
                 </div>
               ))}
             </div>
@@ -163,17 +163,17 @@ export function PortfolioInsights({
                   );
 
                 return (
-                  <div key={entry.buildingId} className="card-machined p-4 transition-all hover:shadow-md hover:border-slate-300">
+                  <div key={entry.buildingId} className="card-machined p-4 transition-all hover:shadow-md hover:border-zinc-300">
                     <div className="flex items-center justify-between gap-3">
-                      <Link href={`/buildings/${entry.buildingId}`} className="font-semibold text-slate-900 hover:text-amber-600 transition-colors">
+                      <Link href={`/buildings/${entry.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors">
                         {entry.buildingName}
                       </Link>
                       <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${blockedStage?.status === "BLOCKED" ? "bg-red-50 text-red-700 ring-1 ring-red-600/20" : "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"}`}>
                         {blockedStage?.status?.replace("_", " ") ?? "NEEDS ATTENTION"}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-slate-700 font-medium">{blockedStage?.label ?? entry.nextAction.title}</p>
-                    <p className="mt-1 text-[13px] text-slate-500">{entry.nextAction.reason}</p>
+                    <p className="mt-2 text-sm text-zinc-700 font-medium">{blockedStage?.label ?? entry.nextAction.title}</p>
+                    <p className="mt-1 text-[13px] text-zinc-500">{entry.nextAction.reason}</p>
                   </div>
                 );
               })}
@@ -190,17 +190,17 @@ export function PortfolioInsights({
           ) : (
             <div className="space-y-3">
               {anomalies.data.map((anomaly) => (
-                <div key={anomaly.id} className="card-machined p-4 transition-all hover:shadow-md hover:border-slate-300">
+                <div key={anomaly.id} className="card-machined p-4 transition-all hover:shadow-md hover:border-zinc-300">
                   <div className="flex items-center justify-between gap-3">
-                    <Link href={`/buildings/${anomaly.buildingId}`} className="font-semibold text-slate-900 hover:text-amber-600 transition-colors">
+                    <Link href={`/buildings/${anomaly.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors">
                       {buildingNameById.get(anomaly.buildingId) ?? anomaly.buildingId}
                     </Link>
                     <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${urgencyClasses(anomaly.severity)}`}>
                       {anomaly.severity}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-slate-700 font-medium">{anomaly.title}</p>
-                  <p className="mt-1 text-[13px] text-slate-500">{anomaly.anomalyType}</p>
+                  <p className="mt-2 text-sm text-zinc-700 font-medium">{anomaly.title}</p>
+                  <p className="mt-1 text-[13px] text-zinc-500">{anomaly.anomalyType}</p>
                 </div>
               ))}
             </div>
@@ -216,13 +216,13 @@ export function PortfolioInsights({
           ) : (
             <div className="space-y-3">
               {retrofit.data.map((candidate) => (
-                <div key={candidate.candidateId} className="card-machined p-4 transition-all hover:shadow-md hover:border-slate-300">
+                <div key={candidate.candidateId} className="card-machined p-4 transition-all hover:shadow-md hover:border-zinc-300">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <Link href={`/buildings/${candidate.buildingId}`} className="font-semibold text-slate-900 hover:text-amber-600 transition-colors line-clamp-1">
+                      <Link href={`/buildings/${candidate.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors line-clamp-1">
                         {candidate.name}
                       </Link>
-                      <p className="mt-1 max-w-[200px] truncate text-xs text-slate-500">
+                      <p className="mt-1 max-w-[200px] truncate text-xs text-zinc-500">
                         {buildingNameById.get(candidate.buildingId) ?? candidate.buildingId}
                       </p>
                     </div>
@@ -233,16 +233,16 @@ export function PortfolioInsights({
                   
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs">
                     <div className="flex flex-col">
-                      <span className="text-slate-500 font-medium mb-0.5">Priority</span>
-                      <span className="text-slate-900 font-mono font-semibold">{candidate.priorityScore}</span>
+                      <span className="text-zinc-500 font-medium mb-0.5">Priority</span>
+                      <span className="text-zinc-900 font-mono font-semibold">{candidate.priorityScore}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-slate-500 font-medium mb-0.5">Avoided penalty</span>
+                      <span className="text-zinc-500 font-medium mb-0.5">Avoided penalty</span>
                       <span className="text-emerald-700 font-mono font-semibold">{formatMoney(candidate.estimatedAvoidedPenalty)}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-slate-500 font-medium mb-0.5">Net cost</span>
-                      <span className="text-slate-900 font-mono font-semibold">{formatMoney(candidate.netProjectCost)}</span>
+                      <span className="text-zinc-500 font-medium mb-0.5">Net cost</span>
+                      <span className="text-zinc-900 font-mono font-semibold">{formatMoney(candidate.netProjectCost)}</span>
                     </div>
                   </div>
                 </div>

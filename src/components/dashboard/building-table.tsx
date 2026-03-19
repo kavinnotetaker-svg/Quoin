@@ -6,6 +6,7 @@ import {
   StatusBadge,
   getComplianceStatusDisplay,
 } from "@/components/internal/status-helpers";
+import { motion, type Variants } from "framer-motion";
 
 interface Snapshot {
   energyStarScore: number | null;
@@ -30,7 +31,7 @@ function formatPenalty(summary: PenaltySummary | null | undefined) {
   if (!summary) {
     return {
       text: "Unavailable",
-      color: "var(--muted-foreground)",
+      color: "text-zinc-400",
       note: "Governed estimate not loaded",
     };
   }
@@ -38,7 +39,7 @@ function formatPenalty(summary: PenaltySummary | null | undefined) {
   if (summary.status === "NOT_APPLICABLE") {
     return {
       text: "$0",
-      color: "var(--muted-foreground)",
+      color: "text-zinc-400",
       note: "Not applicable under governed context",
     };
   }
@@ -46,14 +47,14 @@ function formatPenalty(summary: PenaltySummary | null | undefined) {
   if (summary.status === "INSUFFICIENT_CONTEXT" || summary.currentEstimatedPenalty == null) {
     return {
       text: "Unavailable",
-      color: "var(--muted-foreground)",
+      color: "text-zinc-400",
       note: "Insufficient governed context",
     };
   }
 
   return {
     text: `$${summary.currentEstimatedPenalty.toLocaleString()}`,
-    color: "rgb(220, 38, 38)",
+    color: "text-red-600",
     note: "Current governed estimate",
   };
 }
@@ -64,23 +65,23 @@ function relativeTime(date: string | Date) {
   const days = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
 
   if (days === 0) {
-    return { text: "Today", color: "rgb(22, 163, 74)", note: "Fresh data" };
+    return { text: "Today", color: "text-emerald-600", note: "Fresh data" };
   }
 
   if (days === 1) {
-    return { text: "1d ago", color: "rgb(22, 163, 74)", note: "Fresh data" };
+    return { text: "1d ago", color: "text-emerald-600", note: "Fresh data" };
   }
 
   const text = `${days}d ago`;
   if (days <= 30) {
-    return { text, color: "rgb(22, 163, 74)", note: "Fresh data" };
+    return { text, color: "text-emerald-600", note: "Fresh data" };
   }
 
   if (days <= 60) {
-    return { text, color: "rgb(202, 138, 4)", note: "Review freshness" };
+    return { text, color: "text-amber-600", note: "Review freshness" };
   }
 
-  return { text, color: "rgb(220, 38, 38)", note: "Stale data" };
+  return { text, color: "text-red-600", note: "Stale data" };
 }
 
 const PROPERTY_LABELS: Record<string, string> = {
@@ -88,6 +89,21 @@ const PROPERTY_LABELS: Record<string, string> = {
   MULTIFAMILY: "Multifamily",
   MIXED_USE: "Mixed Use",
   OTHER: "Other",
+};
+
+const container: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const rowVariants: Variants = {
+  hidden: { opacity: 0, x: -5 },
+  show: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
 };
 
 export function BuildingTable({
@@ -99,11 +115,11 @@ export function BuildingTable({
 }) {
   if (buildings.length === 0) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
-        <p className="text-sm font-medium text-slate-900">
+      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 p-8 text-center">
+        <p className="text-sm font-medium text-zinc-900">
           No buildings in this portfolio yet
         </p>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-zinc-500">
           Add a building to start benchmarking, BEPS review, and filing work.
         </p>
       </div>
@@ -114,8 +130,8 @@ export function BuildingTable({
     <div className="overflow-hidden card-machined">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50/50">
-            <tr className="border-b border-slate-200/60 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <thead className="bg-zinc-50/50">
+            <tr className="border-b border-zinc-200/60 text-xs font-semibold uppercase tracking-wider text-zinc-500">
               <th className="px-6 py-3 font-medium">Building</th>
               <th className="px-6 py-3 font-medium text-right">Latest Score</th>
               <th className="px-6 py-3 font-medium">Compliance Outlook</th>
@@ -127,7 +143,12 @@ export function BuildingTable({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <motion.tbody 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="divide-y divide-zinc-100"
+          >
             {buildings.map((building) => {
               const snapshot = building.latestSnapshot;
               const penalty = formatPenalty(
@@ -141,29 +162,30 @@ export function BuildingTable({
               );
 
               return (
-                <tr
+                <motion.tr
                   key={building.id}
-                  className="group transition-colors duration-200 hover:bg-slate-50"
+                  variants={rowVariants}
+                  className="group transition-colors duration-200 hover:bg-zinc-50/80"
                 >
                   <td className="px-6 py-4">
                     <Link
                       href={`/buildings/${building.id}`}
-                      className="font-semibold text-slate-900 transition-colors group-hover:text-amber-600"
+                      className="font-semibold text-zinc-900 transition-colors group-hover:text-zinc-600"
                     >
                       {building.name}
                     </Link>
-                    <div className="mt-1 text-[13px] text-slate-500">
+                    <div className="mt-1 text-[13px] text-zinc-500">
                       {PROPERTY_LABELS[building.propertyType] ??
                         building.propertyType}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="font-mono font-medium text-slate-800">
+                    <div className="font-mono font-medium text-zinc-800">
                       {snapshot?.energyStarScore != null
                         ? snapshot.energyStarScore
                         : "---"}
                     </div>
-                    <div className="mt-1 text-[12px] text-slate-500">
+                    <div className="mt-1 text-[12px] text-zinc-500">
                       {snapshot?.energyStarScore != null
                         ? "Most recent score"
                         : "Needs usable benchmark data"}
@@ -174,7 +196,7 @@ export function BuildingTable({
                       label={compliance.label}
                       tone={compliance.tone}
                     />
-                    <div className="mt-1 text-[12px] text-slate-500">
+                    <div className="mt-1 text-[12px] text-zinc-500">
                       {snapshot?.complianceStatus === "NON_COMPLIANT"
                         ? "Immediate follow-up needed"
                         : snapshot?.complianceStatus === "AT_RISK"
@@ -185,28 +207,27 @@ export function BuildingTable({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="font-mono font-medium" style={{ color: penalty.color }}>
+                    <div className={`font-mono font-medium ${penalty.color}`}>
                       {penalty.text}
                     </div>
-                    <div className="mt-1 text-[12px] text-slate-500">
+                    <div className="mt-1 text-[12px] text-zinc-500">
                       {penalty.note}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div
-                      className="font-mono font-medium text-[13px]"
-                      style={{ color: freshness.color }}
+                      className={`font-mono font-medium text-[13px] ${freshness.color}`}
                     >
                       {freshness.text}
                     </div>
-                    <div className="mt-1 text-[12px] text-slate-500">
+                    <div className="mt-1 text-[12px] text-zinc-500">
                       {freshness.note}
                     </div>
                   </td>
-                </tr>
+                </motion.tr>
               );
             })}
-          </tbody>
+          </motion.tbody>
         </table>
       </div>
     </div>

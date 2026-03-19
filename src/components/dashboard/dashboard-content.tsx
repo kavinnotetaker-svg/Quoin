@@ -202,7 +202,7 @@ export function DashboardContent() {
                 ? `${s.nonCompliant} need immediate BEPS follow-up`
                 : "No buildings currently non-compliant",
             subtitleColor:
-              s.nonCompliant > 0 ? "rgb(220, 38, 38)" : undefined,
+              s.nonCompliant > 0 ? "danger" : undefined,
           },
           {
             label: "Current penalty exposure",

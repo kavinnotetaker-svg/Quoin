@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   ErrorState,
@@ -46,6 +47,37 @@ function getWorkflowStateDisplay(state: string) {
     default:
       return { label: "No workflow", tone: "muted" as const };
   }
+}
+
+function getFinalizeGuidance(workflow: ArtifactWorkflow) {
+  if (workflow.canFinalize) {
+    return "Finalize is available because the latest governed artifact is ready to lock for review.";
+  }
+
+  if (!workflow.latestArtifact) {
+    return "Generate the governed artifact before finalization is available.";
+  }
+
+  if (workflow.latestArtifact.finalizedAt) {
+    return "The latest governed artifact is already finalized.";
+  }
+
+  return "Finalize is blocked by the current governed artifact state.";
+}
+
+function getWorkflowGuidance(
+  workflow: ArtifactWorkflow,
+  canManageSubmissionWorkflows: boolean,
+) {
+  if (!canManageSubmissionWorkflows) {
+    return "Submission workflow transitions require manager or admin access.";
+  }
+
+  if (!workflow.submissionWorkflow) {
+    return "Generate the governed artifact to start submission workflow tracking.";
+  }
+
+  return workflow.submissionWorkflow.nextAction.reason;
 }
 
 type ArtifactWorkflow = {
@@ -162,6 +194,9 @@ function ArtifactCard({
   isFinalizing,
   onWorkflowTransition,
   isTransitioning,
+  canManageSubmissionWorkflows,
+  transitionNotes,
+  onTransitionNotesChange,
 }: {
   workflow: ArtifactWorkflow;
   onGenerate: () => void;
@@ -176,8 +211,12 @@ function ArtifactCard({
       | "SUBMITTED"
       | "COMPLETED"
       | "NEEDS_CORRECTION",
+    notes: string | null,
   ) => void;
   isTransitioning: boolean;
+  canManageSubmissionWorkflows: boolean;
+  transitionNotes: string;
+  onTransitionNotesChange: (value: string) => void;
 }) {
   const statusDisplay = getPacketStatusDisplay(workflow.status);
   const dispositionDisplay = getDispositionDisplay(workflow.disposition);
@@ -186,11 +225,11 @@ function ArtifactCard({
   );
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-zinc-200 bg-white p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="font-semibold text-slate-900">{workflow.label}</div>
-          <div className="mt-1 text-sm text-slate-500">
+          <div className="font-semibold text-zinc-900">{workflow.label}</div>
+          <div className="mt-1 text-sm text-zinc-500">
             {workflow.sourceContext.reportingYear != null
               ? `Reporting year ${workflow.sourceContext.reportingYear}`
               : workflow.sourceContext.filingYear != null
@@ -205,20 +244,20 @@ function ArtifactCard({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 text-sm text-slate-700">
+      <div className="mt-4 grid gap-3 md:grid-cols-2 text-sm text-zinc-700">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Source context
           </div>
           <div className="mt-1">{workflow.sourceContext.reasonSummary}</div>
-          <div className="mt-1 text-slate-500">
+          <div className="mt-1 text-zinc-500">
             Readiness {workflow.sourceContext.readinessState.replaceAll("_", " ").toLowerCase()}
             {" · "}
             QA {workflow.sourceContext.qaVerdict ?? "not recorded"}
           </div>
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Latest artifact
           </div>
           <div className="mt-1">
@@ -228,14 +267,14 @@ function ArtifactCard({
                 )}`
               : "No artifact has been generated yet."}
           </div>
-          <div className="mt-1 text-slate-500">
+          <div className="mt-1 text-zinc-500">
             {workflow.latestArtifact?.finalizedAt
               ? `Finalized ${formatDate(workflow.latestArtifact.finalizedAt)}`
               : "Not finalized"}
           </div>
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Submission workflow
           </div>
           <div className="mt-1">
@@ -243,14 +282,14 @@ function ArtifactCard({
               ? workflow.submissionWorkflow.nextAction.title
               : "No submission workflow has started."}
           </div>
-          <div className="mt-1 text-slate-500">
+          <div className="mt-1 text-zinc-500">
             {workflow.submissionWorkflow?.latestTransitionAt
               ? `Last transition ${formatDate(workflow.submissionWorkflow.latestTransitionAt)}`
               : "Workflow starts after artifact generation."}
           </div>
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Blockers and warnings
           </div>
           <div className="mt-1">
@@ -258,7 +297,7 @@ function ArtifactCard({
           </div>
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Penalty context
           </div>
           <div className="mt-1">
@@ -266,7 +305,7 @@ function ArtifactCard({
               ? formatMoney(workflow.sourceContext.currentEstimatedPenalty)
               : "No current estimate"}
           </div>
-          <div className="mt-1 text-slate-500">
+          <div className="mt-1 text-zinc-500">
             {workflow.sourceContext.penaltyEstimatedAt
               ? `Calculated ${formatDate(workflow.sourceContext.penaltyEstimatedAt)}`
               : "No governed penalty run linked"}
@@ -279,7 +318,7 @@ function ArtifactCard({
           type="button"
           onClick={onGenerate}
           disabled={!workflow.canGenerate || isGenerating}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
         >
           {isGenerating
             ? "Generating..."
@@ -291,7 +330,7 @@ function ArtifactCard({
           type="button"
           onClick={onFinalize}
           disabled={!workflow.canFinalize || isFinalizing}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
         >
           {isFinalizing ? "Finalizing..." : "Finalize artifact"}
         </button>
@@ -299,7 +338,7 @@ function ArtifactCard({
           type="button"
           onClick={() => onExport("PDF")}
           disabled={!workflow.latestArtifact}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
         >
           Export PDF
         </button>
@@ -307,29 +346,58 @@ function ArtifactCard({
           type="button"
           onClick={() => onExport("JSON")}
           disabled={!workflow.latestArtifact}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
         >
           Export JSON
         </button>
-        {workflow.submissionWorkflow?.allowedTransitions.map((transition) => (
-          <button
-            key={transition.nextState}
-            type="button"
-            onClick={() => onWorkflowTransition(transition.nextState)}
-            disabled={isTransitioning}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-          >
-            {transition.label}
-          </button>
-        ))}
+        {canManageSubmissionWorkflows
+          ? workflow.submissionWorkflow?.allowedTransitions.map((transition) => (
+              <button
+                key={transition.nextState}
+                type="button"
+                onClick={() =>
+                  onWorkflowTransition(
+                    transition.nextState,
+                    transitionNotes.trim().length > 0 ? transitionNotes.trim() : null,
+                  )
+                }
+                disabled={isTransitioning}
+                className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
+              >
+                {transition.label}
+              </button>
+            ))
+          : null}
       </div>
 
+      <div className="mt-3 space-y-2 text-xs text-zinc-500">
+        <div>{getFinalizeGuidance(workflow)}</div>
+        <div>{getWorkflowGuidance(workflow, canManageSubmissionWorkflows)}</div>
+      </div>
+
+      {canManageSubmissionWorkflows && workflow.submissionWorkflow ? (
+        <div className="mt-4">
+          <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Transition note (optional)
+          </label>
+          <textarea
+            value={transitionNotes}
+            onChange={(event) => onTransitionNotesChange(event.target.value)}
+            placeholder="Add rationale for this workflow transition."
+            className="mt-2 min-h-[84px] w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition-colors focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+          />
+          <div className="mt-2 text-xs text-zinc-500">
+            Notes are stored on the governed workflow transition event.
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-4">
-        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
           Version history
         </div>
         {workflow.history.length === 0 ? (
-          <div className="mt-2 text-sm text-slate-500">
+          <div className="mt-2 text-sm text-zinc-500">
             No governed artifact versions exist yet.
           </div>
         ) : (
@@ -339,13 +407,13 @@ function ArtifactCard({
               return (
                 <div
                   key={version.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm"
                 >
                   <div>
-                    <div className="font-medium text-slate-900">
+                    <div className="font-medium text-zinc-900">
                       v{version.version} · {formatDate(version.generatedAt)}
                     </div>
-                    <div className="mt-1 text-slate-500">
+                    <div className="mt-1 text-zinc-500">
                       {version.finalizedAt
                         ? `Finalized ${formatDate(version.finalizedAt)}`
                         : "Not finalized"}
@@ -364,11 +432,11 @@ function ArtifactCard({
 
       {workflow.submissionWorkflow ? (
         <div className="mt-4">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Workflow history
           </div>
           {workflow.submissionWorkflow.history.length === 0 ? (
-            <div className="mt-2 text-sm text-slate-500">
+            <div className="mt-2 text-sm text-zinc-500">
               No workflow transitions have been recorded yet.
             </div>
           ) : (
@@ -376,13 +444,13 @@ function ArtifactCard({
               {workflow.submissionWorkflow.history.map((entry) => (
                 <div
                   key={entry.id}
-                  className="rounded-lg border border-slate-200 bg-white p-3 text-sm"
+                  className="rounded-lg border border-zinc-200 bg-white p-3 text-sm"
                 >
-                  <div className="font-medium text-slate-900">
+                  <div className="font-medium text-zinc-900">
                     {(entry.fromState ?? "START").replaceAll("_", " ")} to{" "}
                     {entry.toState.replaceAll("_", " ")}
                   </div>
-                  <div className="mt-1 text-slate-500">
+                  <div className="mt-1 text-zinc-500">
                     {formatDate(entry.createdAt)}
                     {entry.notes ? ` · ${entry.notes}` : ""}
                   </div>
@@ -396,8 +464,16 @@ function ArtifactCard({
   );
 }
 
-export function ArtifactWorkspacePanel({ buildingId }: { buildingId: string }) {
+export function ArtifactWorkspacePanel({
+  buildingId,
+  canManageSubmissionWorkflows = false,
+}: {
+  buildingId: string;
+  canManageSubmissionWorkflows?: boolean;
+}) {
   const utils = trpc.useUtils();
+  const [benchmarkWorkflowNotes, setBenchmarkWorkflowNotes] = useState("");
+  const [bepsWorkflowNotes, setBepsWorkflowNotes] = useState("");
   const artifactWorkspace = trpc.building.getArtifactWorkspace.useQuery(
     { buildingId },
     { retry: false },
@@ -478,7 +554,7 @@ export function ArtifactWorkspacePanel({ buildingId }: { buildingId: string }) {
         title="Governed artifacts"
         subtitle="Immutable filing and submission artifacts generated from the current governed compliance context."
       >
-        <div className="text-sm text-slate-500">Loading artifact workspace...</div>
+        <div className="text-sm text-zinc-500">Loading artifact workspace...</div>
       </Panel>
     );
   }
@@ -518,17 +594,21 @@ export function ArtifactWorkspacePanel({ buildingId }: { buildingId: string }) {
           onExport={exportBenchmark}
           isGenerating={benchmarkGenerate.isPending}
           isFinalizing={benchmarkFinalize.isPending}
-          onWorkflowTransition={(nextState) => {
+          onWorkflowTransition={(nextState, notes) => {
             const workflowId = benchmark.submissionWorkflow?.id;
             if (workflowId) {
               transitionWorkflow.mutate({
                 buildingId,
                 workflowId,
                 nextState,
+                notes,
               });
             }
           }}
           isTransitioning={transitionWorkflow.isPending}
+          canManageSubmissionWorkflows={canManageSubmissionWorkflows}
+          transitionNotes={benchmarkWorkflowNotes}
+          onTransitionNotesChange={setBenchmarkWorkflowNotes}
         />
 
         <ArtifactCard
@@ -554,17 +634,21 @@ export function ArtifactWorkspacePanel({ buildingId }: { buildingId: string }) {
           onExport={exportBeps}
           isGenerating={bepsGenerate.isPending}
           isFinalizing={bepsFinalize.isPending}
-          onWorkflowTransition={(nextState) => {
+          onWorkflowTransition={(nextState, notes) => {
             const workflowId = beps.submissionWorkflow?.id;
             if (workflowId) {
               transitionWorkflow.mutate({
                 buildingId,
                 workflowId,
                 nextState,
+                notes,
               });
             }
           }}
           isTransitioning={transitionWorkflow.isPending}
+          canManageSubmissionWorkflows={canManageSubmissionWorkflows}
+          transitionNotes={bepsWorkflowNotes}
+          onTransitionNotesChange={setBepsWorkflowNotes}
         />
       </div>
     </Panel>

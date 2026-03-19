@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, tenantProcedure, protectedProcedure } from "../init";
+import { router, tenantProcedure, protectedProcedure, operatorProcedure } from "../init";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/server/lib/db";
 import {
@@ -25,11 +25,21 @@ import {
   listBuildingGovernedOperationalSummaries,
 } from "@/server/compliance/governed-operational-summary";
 import { getBuildingArtifactWorkspace } from "@/server/compliance/compliance-artifacts";
+import { getBuildingSourceReconciliationSummary } from "@/server/compliance/source-reconciliation";
 import {
   getOrCreatePenaltySummary,
   listPenaltySummaries,
 } from "@/server/compliance/penalties";
 import { transitionSubmissionWorkflow } from "@/server/compliance/submission-workflows";
+import { listOperationalAnomalies } from "@/server/compliance/operations-anomalies";
+import { createESPMClient } from "@/server/integrations/espm";
+import {
+  executeBulkPortfolioOperatorAction,
+  refreshPenaltySummaryFromOperator,
+  reenqueueGreenButtonIngestionFromOperator,
+  rerunSourceReconciliationFromOperator,
+  retryPortfolioManagerSyncFromOperator,
+} from "@/server/compliance/operator-controls";
 
 const createBuildingInput = z.object({
   name: z.string().min(1).max(200),
@@ -70,6 +80,7 @@ const portfolioWorklistInput = z.object({
   nextAction: z
     .enum([
       "RESOLVE_BLOCKING_ISSUES",
+      "REFRESH_INTEGRATION",
       "REGENERATE_ARTIFACT",
       "FINALIZE_ARTIFACT",
       "REVIEW_COMPLIANCE_RESULT",
@@ -96,6 +107,12 @@ const submissionWorkflowTransitionSchema = z.enum([
   "NEEDS_CORRECTION",
 ]);
 
+const bulkPortfolioOperatorActionSchema = z.enum([
+  "RERUN_SOURCE_RECONCILIATION",
+  "REFRESH_PENALTY_SUMMARY",
+  "RETRY_PORTFOLIO_MANAGER_SYNC",
+]);
+
 async function ensureTenantBuilding(
   tenantDb: {
     building: {
@@ -114,6 +131,13 @@ async function ensureTenantBuilding(
       message: "Building not found",
     });
   }
+}
+
+function buildOperatorAccess(appRole: string) {
+  return {
+    canManage: appRole === "ADMIN" || appRole === "MANAGER",
+    appRole,
+  };
 }
 
 export const buildingRouter = router({
@@ -247,19 +271,33 @@ export const buildingRouter = router({
         });
       }
 
-      const governedSummary = await getBuildingGovernedOperationalSummary({
-        organizationId: ctx.organizationId,
-        buildingId: input.id,
-      });
+      const [governedSummary, sourceReconciliation, operationalAnomalies] = await Promise.all([
+        getBuildingGovernedOperationalSummary({
+          organizationId: ctx.organizationId,
+          buildingId: input.id,
+        }),
+        getBuildingSourceReconciliationSummary({
+          organizationId: ctx.organizationId,
+          buildingId: input.id,
+        }),
+        listOperationalAnomalies({
+          organizationId: ctx.organizationId,
+          buildingId: input.id,
+          limit: 20,
+        }),
+      ]);
 
       return {
         ...building,
         latestSnapshot: building.complianceSnapshots[0] ?? null,
         recentAuditLogs: building.auditLogs,
         workflowSummary,
+        operatorAccess: buildOperatorAccess(ctx.appRole),
         readinessSummary: governedSummary.readinessSummary,
         issueSummary: governedSummary.issueSummary,
         governedSummary,
+        sourceReconciliation,
+        operationalAnomalies,
       };
     }),
 
@@ -288,8 +326,8 @@ export const buildingRouter = router({
 
   portfolioWorklist: tenantProcedure
     .input(portfolioWorklistInput)
-    .query(async ({ ctx, input }) =>
-      getPortfolioWorklist({
+    .query(async ({ ctx, input }) => {
+      const result = await getPortfolioWorklist({
         organizationId: ctx.organizationId,
         search: input.search,
         readinessState: input.readinessState,
@@ -298,8 +336,13 @@ export const buildingRouter = router({
         artifactStatus: input.artifactStatus,
         nextAction: input.nextAction,
         sortBy: input.sortBy,
-      }),
-    ),
+      });
+
+      return {
+        ...result,
+        operatorAccess: buildOperatorAccess(ctx.appRole),
+      };
+    }),
 
   listPenaltySummaries: tenantProcedure
     .input(
@@ -391,7 +434,108 @@ export const buildingRouter = router({
       });
     }),
 
-  transitionSubmissionWorkflow: tenantProcedure
+  retryPortfolioManagerSync: operatorProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        reportingYear: z.number().int().min(2000).max(2100).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      const espmClient = ctx.espmFactory ? ctx.espmFactory() : createESPMClient();
+
+      return retryPortfolioManagerSyncFromOperator({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportingYear: input.reportingYear,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+        espmClient,
+      });
+    }),
+
+  reenqueueGreenButtonIngestion: operatorProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return reenqueueGreenButtonIngestionFromOperator({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
+    }),
+
+  rerunSourceReconciliation: operatorProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return rerunSourceReconciliationFromOperator({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
+    }),
+
+  refreshPenaltySummary: operatorProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return refreshPenaltySummaryFromOperator({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
+    }),
+
+  bulkOperatePortfolio: operatorProcedure
+    .input(
+      z.object({
+        buildingIds: z.array(z.string()).min(1).max(100),
+        action: bulkPortfolioOperatorActionSchema,
+        reportingYear: z.number().int().min(2000).max(2100).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const espmClient =
+        input.action === "RETRY_PORTFOLIO_MANAGER_SYNC"
+          ? ctx.espmFactory
+            ? ctx.espmFactory()
+            : createESPMClient()
+          : undefined;
+
+      return executeBulkPortfolioOperatorAction({
+        organizationId: ctx.organizationId,
+        buildingIds: input.buildingIds,
+        action: input.action,
+        reportingYear: input.reportingYear,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+        espmClient,
+      });
+    }),
+
+  transitionSubmissionWorkflow: operatorProcedure
     .input(
       z.object({
         buildingId: z.string(),
@@ -526,6 +670,8 @@ export const buildingRouter = router({
         await tx.benchmarkPacket.deleteMany({ where: childScope });
         await tx.financingPacket.deleteMany({ where: childScope });
         await tx.penaltyRun.deleteMany({ where: childScope });
+        await tx.meterSourceReconciliation.deleteMany({ where: childScope });
+        await tx.buildingSourceReconciliation.deleteMany({ where: childScope });
         await tx.financingCaseCandidate.deleteMany({ where: childScope });
         await tx.dataIssue.deleteMany({ where: childScope });
         await tx.benchmarkRequestItem.deleteMany({ where: childScope });

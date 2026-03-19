@@ -19,15 +19,15 @@ export function StepOrg({ onNext }: StepOrgProps) {
     return (
       <div className="space-y-8">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-slate-900">Organization</h2>
-          <p className="mt-2 text-[15px] text-slate-500 leading-relaxed">
-            You&apos;re already part of <strong className="font-semibold text-slate-900">{organization.name}</strong>.
+          <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Organization</h2>
+          <p className="mt-2 text-[15px] text-zinc-500 leading-relaxed">
+            You&apos;re already part of <strong className="font-semibold text-zinc-900">{organization.name}</strong>.
           </p>
         </div>
         <button
           type="button"
           onClick={onNext}
-          className="w-full rounded-lg bg-slate-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-slate-800 transition-all active:scale-[0.98]"
+          className="w-full rounded-lg bg-zinc-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-zinc-800 transition-all active:scale-[0.98]"
         >
           Continue Pipeline
         </button>
@@ -54,14 +54,14 @@ export function StepOrg({ onNext }: StepOrgProps) {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900">Create your organization</h2>
-        <p className="mt-2 text-[15px] text-slate-500 leading-relaxed">
+        <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Create your organization</h2>
+        <p className="mt-2 text-[15px] text-zinc-500 leading-relaxed">
           This is the company or entity that owns or manages the buildings.
         </p>
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="org-name" className="block text-[13px] font-semibold tracking-wide text-slate-700">
+        <label htmlFor="org-name" className="block text-[13px] font-semibold tracking-wide text-zinc-700">
           Organization name
         </label>
         <input
@@ -70,7 +70,7 @@ export function StepOrg({ onNext }: StepOrgProps) {
           value={orgName}
           onChange={(e) => setOrgName(e.target.value)}
           placeholder="e.g., Acme Property Management"
-          className="block w-full rounded-lg border border-slate-300 px-4 py-3 text-[15px] text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-shadow"
+          className="block w-full rounded-lg border border-zinc-300 px-4 py-3 text-[15px] text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-shadow"
           onKeyDown={(e) => e.key === "Enter" && handleCreate()}
         />
       </div>
@@ -85,7 +85,7 @@ export function StepOrg({ onNext }: StepOrgProps) {
         type="button"
         onClick={handleCreate}
         disabled={loading || !orgName.trim()}
-        className="w-full rounded-lg bg-slate-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-slate-800 transition-all disabled:opacity-50 active:scale-[0.98]"
+        className="w-full rounded-lg bg-zinc-900 px-4 py-3 text-[15px] font-semibold text-white shadow-md hover:bg-zinc-800 transition-all disabled:opacity-50 active:scale-[0.98]"
       >
         {loading ? "Creating…" : "Create & continue"}
       </button>

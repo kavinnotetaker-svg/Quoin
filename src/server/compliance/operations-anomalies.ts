@@ -4,12 +4,16 @@ import type {
   AlertSeverity,
   ComplianceCycle,
   MeterType,
+  OperationalAnomalyConfidenceBand,
+  OperationalAnomalyPenaltyImpactStatus,
   OperationalAnomalyStatus,
   OperationalAnomalyType,
   Prisma,
 } from "@/generated/prisma/client";
 import { prisma } from "@/server/lib/db";
 import { getLatestComplianceSnapshot } from "@/server/lib/compliance-snapshots";
+import { getBuildingOperationalState, type BuildingReadinessSummary } from "@/server/compliance/data-issues";
+import { listStoredPenaltySummaries, type PenaltySummary } from "@/server/compliance/penalties";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -47,6 +51,9 @@ export interface OperationalAnomalySourceRef {
 export interface OperationalAnomalyAttribution {
   estimatedEnergyImpactKbtu: number | null;
   estimatedSiteEuiDelta: number | null;
+  estimatedPenaltyImpactUsd: number | null;
+  penaltyImpactStatus: OperationalAnomalyPenaltyImpactStatus;
+  penaltyImpactExplanation: string;
   likelyBepsImpact:
     | "LIKELY_HIGHER_EUI_AND_WORSE_TRAJECTORY"
     | "LIKELY_LOWER_EUI"
@@ -65,6 +72,8 @@ export interface OperationalAnomalyAttribution {
 export interface OperationalAnomalyCandidate {
   anomalyType: OperationalAnomalyType;
   severity: AlertSeverity;
+  confidenceBand: OperationalAnomalyConfidenceBand;
+  confidenceScore: number;
   detectionHash: string;
   meterId: string | null;
   title: string;
@@ -78,6 +87,65 @@ export interface OperationalAnomalyCandidate {
   estimatedEnergyImpactKbtu: number | null;
   attribution: OperationalAnomalyAttribution;
   metadata: Record<string, unknown>;
+}
+
+export interface OperationalAnomalyRecord {
+  id: string;
+  buildingId: string;
+  meterId: string | null;
+  anomalyType: OperationalAnomalyType;
+  severity: AlertSeverity;
+  status: OperationalAnomalyStatus;
+  confidenceBand: OperationalAnomalyConfidenceBand;
+  confidenceScore: number | null;
+  title: string;
+  summary: string;
+  explanation: string;
+  causeHypothesis: string | null;
+  detectionWindowStart: string;
+  detectionWindowEnd: string;
+  comparisonWindowStart: string | null;
+  comparisonWindowEnd: string | null;
+  reasonCodes: OperationalAnomalyReasonCode[];
+  estimatedEnergyImpactKbtu: number | null;
+  estimatedPenaltyImpactUsd: number | null;
+  penaltyImpactStatus: OperationalAnomalyPenaltyImpactStatus;
+  attribution: OperationalAnomalyAttribution;
+  sourceRefs: OperationalAnomalySourceRef[];
+  updatedAt: string;
+  createdAt: string;
+  building: {
+    id: string;
+    name: string;
+    complianceCycle: ComplianceCycle;
+  };
+  meter: {
+    id: string;
+    name: string;
+    meterType: MeterType;
+  } | null;
+}
+
+export interface BuildingOperationalAnomalySummary {
+  activeCount: number;
+  highSeverityCount: number;
+  totalEstimatedEnergyImpactKbtu: number | null;
+  totalEstimatedPenaltyImpactUsd: number | null;
+  penaltyImpactStatus: OperationalAnomalyPenaltyImpactStatus;
+  highestPriority: OperationalPriority | null;
+  latestDetectedAt: string | null;
+  needsAttention: boolean;
+  topAnomalies: Array<{
+    id: string;
+    anomalyType: OperationalAnomalyType;
+    severity: AlertSeverity;
+    confidenceBand: OperationalAnomalyConfidenceBand;
+    title: string;
+    explanation: string;
+    estimatedEnergyImpactKbtu: number | null;
+    estimatedPenaltyImpactUsd: number | null;
+    penaltyImpactStatus: OperationalAnomalyPenaltyImpactStatus;
+  }>;
 }
 
 interface BuildingInput {
@@ -120,6 +188,14 @@ interface DetectionInput {
   readings: EnergyReadingInput[];
   latestSnapshot: ComplianceSnapshotInput | null;
   syncState: SyncStateInput | null;
+  readinessSummary?: Pick<
+    BuildingReadinessSummary,
+    "state" | "primaryStatus" | "lastComplianceEvaluatedAt"
+  > | null;
+  penaltySummary?: Pick<
+    PenaltySummary,
+    "status" | "currentEstimatedPenalty" | "calculatedAt"
+  > | null;
   now?: Date;
 }
 
@@ -186,6 +262,86 @@ function priorityFromSeverity(severity: AlertSeverity): OperationalPriority {
   return "LOW";
 }
 
+function confidenceBandFromSeverity(
+  severity: AlertSeverity,
+): OperationalAnomalyConfidenceBand {
+  if (severity === "CRITICAL" || severity === "HIGH") {
+    return "HIGH";
+  }
+  if (severity === "MEDIUM") {
+    return "MEDIUM";
+  }
+  return "LOW";
+}
+
+function confidenceScoreFromBand(band: OperationalAnomalyConfidenceBand) {
+  switch (band) {
+    case "HIGH":
+      return 0.9;
+    case "MEDIUM":
+      return 0.72;
+    default:
+      return 0.55;
+  }
+}
+
+function penaltyImpactFromContext(input: {
+  estimatedSiteEuiDelta: number | null;
+  latestSnapshot: ComplianceSnapshotInput | null;
+  penaltySummary?: Pick<
+    PenaltySummary,
+    "status" | "currentEstimatedPenalty" | "calculatedAt"
+  > | null;
+}) {
+  if (!input.penaltySummary || input.penaltySummary.status === "INSUFFICIENT_CONTEXT") {
+    return {
+      estimatedPenaltyImpactUsd: null,
+      penaltyImpactStatus: "INSUFFICIENT_CONTEXT" as const,
+      penaltyImpactExplanation:
+        "No governed penalty run is available yet, so anomaly-to-penalty impact cannot be estimated.",
+    };
+  }
+
+  if (input.penaltySummary.status === "NOT_APPLICABLE") {
+    return {
+      estimatedPenaltyImpactUsd: null,
+      penaltyImpactStatus: "NOT_APPLICABLE" as const,
+      penaltyImpactExplanation:
+        "The latest governed penalty context is not applicable for this building, so anomaly penalty impact is not estimated.",
+    };
+  }
+
+  const currentPenalty = input.penaltySummary.currentEstimatedPenalty;
+  const latestSiteEui = input.latestSnapshot?.siteEui ?? null;
+  if (
+    currentPenalty == null ||
+    currentPenalty <= 0 ||
+    input.estimatedSiteEuiDelta == null ||
+    input.estimatedSiteEuiDelta <= 0 ||
+    latestSiteEui == null ||
+    latestSiteEui <= 0
+  ) {
+    return {
+      estimatedPenaltyImpactUsd: null,
+      penaltyImpactStatus: "INSUFFICIENT_CONTEXT" as const,
+      penaltyImpactExplanation:
+        "The latest governed penalty run exists, but there is not enough positive EUI context to estimate incremental penalty impact from this anomaly.",
+    };
+  }
+
+  const estimatedPenaltyImpactUsd = round(
+    currentPenalty * Math.min(1, input.estimatedSiteEuiDelta / latestSiteEui),
+    2,
+  );
+
+  return {
+    estimatedPenaltyImpactUsd,
+    penaltyImpactStatus: "ESTIMATED" as const,
+    penaltyImpactExplanation:
+      "Estimated by scaling the latest governed BEPS penalty exposure by the anomaly's implied site-EUI share of the latest compliance snapshot.",
+  };
+}
+
 function buildDetectionHash(input: {
   anomalyType: OperationalAnomalyType;
   meterId: string | null;
@@ -212,11 +368,24 @@ function buildAttribution(input: {
   estimatedEnergyImpactKbtu: number | null;
   anomalyType: OperationalAnomalyType;
   latestSnapshot: ComplianceSnapshotInput | null;
+  readinessSummary?: Pick<
+    BuildingReadinessSummary,
+    "state" | "primaryStatus" | "lastComplianceEvaluatedAt"
+  > | null;
+  penaltySummary?: Pick<
+    PenaltySummary,
+    "status" | "currentEstimatedPenalty" | "calculatedAt"
+  > | null;
 }): OperationalAnomalyAttribution {
   const estimatedSiteEuiDelta =
     input.estimatedEnergyImpactKbtu != null && input.building.grossSquareFeet > 0
       ? round(input.estimatedEnergyImpactKbtu / input.building.grossSquareFeet, 4)
       : null;
+  const penaltyImpact = penaltyImpactFromContext({
+    estimatedSiteEuiDelta,
+    latestSnapshot: input.latestSnapshot,
+    penaltySummary: input.penaltySummary,
+  });
 
   const dataQualityRisk =
     input.anomalyType === "MISSING_OR_SUSPECT_METER_DATA" ||
@@ -228,6 +397,9 @@ function buildAttribution(input: {
         ? round(input.estimatedEnergyImpactKbtu, 2)
         : null,
     estimatedSiteEuiDelta,
+    estimatedPenaltyImpactUsd: penaltyImpact.estimatedPenaltyImpactUsd,
+    penaltyImpactStatus: penaltyImpact.penaltyImpactStatus,
+    penaltyImpactExplanation: penaltyImpact.penaltyImpactExplanation,
     likelyBepsImpact: dataQualityRisk
       ? input.anomalyType === "INCONSISTENT_METER_BEHAVIOR"
         ? "METER_REVIEW_REQUIRED"
@@ -374,10 +546,20 @@ function buildSourceRefs(input: {
 
 function pushCandidate(
   candidates: OperationalAnomalyCandidate[],
-  input: Omit<OperationalAnomalyCandidate, "detectionHash">,
+  input: Omit<
+    OperationalAnomalyCandidate,
+    "detectionHash" | "confidenceBand" | "confidenceScore"
+  > & {
+    confidenceBand?: OperationalAnomalyConfidenceBand;
+    confidenceScore?: number;
+  },
 ) {
+  const confidenceBand = input.confidenceBand ?? confidenceBandFromSeverity(input.severity);
   candidates.push({
     ...input,
+    confidenceBand,
+    confidenceScore:
+      input.confidenceScore ?? confidenceScoreFromBand(confidenceBand),
     detectionHash: buildDetectionHash({
       anomalyType: input.anomalyType,
       meterId: input.meterId,
@@ -393,6 +575,12 @@ export function detectOperationalAnomaliesData(input: DetectionInput) {
   const candidates: OperationalAnomalyCandidate[] = [];
   const activeMeters = input.meters.filter((meter) => meter.isActive);
   const buildingSeries = aggregateMonthlyBuckets(input.readings);
+  const sharedAttributionContext = {
+    building: input.building,
+    latestSnapshot: input.latestSnapshot,
+    readinessSummary: input.readinessSummary,
+    penaltySummary: input.penaltySummary,
+  };
 
   if (activeMeters.length === 0) {
     const detectionWindowStart = addUtcDays(now, -365);
@@ -416,11 +604,10 @@ export function detectOperationalAnomaliesData(input: DetectionInput) {
       reasonCodes: [OPERATIONAL_ANOMALY_REASON_CODES.noActiveMeters],
       estimatedEnergyImpactKbtu: null,
       attribution: buildAttribution({
-        building: input.building,
+        ...sharedAttributionContext,
         severity,
         estimatedEnergyImpactKbtu: null,
         anomalyType: "MISSING_OR_SUSPECT_METER_DATA",
-        latestSnapshot: input.latestSnapshot,
       }),
       metadata: {
         explanation:
@@ -491,11 +678,10 @@ export function detectOperationalAnomaliesData(input: DetectionInput) {
         reasonCodes,
         estimatedEnergyImpactKbtu: null,
         attribution: buildAttribution({
-          building: input.building,
+          ...sharedAttributionContext,
           severity,
           estimatedEnergyImpactKbtu: null,
           anomalyType: "MISSING_OR_SUSPECT_METER_DATA",
-          latestSnapshot: input.latestSnapshot,
         }),
         metadata: {
           explanation:
@@ -548,11 +734,10 @@ export function detectOperationalAnomaliesData(input: DetectionInput) {
             reasonCodes: [OPERATIONAL_ANOMALY_REASON_CODES.consumptionSpike],
             estimatedEnergyImpactKbtu: round(energyImpactKbtu, 2),
             attribution: buildAttribution({
-              building: input.building,
+              ...sharedAttributionContext,
               severity,
               estimatedEnergyImpactKbtu: energyImpactKbtu,
               anomalyType: "UNUSUAL_CONSUMPTION_SPIKE",
-              latestSnapshot: input.latestSnapshot,
             }),
             metadata: {
               explanation:
@@ -591,11 +776,10 @@ export function detectOperationalAnomaliesData(input: DetectionInput) {
             reasonCodes: [OPERATIONAL_ANOMALY_REASON_CODES.consumptionDrop],
             estimatedEnergyImpactKbtu: round(energyImpactKbtu, 2),
             attribution: buildAttribution({
-              building: input.building,
+              ...sharedAttributionContext,
               severity,
               estimatedEnergyImpactKbtu: energyImpactKbtu,
               anomalyType: "UNUSUAL_CONSUMPTION_DROP",
-              latestSnapshot: input.latestSnapshot,
             }),
             metadata: {
               explanation:
@@ -684,11 +868,10 @@ export function detectOperationalAnomaliesData(input: DetectionInput) {
           reasonCodes: [OPERATIONAL_ANOMALY_REASON_CODES.elevatedBaseload],
           estimatedEnergyImpactKbtu: round(baseloadImpactKbtu, 2),
           attribution: buildAttribution({
-            building: input.building,
+            ...sharedAttributionContext,
             severity,
             estimatedEnergyImpactKbtu: baseloadImpactKbtu,
             anomalyType: "ABNORMAL_BASELOAD",
-            latestSnapshot: input.latestSnapshot,
           }),
           metadata: {
             explanation:
@@ -743,11 +926,10 @@ export function detectOperationalAnomaliesData(input: DetectionInput) {
           ],
           estimatedEnergyImpactKbtu: round(scheduleDriftImpactKbtu, 2),
           attribution: buildAttribution({
-            building: input.building,
+            ...sharedAttributionContext,
             severity,
             estimatedEnergyImpactKbtu: scheduleDriftImpactKbtu,
             anomalyType: "OFF_HOURS_SCHEDULE_DRIFT",
-            latestSnapshot: input.latestSnapshot,
           }),
           metadata: {
             explanation:
@@ -828,11 +1010,10 @@ export function detectOperationalAnomaliesData(input: DetectionInput) {
             reasonCodes: [OPERATIONAL_ANOMALY_REASON_CODES.meterDivergesFromBuildingTrend],
             estimatedEnergyImpactKbtu: round(energyImpactKbtu, 2),
             attribution: buildAttribution({
-              building: input.building,
+              ...sharedAttributionContext,
               severity,
               estimatedEnergyImpactKbtu: energyImpactKbtu,
               anomalyType: "INCONSISTENT_METER_BEHAVIOR",
-              latestSnapshot: input.latestSnapshot,
             }),
             metadata: {
               explanation:
@@ -877,6 +1058,326 @@ function anomalySortWeight(anomaly: {
   );
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function asNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function defaultCauseHypothesis(anomalyType: OperationalAnomalyType) {
+  switch (anomalyType) {
+    case "ABNORMAL_BASELOAD":
+      return "Persistent base load has risen relative to the prior operating pattern.";
+    case "OFF_HOURS_SCHEDULE_DRIFT":
+      return "The building may be running longer hours or missing expected setback behavior.";
+    case "UNUSUAL_CONSUMPTION_SPIKE":
+      return "A recent operational or data change increased energy use above the trailing pattern.";
+    case "UNUSUAL_CONSUMPTION_DROP":
+      return "A recent operational or data change reduced energy use below the trailing pattern.";
+    case "MISSING_OR_SUSPECT_METER_DATA":
+      return "Coverage, overlap, or meter linkage problems are degrading the input signal.";
+    case "INCONSISTENT_METER_BEHAVIOR":
+      return "One meter is deviating from the building trend and may need linkage or system review.";
+  }
+}
+
+function parseSourceRefs(metadata: unknown) {
+  const metadataRecord = asRecord(metadata);
+  const refs = Array.isArray(metadataRecord?.sourceRefs) ? metadataRecord.sourceRefs : [];
+  return refs
+    .map((ref) => {
+      const record = asRecord(ref);
+      const recordType = asString(record?.recordType);
+      const recordId = asString(record?.recordId);
+      const label = asString(record?.label);
+      if (!recordType || !recordId || !label) {
+        return null;
+      }
+
+      return {
+        recordType,
+        recordId,
+        label,
+      } as OperationalAnomalySourceRef;
+    })
+    .filter((ref): ref is OperationalAnomalySourceRef => ref !== null);
+}
+
+function parseAttribution(
+  anomaly: Pick<
+    OperationalAnomalyRecord,
+    never
+  > & {
+    attributionJson: unknown;
+    estimatedEnergyImpactKbtu: number | null;
+    estimatedPenaltyImpactUsd: number | null;
+    penaltyImpactStatus: OperationalAnomalyPenaltyImpactStatus;
+  },
+): OperationalAnomalyAttribution {
+  const attributionRecord = asRecord(anomaly.attributionJson) ?? {};
+  const latestSnapshotDate = asString(attributionRecord.latestSnapshotDate);
+  const latestSiteEui = asNumber(attributionRecord.latestSiteEui);
+
+  return {
+    estimatedEnergyImpactKbtu:
+      anomaly.estimatedEnergyImpactKbtu ??
+      asNumber(attributionRecord.estimatedEnergyImpactKbtu),
+    estimatedSiteEuiDelta: asNumber(attributionRecord.estimatedSiteEuiDelta),
+    estimatedPenaltyImpactUsd:
+      anomaly.estimatedPenaltyImpactUsd ??
+      asNumber(attributionRecord.estimatedPenaltyImpactUsd),
+    penaltyImpactStatus: anomaly.penaltyImpactStatus,
+    penaltyImpactExplanation:
+      asString(attributionRecord.penaltyImpactExplanation) ??
+      "Penalty impact was not explained for this anomaly.",
+    likelyBepsImpact:
+      attributionRecord.likelyBepsImpact === "LIKELY_HIGHER_EUI_AND_WORSE_TRAJECTORY" ||
+      attributionRecord.likelyBepsImpact === "LIKELY_LOWER_EUI" ||
+      attributionRecord.likelyBepsImpact === "DATA_QUALITY_RISK" ||
+      attributionRecord.likelyBepsImpact === "METER_REVIEW_REQUIRED"
+        ? attributionRecord.likelyBepsImpact
+        : "NONE",
+    likelyBenchmarkingImpact:
+      attributionRecord.likelyBenchmarkingImpact === "LIKELY_READINESS_BLOCKER" ||
+      attributionRecord.likelyBenchmarkingImpact === "MAY_CHANGE_REPORTED_METRICS"
+        ? attributionRecord.likelyBenchmarkingImpact
+        : "NONE",
+    operationalPriority:
+      attributionRecord.operationalPriority === "CRITICAL" ||
+      attributionRecord.operationalPriority === "HIGH" ||
+      attributionRecord.operationalPriority === "MEDIUM"
+        ? attributionRecord.operationalPriority
+        : "LOW",
+    latestSnapshotDate,
+    latestSiteEui,
+  };
+}
+
+function normalizeOperationalAnomaly(anomaly: {
+  id: string;
+  buildingId: string;
+  meterId: string | null;
+  anomalyType: OperationalAnomalyType;
+  severity: AlertSeverity;
+  status: OperationalAnomalyStatus;
+  confidenceBand: OperationalAnomalyConfidenceBand;
+  confidenceScore: number | null;
+  title: string;
+  summary: string;
+  detectionWindowStart: Date;
+  detectionWindowEnd: Date;
+  comparisonWindowStart: Date | null;
+  comparisonWindowEnd: Date | null;
+  reasonCodesJson: unknown;
+  estimatedEnergyImpactKbtu: number | null;
+  estimatedPenaltyImpactUsd: number | null;
+  penaltyImpactStatus: OperationalAnomalyPenaltyImpactStatus;
+  attributionJson: unknown;
+  metadata: unknown;
+  updatedAt: Date;
+  createdAt: Date;
+  building: {
+    id: string;
+    name: string;
+    complianceCycle: ComplianceCycle;
+  };
+  meter: {
+    id: string;
+    name: string;
+    meterType: MeterType;
+  } | null;
+}): OperationalAnomalyRecord {
+  const metadata = asRecord(anomaly.metadata) ?? {};
+  const explanation =
+    asString(metadata.explanation) ?? anomaly.summary;
+  const attribution = parseAttribution({
+    attributionJson: anomaly.attributionJson,
+    estimatedEnergyImpactKbtu: anomaly.estimatedEnergyImpactKbtu,
+    estimatedPenaltyImpactUsd: anomaly.estimatedPenaltyImpactUsd,
+    penaltyImpactStatus: anomaly.penaltyImpactStatus,
+  });
+  const reasonCodes = Array.isArray(anomaly.reasonCodesJson)
+    ? anomaly.reasonCodesJson.filter(
+        (reasonCode): reasonCode is OperationalAnomalyReasonCode =>
+          typeof reasonCode === "string",
+      )
+    : [];
+
+  return {
+    id: anomaly.id,
+    buildingId: anomaly.buildingId,
+    meterId: anomaly.meterId,
+    anomalyType: anomaly.anomalyType,
+    severity: anomaly.severity,
+    status: anomaly.status,
+    confidenceBand: anomaly.confidenceBand,
+    confidenceScore: anomaly.confidenceScore,
+    title: anomaly.title,
+    summary: anomaly.summary,
+    explanation,
+    causeHypothesis:
+      asString(metadata.causeHypothesis) ??
+      defaultCauseHypothesis(anomaly.anomalyType),
+    detectionWindowStart: anomaly.detectionWindowStart.toISOString(),
+    detectionWindowEnd: anomaly.detectionWindowEnd.toISOString(),
+    comparisonWindowStart: anomaly.comparisonWindowStart?.toISOString() ?? null,
+    comparisonWindowEnd: anomaly.comparisonWindowEnd?.toISOString() ?? null,
+    reasonCodes,
+    estimatedEnergyImpactKbtu: anomaly.estimatedEnergyImpactKbtu,
+    estimatedPenaltyImpactUsd: anomaly.estimatedPenaltyImpactUsd,
+    penaltyImpactStatus: anomaly.penaltyImpactStatus,
+    attribution,
+    sourceRefs: parseSourceRefs(anomaly.metadata),
+    updatedAt: anomaly.updatedAt.toISOString(),
+    createdAt: anomaly.createdAt.toISOString(),
+    building: {
+      id: anomaly.building.id,
+      name: anomaly.building.name,
+      complianceCycle: anomaly.building.complianceCycle,
+    },
+    meter: anomaly.meter
+      ? {
+          id: anomaly.meter.id,
+          name: anomaly.meter.name,
+          meterType: anomaly.meter.meterType,
+        }
+      : null,
+  };
+}
+
+function summarizeOperationalAnomalies(
+  anomalies: OperationalAnomalyRecord[],
+): BuildingOperationalAnomalySummary {
+  if (anomalies.length === 0) {
+    return {
+      activeCount: 0,
+      highSeverityCount: 0,
+      totalEstimatedEnergyImpactKbtu: null,
+      totalEstimatedPenaltyImpactUsd: null,
+      penaltyImpactStatus: "INSUFFICIENT_CONTEXT",
+      highestPriority: null,
+      latestDetectedAt: null,
+      needsAttention: false,
+      topAnomalies: [],
+    };
+  }
+
+  const totalEstimatedEnergyImpactKbtu = anomalies.reduce<number | null>((sum, anomaly) => {
+    if (anomaly.estimatedEnergyImpactKbtu == null) {
+      return sum;
+    }
+    return (sum ?? 0) + anomaly.estimatedEnergyImpactKbtu;
+  }, null);
+  const estimatedPenaltyAnomalies = anomalies.filter(
+    (anomaly) => anomaly.penaltyImpactStatus === "ESTIMATED",
+  );
+  const totalEstimatedPenaltyImpactUsd =
+    estimatedPenaltyAnomalies.length === 0
+      ? null
+      : round(
+          estimatedPenaltyAnomalies.reduce(
+            (sum, anomaly) => sum + (anomaly.estimatedPenaltyImpactUsd ?? 0),
+            0,
+          ),
+          2,
+        );
+  const priorityWeight = (value: OperationalPriority | null) => {
+    switch (value) {
+      case "CRITICAL":
+        return 4;
+      case "HIGH":
+        return 3;
+      case "MEDIUM":
+        return 2;
+      case "LOW":
+        return 1;
+      default:
+        return 0;
+    }
+  };
+  const highestPriority = anomalies
+    .map((anomaly) => anomaly.attribution.operationalPriority)
+    .sort((left, right) => priorityWeight(left) - priorityWeight(right))
+    .at(-1) ?? null;
+
+  return {
+    activeCount: anomalies.length,
+    highSeverityCount: anomalies.filter(
+      (anomaly) => anomaly.severity === "HIGH" || anomaly.severity === "CRITICAL",
+    ).length,
+    totalEstimatedEnergyImpactKbtu,
+    totalEstimatedPenaltyImpactUsd,
+    penaltyImpactStatus:
+      estimatedPenaltyAnomalies.length > 0 ? "ESTIMATED" : anomalies.every(
+        (anomaly) => anomaly.penaltyImpactStatus === "NOT_APPLICABLE",
+      )
+        ? "NOT_APPLICABLE"
+        : "INSUFFICIENT_CONTEXT",
+    highestPriority,
+    latestDetectedAt:
+      [...anomalies]
+        .map((anomaly) => anomaly.detectionWindowEnd)
+        .sort()
+        .at(-1) ?? null,
+    needsAttention: anomalies.some(
+      (anomaly) =>
+        anomaly.severity === "HIGH" ||
+        anomaly.severity === "CRITICAL" ||
+        anomaly.penaltyImpactStatus === "ESTIMATED",
+    ),
+    topAnomalies: anomalies.slice(0, 3).map((anomaly) => ({
+      id: anomaly.id,
+      anomalyType: anomaly.anomalyType,
+      severity: anomaly.severity,
+      confidenceBand: anomaly.confidenceBand,
+      title: anomaly.title,
+      explanation: anomaly.explanation,
+      estimatedEnergyImpactKbtu: anomaly.estimatedEnergyImpactKbtu,
+      estimatedPenaltyImpactUsd: anomaly.estimatedPenaltyImpactUsd,
+      penaltyImpactStatus: anomaly.penaltyImpactStatus,
+    })),
+  };
+}
+
+export async function listBuildingOperationalAnomalySummaries(params: {
+  organizationId: string;
+  buildingIds: string[];
+}) {
+  const buildingIds = Array.from(new Set(params.buildingIds)).filter(Boolean);
+  if (buildingIds.length === 0) {
+    return new Map<string, BuildingOperationalAnomalySummary>();
+  }
+
+  const anomalies = await listOperationalAnomalies({
+    organizationId: params.organizationId,
+    includeDismissed: false,
+    buildingIds,
+    limit: 500,
+  });
+
+  const byBuildingId = new Map<string, OperationalAnomalyRecord[]>();
+  for (const anomaly of anomalies) {
+    const current = byBuildingId.get(anomaly.buildingId) ?? [];
+    current.push(anomaly);
+    byBuildingId.set(anomaly.buildingId, current);
+  }
+
+  return new Map(
+    buildingIds.map((buildingId) => [
+      buildingId,
+      summarizeOperationalAnomalies(byBuildingId.get(buildingId) ?? []),
+    ]),
+  );
+}
+
 export async function refreshOperationalAnomaliesForBuilding(params: {
   organizationId: string;
   buildingId: string;
@@ -889,7 +1390,15 @@ export async function refreshOperationalAnomaliesForBuilding(params: {
     now.getUTCMonth() - lookbackMonths,
   );
 
-  const [building, meters, readings, latestSnapshot, syncState] = await Promise.all([
+  const [
+    building,
+    meters,
+    readings,
+    latestSnapshot,
+    syncState,
+    operationalState,
+    storedPenaltySummaries,
+  ] = await Promise.all([
     prisma.building.findFirst({
       where: {
         id: params.buildingId,
@@ -951,6 +1460,14 @@ export async function refreshOperationalAnomaliesForBuilding(params: {
         id: true,
       },
     }),
+    getBuildingOperationalState({
+      organizationId: params.organizationId,
+      buildingId: params.buildingId,
+    }),
+    listStoredPenaltySummaries({
+      organizationId: params.organizationId,
+      buildingIds: [params.buildingId],
+    }),
   ]);
 
   if (!building) {
@@ -963,6 +1480,8 @@ export async function refreshOperationalAnomaliesForBuilding(params: {
     readings,
     latestSnapshot,
     syncState,
+    readinessSummary: operationalState.readinessSummary,
+    penaltySummary: storedPenaltySummaries[0]?.summary ?? null,
     now,
   });
 
@@ -1022,6 +1541,8 @@ export async function refreshOperationalAnomaliesForBuilding(params: {
           anomalyType: candidate.anomalyType,
           severity: candidate.severity,
           status: "ACTIVE",
+          confidenceBand: candidate.confidenceBand,
+          confidenceScore: candidate.confidenceScore,
           detectionHash: candidate.detectionHash,
           title: candidate.title,
           summary: candidate.summary,
@@ -1032,6 +1553,8 @@ export async function refreshOperationalAnomaliesForBuilding(params: {
           basisJson: candidate.basis as Prisma.InputJsonValue,
           reasonCodesJson: candidate.reasonCodes as unknown as Prisma.InputJsonValue,
           estimatedEnergyImpactKbtu: candidate.estimatedEnergyImpactKbtu,
+          estimatedPenaltyImpactUsd: candidate.attribution.estimatedPenaltyImpactUsd,
+          penaltyImpactStatus: candidate.attribution.penaltyImpactStatus,
           attributionJson: candidate.attribution as unknown as Prisma.InputJsonValue,
           metadata: candidate.metadata as Prisma.InputJsonValue,
         },
@@ -1040,6 +1563,8 @@ export async function refreshOperationalAnomaliesForBuilding(params: {
           anomalyType: candidate.anomalyType,
           severity: candidate.severity,
           status: prior?.status ?? "ACTIVE",
+          confidenceBand: candidate.confidenceBand,
+          confidenceScore: candidate.confidenceScore,
           title: candidate.title,
           summary: candidate.summary,
           detectionWindowStart: candidate.detectionWindowStart,
@@ -1049,6 +1574,8 @@ export async function refreshOperationalAnomaliesForBuilding(params: {
           basisJson: candidate.basis as Prisma.InputJsonValue,
           reasonCodesJson: candidate.reasonCodes as unknown as Prisma.InputJsonValue,
           estimatedEnergyImpactKbtu: candidate.estimatedEnergyImpactKbtu,
+          estimatedPenaltyImpactUsd: candidate.attribution.estimatedPenaltyImpactUsd,
+          penaltyImpactStatus: candidate.attribution.penaltyImpactStatus,
           attributionJson: candidate.attribution as unknown as Prisma.InputJsonValue,
           metadata: candidate.metadata as Prisma.InputJsonValue,
           acknowledgedAt: prior?.acknowledgedAt ?? null,
@@ -1071,6 +1598,7 @@ export async function refreshOperationalAnomaliesForBuilding(params: {
 export async function listOperationalAnomalies(params: {
   organizationId: string;
   buildingId?: string;
+  buildingIds?: string[];
   includeDismissed?: boolean;
   limit?: number;
 }) {
@@ -1078,6 +1606,13 @@ export async function listOperationalAnomalies(params: {
     where: {
       organizationId: params.organizationId,
       ...(params.buildingId ? { buildingId: params.buildingId } : {}),
+      ...(params.buildingIds?.length
+        ? {
+            buildingId: {
+              in: params.buildingIds,
+            },
+          }
+        : {}),
       ...(params.includeDismissed ? {} : { status: { not: "DISMISSED" } }),
     },
     orderBy: [{ updatedAt: "desc" }],
@@ -1100,14 +1635,16 @@ export async function listOperationalAnomalies(params: {
     },
   });
 
-  return anomalies.sort((left, right) => anomalySortWeight(right) - anomalySortWeight(left));
+  return anomalies
+    .sort((left, right) => anomalySortWeight(right) - anomalySortWeight(left))
+    .map(normalizeOperationalAnomaly);
 }
 
 export async function getOperationalAnomalyDetail(params: {
   organizationId: string;
   anomalyId: string;
 }) {
-  return prisma.operationalAnomaly.findFirst({
+  const anomaly = await prisma.operationalAnomaly.findFirst({
     where: {
       id: params.anomalyId,
       organizationId: params.organizationId,
@@ -1130,6 +1667,8 @@ export async function getOperationalAnomalyDetail(params: {
       },
     },
   });
+
+  return anomaly ? normalizeOperationalAnomaly(anomaly) : null;
 }
 
 export async function updateOperationalAnomalyStatus(params: {
@@ -1153,7 +1692,7 @@ export async function updateOperationalAnomalyStatus(params: {
     throw new Error("Operational anomaly not found");
   }
 
-  return prisma.operationalAnomaly.update({
+  const updated = await prisma.operationalAnomaly.update({
     where: {
       id: params.anomalyId,
     },
@@ -1171,5 +1710,23 @@ export async function updateOperationalAnomalyStatus(params: {
       dismissedById:
         params.nextStatus === "DISMISSED" ? params.actorId ?? null : null,
     },
+    include: {
+      building: {
+        select: {
+          id: true,
+          name: true,
+          complianceCycle: true,
+        },
+      },
+      meter: {
+        select: {
+          id: true,
+          name: true,
+          meterType: true,
+        },
+      },
+    },
   });
+
+  return normalizeOperationalAnomaly(updated);
 }

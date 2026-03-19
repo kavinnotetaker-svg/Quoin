@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenantProcedure, router } from "../init";
+import { tenantProcedure, router, operatorProcedure } from "../init";
 import { TRPCError } from "@trpc/server";
 import {
   getLatestComplianceSnapshot,
@@ -11,6 +11,14 @@ import {
   screenForExemptions,
   type FinancialDistressIndicators,
 } from "@/server/pipelines/pathway-analysis/exemption-screener";
+import {
+  getGovernedPublicationOverview,
+  markFactorSetVersionCandidate,
+  markRuleVersionCandidate,
+  publishGovernedPublicationRun,
+  validateFactorSetVersionCandidate,
+  validateRuleVersionCandidate,
+} from "@/server/compliance/rule-publication";
 
 /**
  * Report tRPC Router
@@ -342,6 +350,89 @@ const exemptionReportSchema = z.object({
 });
 
 export const reportRouter = router({
+  publicationOverview: tenantProcedure.query(async ({ ctx }) => ({
+    operatorAccess: {
+      canManage: ctx.appRole === "ADMIN" || ctx.appRole === "MANAGER",
+      appRole: ctx.appRole,
+    },
+    ...(await getGovernedPublicationOverview()),
+  })),
+
+  promoteRuleCandidate: operatorProcedure
+    .input(
+      z.object({
+        ruleVersionId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      markRuleVersionCandidate({
+        ruleVersionId: input.ruleVersionId,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      }),
+    ),
+
+  promoteFactorCandidate: operatorProcedure
+    .input(
+      z.object({
+        factorSetVersionId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      markFactorSetVersionCandidate({
+        factorSetVersionId: input.factorSetVersionId,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      }),
+    ),
+
+  validateRuleCandidate: operatorProcedure
+    .input(
+      z.object({
+        ruleVersionId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      validateRuleVersionCandidate({
+        ruleVersionId: input.ruleVersionId,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      }),
+    ),
+
+  validateFactorCandidate: operatorProcedure
+    .input(
+      z.object({
+        factorSetVersionId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      validateFactorSetVersionCandidate({
+        factorSetVersionId: input.factorSetVersionId,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      }),
+    ),
+
+  publishGovernedCandidate: operatorProcedure
+    .input(
+      z.object({
+        runId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      publishGovernedPublicationRun({
+        runId: input.runId,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      }),
+    ),
+
   /**
    * Generate compliance report data for a building.
    * Assembles all data needed for the HTML/PDF template.

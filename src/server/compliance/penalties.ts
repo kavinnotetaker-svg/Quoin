@@ -1099,6 +1099,7 @@ export async function listStoredPenaltySummaries(params: {
         in: uniqueBuildingIds,
       },
     },
+    distinct: ["buildingId"],
     orderBy: [{ buildingId: "asc" }, { createdAt: "desc" }],
     select: {
       id: true,
@@ -1110,19 +1111,36 @@ export async function listStoredPenaltySummaries(params: {
     },
   });
 
-  const latestByBuildingId = new Map<
-    string,
-    (typeof runs)[number]
-  >();
-
-  for (const run of runs) {
-    if (!latestByBuildingId.has(run.buildingId)) {
-      latestByBuildingId.set(run.buildingId, run);
-    }
-  }
-
-  return Array.from(latestByBuildingId.entries()).map(([buildingId, run]) => ({
-    buildingId,
+  return runs.map((run) => ({
+    buildingId: run.buildingId,
     summary: parsePenaltyRun(run),
   }));
+}
+
+export async function listLatestPenaltyRunIdsByBuilding(params: {
+  organizationId: string;
+  buildingIds: string[];
+}) {
+  const uniqueBuildingIds = Array.from(new Set(params.buildingIds)).filter(Boolean);
+
+  if (uniqueBuildingIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const runs = await prisma.penaltyRun.findMany({
+    where: {
+      organizationId: params.organizationId,
+      buildingId: {
+        in: uniqueBuildingIds,
+      },
+    },
+    distinct: ["buildingId"],
+    orderBy: [{ buildingId: "asc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      buildingId: true,
+    },
+  });
+
+  return new Map(runs.map((run) => [run.buildingId, run.id]));
 }

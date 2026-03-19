@@ -58,6 +58,9 @@ describe("building penalty consistency", () => {
 
   afterAll(async () => {
     try {
+      await prisma.penaltyRun.deleteMany({
+        where: { buildingId: building.id, organizationId: organization.id },
+      });
       await prisma.complianceSnapshot.deleteMany({
         where: { buildingId: building.id, organizationId: organization.id },
       });
@@ -196,5 +199,78 @@ describe("building penalty consistency", () => {
     expect(report.complianceData.estimatedPenalty).toBeNull();
     expect(report.governedPenalty).toBeNull();
     expect(report.governedOperationalSummary.penaltySummary).toBeNull();
+  });
+
+  it("keeps the latest governed penalty summary aligned across building, list, and report reads", async () => {
+    await prisma.penaltyRun.deleteMany({
+      where: { buildingId: building.id, organizationId: organization.id },
+    });
+
+    await prisma.penaltyRun.createMany({
+      data: [
+        {
+          organizationId: organization.id,
+          buildingId: building.id,
+          calculationMode: "CURRENT_BEPS_EXPOSURE",
+          implementationKey: "penalty-engine/beps-v1",
+          inputSnapshotHash: `older-penalty-${scope}`,
+          baselineResultPayload: {
+            status: "ESTIMATED",
+            currentEstimatedPenalty: 125000,
+            currency: "USD",
+            basis: {
+              code: "TEST",
+              label: "Older basis",
+              explanation: "Older basis",
+            },
+            governingContext: {},
+            artifacts: {},
+            timestamps: {},
+            keyDrivers: [],
+          },
+          scenarioResultsPayload: [],
+          createdAt: new Date("2026-03-12T10:00:00.000Z"),
+        },
+        {
+          organizationId: organization.id,
+          buildingId: building.id,
+          calculationMode: "CURRENT_BEPS_EXPOSURE",
+          implementationKey: "penalty-engine/beps-v1",
+          inputSnapshotHash: `latest-penalty-${scope}`,
+          baselineResultPayload: {
+            status: "ESTIMATED",
+            currentEstimatedPenalty: 275000,
+            currency: "USD",
+            basis: {
+              code: "TEST",
+              label: "Latest basis",
+              explanation: "Latest basis",
+            },
+            governingContext: {},
+            artifacts: {},
+            timestamps: {},
+            keyDrivers: [],
+          },
+          scenarioResultsPayload: [],
+          createdAt: new Date("2026-03-12T12:00:00.000Z"),
+        },
+      ],
+    });
+
+    const caller = createCaller();
+    const [detail, list, report] = await Promise.all([
+      caller.building.get({ id: building.id }),
+      caller.building.list({ page: 1, pageSize: 25 }),
+      caller.report.getComplianceReport({ buildingId: building.id }),
+    ]);
+
+    const listRow = list.buildings.find((entry) => entry.id === building.id);
+
+    expect(detail.governedSummary.penaltySummary?.currentEstimatedPenalty).toBe(275000);
+    expect(listRow?.governedSummary.penaltySummary?.currentEstimatedPenalty).toBe(275000);
+    expect(report.governedPenalty?.currentEstimatedPenalty).toBe(275000);
+    expect(report.governedOperationalSummary.penaltySummary?.currentEstimatedPenalty).toBe(
+      275000,
+    );
   });
 });

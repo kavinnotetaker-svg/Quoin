@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { NotFoundError } from "@/server/lib/errors";
-import { router, tenantProcedure } from "../init";
+import { router, tenantProcedure, operatorProcedure } from "../init";
 import { createESPMClient } from "@/server/integrations/espm";
 import {
   evaluateAndUpsertBenchmarkSubmission,
@@ -89,7 +89,7 @@ async function ensureTenantBuilding(
 }
 
 export const benchmarkingRouter = router({
-  syncPortfolioManager: tenantProcedure
+  syncPortfolioManager: operatorProcedure
     .input(
       z.object({
         buildingId: z.string(),

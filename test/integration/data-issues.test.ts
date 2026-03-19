@@ -405,6 +405,21 @@ describe("data issue resolution workflow", () => {
         organizationId: org?.id,
       },
     });
+    await prisma.meterSourceReconciliation.deleteMany({
+      where: {
+        organizationId: org?.id,
+      },
+    });
+    await prisma.buildingSourceReconciliation.deleteMany({
+      where: {
+        organizationId: org?.id,
+      },
+    });
+    await prisma.greenButtonConnection.deleteMany({
+      where: {
+        organizationId: org?.id,
+      },
+    });
     await prisma.dataIssue.deleteMany({
       where: {
         organizationId: org?.id,
@@ -481,12 +496,25 @@ describe("data issue resolution workflow", () => {
 
     expect(first.state).toBe("DATA_INCOMPLETE");
     expect(first.blockingIssueCount).toBe(1);
-    expect(first.openIssues.filter((issue) => issue.status === "OPEN")).toHaveLength(1);
-    expect(first.openIssues[0]).toMatchObject({
-      issueType: "MISSING_MONTHS",
-      severity: "BLOCKING",
-      status: "OPEN",
-    });
+    expect(
+      first.openIssues.filter(
+        (issue) => issue.issueType === "MISSING_MONTHS" && issue.status === "OPEN",
+      ),
+    ).toHaveLength(1);
+    expect(first.openIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issueType: "MISSING_MONTHS",
+          severity: "BLOCKING",
+          status: "OPEN",
+        }),
+        expect.objectContaining({
+          issueType: "PM_SYNC_REQUIRED",
+          severity: "WARNING",
+          status: "OPEN",
+        }),
+      ]),
+    );
 
     const second = await refreshBuildingIssuesAfterDataChange({
       organizationId: org.id,
@@ -502,6 +530,7 @@ describe("data issue resolution workflow", () => {
         where: {
           organizationId: org.id,
           buildingId: blockingBuilding.id,
+          issueType: "MISSING_MONTHS",
         },
       }),
     ).toBe(1);
@@ -510,7 +539,17 @@ describe("data issue resolution workflow", () => {
       id: blockingBuilding.id,
     });
 
-    expect(building.issueSummary.openIssues).toHaveLength(1);
+    expect(building.issueSummary.openIssues).toHaveLength(2);
+    expect(building.issueSummary.openIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issueType: "MISSING_MONTHS",
+        }),
+        expect.objectContaining({
+          issueType: "PM_SYNC_REQUIRED",
+        }),
+      ]),
+    );
     expect(building.readinessSummary).toMatchObject({
       state: "DATA_INCOMPLETE",
       primaryStatus: "DATA_INCOMPLETE",
@@ -585,6 +624,7 @@ describe("data issue resolution workflow", () => {
       where: {
         organizationId: org.id,
         buildingId: blockingBuilding.id,
+        issueType: "MISSING_MONTHS",
       },
     });
 
@@ -605,6 +645,7 @@ describe("data issue resolution workflow", () => {
       where: {
         organizationId: org.id,
         buildingId: warningBuilding.id,
+        issueType: "DIRECT_READINGS_MISSING",
       },
     });
 
@@ -633,7 +674,7 @@ describe("data issue resolution workflow", () => {
     });
     expect(reopened.status).toBe("OPEN");
     expect(refreshed.state).toBe("READY_TO_SUBMIT");
-    expect(refreshed.warningIssueCount).toBe(1);
+    expect(refreshed.warningIssueCount).toBe(2);
   });
 
   it("keeps readiness timestamps distinct and stable", async () => {

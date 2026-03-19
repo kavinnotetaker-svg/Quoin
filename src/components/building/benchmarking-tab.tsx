@@ -147,7 +147,7 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
   const verificationSummary = verificationChecklist.data?.summary ?? null;
 
   const btnClass =
-    "rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50";
+    "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50";
   const qualityStatus = getReadinessStatusDisplay(
     String(qaPayload?.status ?? "NOT_AVAILABLE"),
   );
@@ -163,7 +163,7 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
               type="number"
               value={reportingYear}
               onChange={(event) => setReportingYear(Number(event.target.value))}
-              className="w-28 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-900 shadow-sm transition-colors focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="w-28 rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] font-medium text-zinc-900 shadow-sm transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
             <button
               onClick={() => syncMutation.mutate({ buildingId, reportingYear })}
@@ -224,14 +224,14 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
         ) : null}
 
         {syncDiagnostics?.message ? (
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-4 text-sm text-slate-700 shadow-sm">
-            <div className="font-semibold tracking-tight text-slate-900">
+          <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-4 text-sm text-zinc-700 shadow-sm">
+            <div className="font-semibold tracking-tight text-zinc-900">
               Latest sync message
             </div>
-            <div className="mt-2 text-[13px] leading-relaxed text-slate-600">
+            <div className="mt-2 text-[13px] leading-relaxed text-zinc-600">
               {String(syncDiagnostics.message)}
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-slate-500">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-zinc-500">
               <span>Phase: {formatStepLabel(syncDiagnostics.failedStep)}</span>
               <span>
                 Retryable: {syncDiagnostics.retryable === true ? "Yes" : "No"}
@@ -260,38 +260,38 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
         ) : null}
 
         {pushMutation.data ? (
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-4 text-sm text-slate-700 shadow-sm">
-            <div className="font-semibold tracking-tight text-slate-900">
+          <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-4 text-sm text-zinc-700 shadow-sm">
+            <div className="font-semibold tracking-tight text-zinc-900">
               Latest push summary
             </div>
-            <div className="mt-2 text-[13px] leading-relaxed text-slate-600">
+            <div className="mt-2 text-[13px] leading-relaxed text-zinc-600">
               Pushed{" "}
-              <strong className="font-semibold text-slate-900">
+              <strong className="font-semibold text-zinc-900">
                 {pushMutation.data.totals.readingsPushed}
               </strong>{" "}
               of {pushMutation.data.totals.readingsPrepared} local electric/gas
               readings to property{" "}
-              <span className="rounded border border-slate-200 bg-slate-100 px-1 py-0.5 font-mono text-xs">
+              <span className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-xs">
                 {pushMutation.data.propertyId}
               </span>
               .
             </div>
-            <div className="mt-1 text-[13px] leading-relaxed text-slate-600">
+            <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">
               Created{" "}
-              <strong className="font-semibold text-slate-900">
+              <strong className="font-semibold text-zinc-900">
                 {pushMutation.data.metersCreated}
               </strong>{" "}
               new PM meter(s); updated{" "}
-              <strong className="font-semibold text-slate-900">
+              <strong className="font-semibold text-zinc-900">
                 {pushMutation.data.totals.readingsUpdated}
               </strong>{" "}
               existing PM reading(s); skipped{" "}
               {pushMutation.data.totals.readingsSkippedExisting} row(s) already
               matching PM.
             </div>
-            <div className="mt-1 text-[13px] leading-relaxed text-slate-600">
+            <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">
               PM refresh result:{" "}
-              <strong className="font-semibold text-slate-900">
+              <strong className="font-semibold text-zinc-900">
                 {formatSyncStatus(pushMutation.data.syncState.status)}
               </strong>
             </div>
@@ -326,10 +326,10 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
                 return (
                   <div
                     key={`${String(record.code ?? "finding")}-${index}`}
-                    className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                    className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 font-semibold tracking-tight text-slate-900">
+                      <div className="flex-1 font-semibold tracking-tight text-zinc-900">
                         {String(record.code ?? "Finding")}
                       </div>
                       <StatusBadge
@@ -341,7 +341,7 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
                         }
                       />
                     </div>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-600">
                       {String(record.message ?? "No detail available.")}
                     </p>
                   </div>
@@ -363,9 +363,9 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
           ) : readiness.error?.data?.code === "NOT_FOUND" || !readiness.data ? (
             <EmptyState message="No benchmark submission exists yet for the selected reporting year." />
           ) : (
-            <div className="space-y-4 text-sm text-slate-700">
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="text-lg font-semibold tracking-tight text-slate-900">
+            <div className="space-y-4 text-sm text-zinc-700">
+              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <div className="text-lg font-semibold tracking-tight text-zinc-900">
                   Reporting Year {readiness.data.reportingYear}
                 </div>
                 <div className="mt-2">
@@ -374,26 +374,26 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
                     tone={getReadinessStatusDisplay(readiness.data.status).tone}
                   />
                 </div>
-                <p className="mt-3 text-[13px] text-slate-600">
+                <p className="mt-3 text-[13px] text-zinc-600">
                   {readiness.data.status === "READY"
                     ? "The current record supports annual benchmarking submission."
                     : "The building still has blocking issues or missing requirements before submission."}
                 </p>
                 {readiness.data.complianceRunId ? (
-                  <div className="mt-3 text-[13px] font-medium text-slate-500">
+                  <div className="mt-3 text-[13px] font-medium text-zinc-500">
                     Compliance run ID:{" "}
-                    <span className="ml-1 font-mono text-xs text-slate-900">
+                    <span className="ml-1 font-mono text-xs text-zinc-900">
                       {readiness.data.complianceRunId}
                     </span>
                   </div>
                 ) : null}
               </div>
-              <details className="group rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 shadow-sm transition-all outline-none">
-                <summary className="cursor-pointer font-semibold tracking-tight text-slate-900 outline-none">
+              <details className="group rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-3 shadow-sm transition-all outline-none">
+                <summary className="cursor-pointer font-semibold tracking-tight text-zinc-900 outline-none">
                   Technical workflow record
                 </summary>
-                <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-slate-100 bg-white p-3">
-                  <pre className="font-mono text-xs text-slate-600">
+                <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-zinc-100 bg-white p-3">
+                  <pre className="font-mono text-xs text-zinc-600">
                     {JSON.stringify(readinessPayload ?? {}, null, 2)}
                   </pre>
                 </div>
@@ -443,18 +443,18 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
                 return (
                   <div
                     key={item.key}
-                    className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                    className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <div className="text-[15px] font-semibold tracking-tight text-slate-900">
+                        <div className="text-[15px] font-semibold tracking-tight text-zinc-900">
                           {item.category
                             .toLowerCase()
                             .split("_")
                             .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
                             .join(" ")}
                         </div>
-                        <div className="text-[12px] uppercase tracking-wide text-slate-400">
+                        <div className="text-[12px] uppercase tracking-wide text-zinc-400">
                           {item.key}
                         </div>
                       </div>
@@ -463,16 +463,16 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
                         tone={statusDisplay.tone}
                       />
                     </div>
-                    <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                    <p className="mt-3 text-sm leading-relaxed text-zinc-600">
                       {item.explanation}
                     </p>
-                    <div className="mt-3 text-[12px] text-slate-500">
+                    <div className="mt-3 text-[12px] text-zinc-500">
                       {item.evidenceLinks.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {item.evidenceLinks.map((link) => (
                             <span
                               key={link.id}
-                              className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"
+                              className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1"
                             >
                               {link.artifactKind === "EVIDENCE" ? "Evidence" : "Source"}:{" "}
                               {link.name}
@@ -502,10 +502,10 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
             {submissions.data.map((submission) => (
               <div
                 key={submission.id}
-                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[15px] font-semibold text-slate-900">
+                  <div className="text-[15px] font-semibold text-zinc-900">
                     Reporting Year {submission.reportingYear}
                   </div>
                   <StatusBadge
@@ -513,13 +513,13 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
                     tone={getReadinessStatusDisplay(submission.status).tone}
                   />
                 </div>
-                <div className="mt-3 text-[13px] font-medium text-slate-600">
+                <div className="mt-3 text-[13px] font-medium text-zinc-600">
                   Rule package:{" "}
-                  <span className="rounded border border-slate-100 bg-slate-50 px-1 py-0.5 font-mono text-xs text-slate-500">
+                  <span className="rounded border border-zinc-100 bg-zinc-50 px-1 py-0.5 font-mono text-xs text-zinc-500">
                     {submission.ruleVersion.rulePackage.key}
                   </span>
                 </div>
-                <div className="mt-2 text-[13px] font-medium text-slate-500">
+                <div className="mt-2 text-[13px] font-medium text-zinc-500">
                   Created {formatDate(submission.createdAt)}
                 </div>
               </div>
