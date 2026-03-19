@@ -87,7 +87,7 @@ describe("building penalty consistency", () => {
     });
   }
 
-  it("keeps building list, detail, and report aligned to the latest penalty snapshot after a newer BEPS evaluation", async () => {
+  it("keeps legacy snapshots historical while reports require governed penalty context", async () => {
     await prisma.complianceSnapshot.createMany({
       data: [
         {
@@ -138,10 +138,12 @@ describe("building penalty consistency", () => {
 
     expect(detail.latestSnapshot?.estimatedPenalty).toBe(2_712_000);
     expect(listRow?.latestSnapshot?.estimatedPenalty).toBe(2_712_000);
-    expect(report.complianceData.estimatedPenalty).toBe(2_712_000);
+    expect(report.complianceData.estimatedPenalty).toBeNull();
+    expect(report.governedPenalty).toBeNull();
+    expect(report.governedOperationalSummary.penaltySummary).toBeNull();
   });
 
-  it("uses a deterministic latest snapshot tie-break when penalties share the same snapshot timestamp", async () => {
+  it("uses a deterministic latest snapshot tie-break for historical snapshot fields while governed penalty remains separate", async () => {
     await prisma.complianceSnapshot.deleteMany({
       where: { buildingId: building.id, organizationId: organization.id },
     });
@@ -191,6 +193,8 @@ describe("building penalty consistency", () => {
 
     expect(detail.latestSnapshot?.estimatedPenalty).toBe(2_712_000);
     expect(listRow?.latestSnapshot?.estimatedPenalty).toBe(2_712_000);
-    expect(report.complianceData.estimatedPenalty).toBe(2_712_000);
+    expect(report.complianceData.estimatedPenalty).toBeNull();
+    expect(report.governedPenalty).toBeNull();
+    expect(report.governedOperationalSummary.penaltySummary).toBeNull();
   });
 });

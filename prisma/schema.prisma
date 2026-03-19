@@ -255,6 +255,10 @@ enum DataIssueSource {
   USER
 }
 
+enum PenaltyCalculationMode {
+  CURRENT_BEPS_EXPOSURE
+}
+
 enum BepsRequestItemCategory {
   PATHWAY_SELECTION_SUPPORT
   COMPLETED_ACTIONS_EVIDENCE
@@ -296,6 +300,21 @@ enum FilingPacketStatus {
   GENERATED
   STALE
   FINALIZED
+}
+
+enum SubmissionWorkflowType {
+  BENCHMARK_VERIFICATION
+  BEPS_FILING
+}
+
+enum SubmissionWorkflowState {
+  DRAFT
+  READY_FOR_REVIEW
+  APPROVED_FOR_SUBMISSION
+  SUBMITTED
+  COMPLETED
+  NEEDS_CORRECTION
+  SUPERSEDED
 }
 
 enum BepsPacketType {
@@ -468,6 +487,9 @@ model Organization {
   financingCases                      FinancingCase[]
   financingCaseCandidates             FinancingCaseCandidate[]
   financingPackets                    FinancingPacket[]
+  penaltyRuns                         PenaltyRun[]
+  submissionWorkflows                 SubmissionWorkflow[]
+  submissionWorkflowEvents            SubmissionWorkflowEvent[]
   auditLogs                           AuditLog[]
   jobs                                Job[]
 
@@ -562,6 +584,9 @@ model Building {
   financingCases                      FinancingCase[]
   financingCaseCandidates             FinancingCaseCandidate[]
   financingPackets                    FinancingPacket[]
+  penaltyRuns                         PenaltyRun[]
+  submissionWorkflows                 SubmissionWorkflow[]
+  submissionWorkflowEvents            SubmissionWorkflowEvent[]
   auditLogs                           AuditLog[]
   jobs                                Job[]
 
@@ -804,6 +829,7 @@ model RuleVersion {
   complianceRuns       ComplianceRun[]
   calculationManifests CalculationManifest[]
   benchmarkSubmissions BenchmarkSubmission[]
+  penaltyRuns          PenaltyRun[]
 
   @@unique([rulePackageId, version])
   @@index([rulePackageId, status, effectiveFrom(sort: Desc)])
@@ -827,6 +853,7 @@ model FactorSetVersion {
   calculationManifests CalculationManifest[]
   benchmarkSubmissions BenchmarkSubmission[]
   bepsCycles           BepsCycleRegistry[]
+  penaltyRuns          PenaltyRun[]
 
   @@unique([key, version])
   @@index([key, status, effectiveFrom(sort: Desc)])
@@ -882,6 +909,7 @@ model ComplianceRun {
   evidenceArtifacts    EvidenceArtifact[]
   benchmarkSubmissions BenchmarkSubmission[]
   filingRecords        FilingRecord[]
+  penaltyRuns          PenaltyRun[]
 
   @@index([organizationId, buildingId, executedAt(sort: Desc)])
   @@index([ruleVersionId, executedAt(sort: Desc)])
@@ -1080,9 +1108,10 @@ model FilingPacket {
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
-  filingRecord FilingRecord @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  building           Building            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  filingRecord       FilingRecord        @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
+  submissionWorkflow SubmissionWorkflow? @relation("FilingPacketSubmissionWorkflow")
 
   @@unique([filingRecordId, packetType, version])
   @@index([organizationId, buildingId, packetType, generatedAt(sort: Desc)])
@@ -1178,11 +1207,67 @@ model BenchmarkPacket {
   organization        Organization        @relation(fields: [organizationId], references: [id])
   building            Building            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
   benchmarkSubmission BenchmarkSubmission @relation(fields: [benchmarkSubmissionId], references: [id], onDelete: Cascade)
+  submissionWorkflow  SubmissionWorkflow? @relation("BenchmarkPacketSubmissionWorkflow")
 
   @@unique([benchmarkSubmissionId, version])
   @@index([organizationId, buildingId, reportingYear, generatedAt(sort: Desc)])
   @@index([benchmarkSubmissionId, generatedAt(sort: Desc)])
   @@map("benchmark_packets")
+}
+
+model SubmissionWorkflow {
+  id                 String                  @id @default(cuid())
+  organizationId     String                  @map("organization_id")
+  buildingId         String                  @map("building_id")
+  workflowType       SubmissionWorkflowType  @map("workflow_type")
+  state              SubmissionWorkflowState
+  benchmarkPacketId  String?                 @unique @map("benchmark_packet_id")
+  filingPacketId     String?                 @unique @map("filing_packet_id")
+  latestTransitionAt DateTime                @default(now()) @map("latest_transition_at")
+  readyForReviewAt   DateTime?               @map("ready_for_review_at")
+  approvedAt         DateTime?               @map("approved_at")
+  submittedAt        DateTime?               @map("submitted_at")
+  completedAt        DateTime?               @map("completed_at")
+  needsCorrectionAt  DateTime?               @map("needs_correction_at")
+  supersededAt       DateTime?               @map("superseded_at")
+  supersededById     String?                 @map("superseded_by_id")
+  createdByType      ActorType               @map("created_by_type")
+  createdById        String?                 @map("created_by_id")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building        Building                  @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  benchmarkPacket BenchmarkPacket?          @relation("BenchmarkPacketSubmissionWorkflow", fields: [benchmarkPacketId], references: [id], onDelete: SetNull)
+  filingPacket    FilingPacket?             @relation("FilingPacketSubmissionWorkflow", fields: [filingPacketId], references: [id], onDelete: SetNull)
+  supersededBy    SubmissionWorkflow?       @relation("SubmissionWorkflowSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes      SubmissionWorkflow[]      @relation("SubmissionWorkflowSupersession")
+  events          SubmissionWorkflowEvent[]
+
+  @@index([organizationId, buildingId, workflowType, latestTransitionAt(sort: Desc)])
+  @@index([organizationId, workflowType, state, latestTransitionAt(sort: Desc)])
+  @@map("submission_workflows")
+}
+
+model SubmissionWorkflowEvent {
+  id             String                   @id @default(cuid())
+  organizationId String                   @map("organization_id")
+  buildingId     String                   @map("building_id")
+  workflowId     String                   @map("workflow_id")
+  fromState      SubmissionWorkflowState? @map("from_state")
+  toState        SubmissionWorkflowState  @map("to_state")
+  notes          String?                  @db.Text
+  createdByType  ActorType                @map("created_by_type")
+  createdById    String?                  @map("created_by_id")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building           @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  workflow     SubmissionWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId, createdAt(sort: Desc)])
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@map("submission_workflow_events")
 }
 
 model VerificationItemResult {
@@ -1232,6 +1317,34 @@ model DataIssue {
   @@index([organizationId, buildingId, status, severity, detectedAt(sort: Desc)])
   @@index([buildingId, status, detectedAt(sort: Desc)])
   @@map("data_issues")
+}
+
+model PenaltyRun {
+  id                     String                 @id @default(cuid())
+  organizationId         String                 @map("organization_id")
+  buildingId             String                 @map("building_id")
+  complianceRunId        String?                @map("compliance_run_id")
+  ruleVersionId          String?                @map("rule_version_id")
+  factorSetVersionId     String?                @map("factor_set_version_id")
+  calculationMode        PenaltyCalculationMode @map("calculation_mode")
+  inputSnapshotRef       String?                @map("input_snapshot_ref")
+  inputSnapshotHash      String                 @map("input_snapshot_hash")
+  implementationKey      String                 @map("implementation_key")
+  baselineResultPayload  Json                   @default("{}") @map("baseline_result_payload")
+  scenarioResultsPayload Json                   @default("[]") @map("scenario_results_payload")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  building         Building          @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  complianceRun    ComplianceRun?    @relation(fields: [complianceRunId], references: [id], onDelete: SetNull)
+  ruleVersion      RuleVersion?      @relation(fields: [ruleVersionId], references: [id], onDelete: SetNull)
+  factorSetVersion FactorSetVersion? @relation(fields: [factorSetVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([buildingId, calculationMode, inputSnapshotHash])
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@index([complianceRunId, createdAt(sort: Desc)])
+  @@map("penalty_runs")
 }
 
 model BepsMetricInput {

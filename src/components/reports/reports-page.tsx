@@ -10,6 +10,7 @@ import {
   MetricGrid,
   Panel,
   downloadTextFile,
+  formatDate,
   formatMoney,
 } from "@/components/internal/admin-primitives";
 
@@ -98,10 +99,16 @@ export function ReportsPage() {
         <>
           {complianceReport.isLoading || exemptionReport.isLoading ? <LoadingState /> : null}
           {complianceReport.error ? (
-            <ErrorState message="Compliance report failed to load." detail={complianceReport.error.message} />
+            <ErrorState
+              message="Compliance report failed to load."
+              detail={complianceReport.error.message}
+            />
           ) : null}
           {exemptionReport.error ? (
-            <ErrorState message="Exemption report failed to load." detail={exemptionReport.error.message} />
+            <ErrorState
+              message="Exemption report failed to load."
+              detail={exemptionReport.error.message}
+            />
           ) : null}
 
           {selectedBuilding && complianceReport.data ? (
@@ -123,18 +130,146 @@ export function ReportsPage() {
                 </button>
               }
             >
+              <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <div className="font-medium text-slate-900">Latest governed operational summary</div>
+                <div className="mt-1 text-slate-600">
+                  Readiness{" "}
+                  {complianceReport.data.governedOperationalSummary.readinessSummary.state
+                    .toLowerCase()
+                    .replaceAll("_", " ")}
+                  {" | "}Compliance{" "}
+                  {complianceReport.data.governedOperationalSummary.complianceSummary.primaryStatus
+                    .toLowerCase()
+                    .replaceAll("_", " ")}
+                </div>
+                <div className="mt-1 text-slate-500">
+                  Last readiness evaluation{" "}
+                  {formatDate(
+                    complianceReport.data.governedOperationalSummary.timestamps
+                      .lastReadinessEvaluatedAt,
+                  )}
+                  {" | "}Last compliance evaluation{" "}
+                  {formatDate(
+                    complianceReport.data.governedOperationalSummary.timestamps
+                      .lastComplianceEvaluatedAt,
+                  )}
+                </div>
+              </div>
+
               <MetricGrid
                 items={[
-                  { label: "Compliance Status", value: complianceReport.data.complianceData.complianceStatus },
-                  { label: "ENERGY STAR Score", value: complianceReport.data.complianceData.energyStarScore ?? "—" },
-                  { label: "Site EUI", value: complianceReport.data.complianceData.siteEui ?? "—" },
                   {
-                    label: "Estimated Penalty",
-                    value: formatMoney(complianceReport.data.complianceData.estimatedPenalty),
-                    tone: "danger",
+                    label: "Compliance Status",
+                    value:
+                      complianceReport.data.governedOperationalSummary.complianceSummary
+                        .primaryStatus,
+                  },
+                  {
+                    label: "ENERGY STAR Score",
+                    value: complianceReport.data.complianceData.energyStarScore ?? "-",
+                  },
+                  {
+                    label: "Site EUI",
+                    value: complianceReport.data.complianceData.siteEui ?? "-",
+                  },
+                  {
+                    label: "Current Penalty Estimate",
+                    value: formatMoney(
+                      complianceReport.data.governedOperationalSummary.penaltySummary
+                        ?.currentEstimatedPenalty,
+                    ),
+                    tone:
+                      complianceReport.data.governedOperationalSummary.penaltySummary
+                        ?.status === "ESTIMATED"
+                        ? "danger"
+                        : "default",
                   },
                 ]}
               />
+
+              {complianceReport.data.governedOperationalSummary.penaltySummary ? (
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <div className="font-medium text-slate-900">
+                    {
+                      complianceReport.data.governedOperationalSummary.penaltySummary.basis
+                        .label
+                    }
+                  </div>
+                  <div className="mt-1 text-slate-600">
+                    {
+                      complianceReport.data.governedOperationalSummary.penaltySummary.basis
+                        .explanation
+                    }
+                  </div>
+                  <div className="mt-2 text-xs text-slate-500">
+                    Calculated{" "}
+                    {formatDate(
+                      complianceReport.data.governedOperationalSummary.penaltySummary
+                        .calculatedAt,
+                    )}
+                    {" | "}Last compliance evaluation{" "}
+                    {formatDate(
+                      complianceReport.data.governedOperationalSummary.timestamps
+                        .lastComplianceEvaluatedAt,
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                  No governed penalty run is available for this building yet.
+                </div>
+              )}
+
+              <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Artifact status
+                  </div>
+                  <div className="mt-2">
+                    Benchmark:{" "}
+                    {complianceReport.data.governedOperationalSummary.artifactSummary.benchmark.latestArtifactStatus
+                      .toLowerCase()
+                      .replaceAll("_", " ")}
+                  </div>
+                  <div className="mt-1">
+                    BEPS:{" "}
+                    {complianceReport.data.governedOperationalSummary.artifactSummary.beps.latestArtifactStatus
+                      .toLowerCase()
+                      .replaceAll("_", " ")}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Submission workflow
+                  </div>
+                  <div className="mt-2">
+                    Benchmark:{" "}
+                    {(complianceReport.data.governedOperationalSummary.submissionSummary.benchmark
+                      ?.state ?? "NOT_STARTED")
+                      .toLowerCase()
+                      .replaceAll("_", " ")}
+                  </div>
+                  <div className="mt-1">
+                    BEPS:{" "}
+                    {(complianceReport.data.governedOperationalSummary.submissionSummary.beps
+                      ?.state ?? "NOT_STARTED")
+                      .toLowerCase()
+                      .replaceAll("_", " ")}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Next action
+                  </div>
+                  <div className="mt-2 font-medium text-slate-900">
+                    {complianceReport.data.governedOperationalSummary.readinessSummary.nextAction.title}
+                  </div>
+                  <div className="mt-1 text-slate-600">
+                    {complianceReport.data.governedOperationalSummary.readinessSummary.nextAction.reason}
+                  </div>
+                </div>
+              </div>
+
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 <div>
                   <h4 className="text-sm font-medium text-slate-900">Energy History</h4>
@@ -146,10 +281,11 @@ export function ReportsPage() {
                       >
                         <div className="font-medium">{reading.meterType}</div>
                         <div className="text-xs text-slate-500">
-                          {new Date(reading.periodStart).toLocaleDateString()} - {new Date(reading.periodEnd).toLocaleDateString()}
+                          {new Date(reading.periodStart).toLocaleDateString()} -{" "}
+                          {new Date(reading.periodEnd).toLocaleDateString()}
                         </div>
                         <div className="mt-1 text-xs text-slate-600">
-                          {reading.consumptionKbtu.toLocaleString()} kBtu • {reading.source}
+                          {reading.consumptionKbtu.toLocaleString()} kBtu | {reading.source}
                         </div>
                       </div>
                     ))}
@@ -195,22 +331,54 @@ export function ReportsPage() {
             >
               <MetricGrid
                 items={[
-                  { label: "Eligible", value: exemptionReport.data.exemptionScreening.eligible ? "Yes" : "No" },
-                  { label: "Qualified Exemptions", value: exemptionReport.data.exemptionScreening.qualifiedExemptions.length || 0 },
+                  {
+                    label: "Eligible",
+                    value: exemptionReport.data.exemptionScreening.eligible ? "Yes" : "No",
+                  },
+                  {
+                    label: "Qualified Exemptions",
+                    value:
+                      exemptionReport.data.exemptionScreening.qualifiedExemptions.length || 0,
+                  },
                   {
                     label: "Penalty Savings If Exempt",
                     value: formatMoney(exemptionReport.data.penaltyContext.penaltySavingsIfExempt),
                     tone: "success",
                   },
-                  { label: "DOEE Deadline", value: exemptionReport.data.doeeSubmissionGuidance.deadline },
+                  {
+                    label: "Current Penalty Estimate",
+                    value: formatMoney(exemptionReport.data.penaltyContext.currentEstimatedPenalty),
+                  },
                 ]}
               />
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <div className="font-medium text-slate-900">
+                  {exemptionReport.data.penaltyContext.currentEstimateBasis}
+                </div>
+                <div className="mt-1 text-slate-600">
+                  Current estimate status:{" "}
+                  {exemptionReport.data.penaltyContext.currentEstimateStatus
+                    .toLowerCase()
+                    .replaceAll("_", " ")}
+                  .
+                </div>
+                <div className="mt-1 text-slate-500">
+                  Legacy statutory ceiling:{" "}
+                  {formatMoney(exemptionReport.data.penaltyContext.legacyStatutoryMaximum)}
+                </div>
+                <div className="mt-1 text-slate-500">
+                  DOEE deadline: {exemptionReport.data.doeeSubmissionGuidance.deadline}
+                </div>
+              </div>
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 <div>
                   <h4 className="text-sm font-medium text-slate-900">Checklist</h4>
                   <div className="mt-2 space-y-2">
                     {exemptionReport.data.filingChecklist.map((item) => (
-                      <div key={item.item} className="rounded border border-slate-200 px-3 py-2 text-sm">
+                      <div
+                        key={item.item}
+                        className="rounded border border-slate-200 px-3 py-2 text-sm"
+                      >
                         <div className="font-medium text-slate-900">{item.item}</div>
                         <div className="text-xs text-slate-500">{item.status}</div>
                         <div className="mt-1 text-xs text-slate-600">{item.notes}</div>
@@ -225,8 +393,13 @@ export function ReportsPage() {
                       submissions.data
                         .filter((submission) => submission.reportingYear === reportingYear)
                         .map((submission) => (
-                          <div key={submission.id} className="rounded border border-slate-200 px-3 py-2 text-sm">
-                            <div className="font-medium text-slate-900">Reporting year {submission.reportingYear}</div>
+                          <div
+                            key={submission.id}
+                            className="rounded border border-slate-200 px-3 py-2 text-sm"
+                          >
+                            <div className="font-medium text-slate-900">
+                              Reporting year {submission.reportingYear}
+                            </div>
                             <div className="text-xs text-slate-500">{submission.status}</div>
                           </div>
                         ))

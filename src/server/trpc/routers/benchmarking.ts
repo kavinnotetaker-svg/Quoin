@@ -454,6 +454,7 @@ export const benchmarkingRouter = router({
         reportingYear: input.reportingYear,
         createdByType: "USER",
         createdById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 
@@ -520,6 +521,7 @@ export const benchmarkingRouter = router({
         reportingYear: input.reportingYear,
         createdByType: "USER",
         createdById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 
@@ -538,6 +540,9 @@ export const benchmarkingRouter = router({
         buildingId: input.buildingId,
         reportingYear: input.reportingYear,
         format: input.format,
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 });

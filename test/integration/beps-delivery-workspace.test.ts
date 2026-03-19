@@ -541,7 +541,7 @@ describe("BEPS delivery workspace", () => {
       filingRecordId: filingCompliance.id,
       packetType: "COMPLETED_ACTIONS",
     });
-    expect(stalePacket?.status).toBe("STALE");
+    expect(stalePacket?.status).toBe("FINALIZED");
 
     await caller.beps.upsertRequestItem({
       requestItemId: requestItem.id,
@@ -563,6 +563,7 @@ describe("BEPS delivery workspace", () => {
     });
 
     expect(regenerated.version).toBeGreaterThan(generated.version);
+    expect(regenerated.status).toBe("GENERATED");
 
     const exported = await caller.beps.exportPacket({
       buildingId: buildingA.id,

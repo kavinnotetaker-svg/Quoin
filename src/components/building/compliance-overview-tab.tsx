@@ -2,9 +2,11 @@
 
 import React from "react";
 import { trpc } from "@/lib/trpc";
+import { ArtifactWorkspacePanel } from "./artifact-workspace-panel";
 import {
   Panel,
   formatDate,
+  formatMoney,
 } from "@/components/internal/admin-primitives";
 import {
   StatusBadge,
@@ -14,11 +16,6 @@ import {
   getSubmissionReadinessDisplay,
   getVerificationStatusDisplay,
 } from "@/components/internal/status-helpers";
-import {
-  derivePrimaryComplianceStatus,
-  extractComplianceEngineResult,
-  summarizeReasonCodes,
-} from "@/lib/compliance-surface";
 
 function metricLabel(metric: string | null) {
   return metric ? metric.replaceAll("_", " ") : "Not recorded";
@@ -44,26 +41,57 @@ function decisionLabel(input: {
   return "Decision not recorded";
 }
 
-function extractInputSummary(payload: unknown) {
-  const record =
-    payload && typeof payload === "object" && !Array.isArray(payload)
-      ? (payload as Record<string, unknown>)
-      : null;
-
-  const readiness = record?.readiness;
-  const evaluation = record?.evaluation;
-
-  return {
-    readiness:
-      readiness && typeof readiness === "object" && !Array.isArray(readiness)
-        ? (readiness as Record<string, unknown>)
-        : null,
-    evaluation:
-      evaluation && typeof evaluation === "object" && !Array.isArray(evaluation)
-        ? (evaluation as Record<string, unknown>)
-        : null,
-  };
+function getPenaltyStatusDisplay(status: string) {
+  switch (status) {
+    case "ESTIMATED":
+      return { label: "Estimated", tone: "warning" as const };
+    case "NOT_APPLICABLE":
+      return { label: "Not applicable", tone: "muted" as const };
+    default:
+      return { label: "Insufficient context", tone: "muted" as const };
+  }
 }
+
+type PenaltySummaryShape = {
+  id: string;
+  calculationMode: string;
+  calculatedAt: string;
+  status: string;
+  currentEstimatedPenalty: number | null;
+  currency: string;
+  basis: {
+    code: string;
+    label: string;
+    explanation: string;
+  };
+  governingContext: {
+    filingYear: number | null;
+    basisPathway: string | null;
+    ruleVersion: string | null;
+  };
+  timestamps: {
+    lastReadinessEvaluatedAt: string | null;
+    lastComplianceEvaluatedAt: string | null;
+    lastPacketGeneratedAt: string | null;
+  };
+  keyDrivers: Array<{
+    code: string;
+    label: string;
+    value: string;
+  }>;
+  scenarios: Array<{
+    code: string;
+    label: string;
+    description: string;
+    estimatedPenalty: number;
+    deltaFromCurrent: number;
+    metricChange: {
+      label: string;
+      from: number;
+      to: number;
+    } | null;
+  }>;
+};
 
 export function ComplianceOverviewTab({
   building,
@@ -72,14 +100,77 @@ export function ComplianceOverviewTab({
   building: {
     id: string;
     complianceCycle: string;
-    issueSummary: {
+    governedSummary: {
+      penaltySummary: PenaltySummaryShape | null;
+    };
+    readinessSummary: {
       state: string;
       blockingIssueCount: number;
       warningIssueCount: number;
+      primaryStatus: string;
+      qaVerdict: string | null;
+      reasonSummary: string;
+      lastReadinessEvaluatedAt: string | null;
+      lastComplianceEvaluatedAt: string | null;
+      lastPacketGeneratedAt: string | null;
+      lastPacketFinalizedAt: string | null;
       nextAction: {
         title: string;
         reason: string;
       };
+      evaluations: {
+        benchmark: {
+          reportingYear: number | null;
+          ruleVersion: string | null;
+          metricUsed: string | null;
+          status: string | null;
+          reasonSummary: string;
+          decision: {
+            meetsStandard: boolean | null;
+            blocked: boolean;
+          };
+          lastComplianceEvaluatedAt: string | null;
+        } | null;
+        beps: {
+          filingYear: number | null;
+          complianceCycle: string | null;
+          ruleVersion: string | null;
+          metricUsed: string | null;
+          status: string | null;
+          reasonSummary: string;
+          decision: {
+            meetsStandard: boolean | null;
+            blocked: boolean;
+          };
+          lastComplianceEvaluatedAt: string | null;
+        } | null;
+      };
+      artifacts: {
+        benchmarkSubmission: {
+          status: string;
+          reportingYear: number;
+          lastReadinessEvaluatedAt: string | null;
+          lastComplianceEvaluatedAt: string | null;
+        } | null;
+        benchmarkPacket: {
+          status: string;
+          generatedAt: string;
+          finalizedAt: string | null;
+        } | null;
+        bepsFiling: {
+          status: string;
+          filingYear: number | null;
+          complianceCycle: string | null;
+          lastComplianceEvaluatedAt: string | null;
+        } | null;
+        bepsPacket: {
+          status: string;
+          generatedAt: string;
+          finalizedAt: string | null;
+        } | null;
+      };
+    };
+    issueSummary: {
       openIssues: Array<{
         id: string;
         reportingYear: number | null;
@@ -92,24 +183,6 @@ export function ComplianceOverviewTab({
         source: string;
       }>;
     };
-    latestBenchmarkSubmission: {
-      reportingYear: number;
-      status: string;
-      readinessEvaluatedAt: string | Date | null;
-      submissionPayload: unknown;
-      complianceRun: {
-        executedAt: string | Date;
-      } | null;
-    } | null;
-    latestBepsFiling: {
-      filingYear: number | null;
-      complianceCycle: string | null;
-      status: string;
-      filingPayload: unknown;
-      complianceRun: {
-        executedAt: string | Date;
-      } | null;
-    } | null;
     recentAuditLogs: Array<{
       id: string;
       timestamp: string | Date;
@@ -135,21 +208,18 @@ export function ComplianceOverviewTab({
     | null
     | undefined;
 }) {
-  const benchmarkEngine = extractComplianceEngineResult(
-    building.latestBenchmarkSubmission?.submissionPayload,
-  );
-  const bepsEngine = extractComplianceEngineResult(
-    building.latestBepsFiling?.filingPayload,
-  );
   const utils = trpc.useUtils();
+  const readiness = building.readinessSummary;
+  const penaltySummary = building.governedSummary.penaltySummary;
+  const benchmarkReportingYear = readiness.evaluations.benchmark?.reportingYear ?? null;
   const updateIssueStatus = trpc.building.updateIssueStatus.useMutation({
     onSuccess: async () => {
       await Promise.all([
         utils.building.get.invalidate({ id: building.id }),
-        building.latestBenchmarkSubmission
+        benchmarkReportingYear
           ? utils.benchmarking.getVerificationChecklist.invalidate({
               buildingId: building.id,
-              reportingYear: building.latestBenchmarkSubmission.reportingYear,
+              reportingYear: benchmarkReportingYear,
             })
           : Promise.resolve(),
       ]);
@@ -158,17 +228,9 @@ export function ComplianceOverviewTab({
   const activeIssues = building.issueSummary.openIssues.filter(
     (issue) => issue.status === "OPEN" || issue.status === "IN_PROGRESS",
   );
-  const primaryStatus = derivePrimaryComplianceStatus({
-    benchmark: benchmarkEngine,
-    beps: bepsEngine,
-  });
-  const primaryDisplay = getPrimaryComplianceStatusDisplay(primaryStatus);
-  const readinessDisplay = getSubmissionReadinessDisplay(building.issueSummary.state);
-  const qaDisplay = getVerificationStatusDisplay(benchmarkEngine?.qaVerdict ?? "FAIL");
-  const benchmarkInput = extractInputSummary(
-    building.latestBenchmarkSubmission?.submissionPayload,
-  );
-  const bepsInput = extractInputSummary(building.latestBepsFiling?.filingPayload);
+  const primaryDisplay = getPrimaryComplianceStatusDisplay(readiness.primaryStatus);
+  const readinessDisplay = getSubmissionReadinessDisplay(readiness.state);
+  const qaDisplay = getVerificationStatusDisplay(readiness.qaVerdict ?? "FAIL");
 
   return (
     <div className="space-y-6">
@@ -185,7 +247,7 @@ export function ComplianceOverviewTab({
               <StatusBadge label={readinessDisplay.label} tone={readinessDisplay.tone} />
             </div>
             <div className="mt-2 text-sm text-slate-600">
-              {building.issueSummary.nextAction.reason}
+              {readiness.nextAction.reason}
             </div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -209,8 +271,8 @@ export function ComplianceOverviewTab({
               <StatusBadge label={primaryDisplay.label} tone={primaryDisplay.tone} />
             </div>
             <div className="mt-2 text-sm text-slate-600">
-              {building.issueSummary.blockingIssueCount > 0
-                ? `${building.issueSummary.blockingIssueCount} blocking issue(s) must be resolved before the compliance result is submission-ready.`
+              {readiness.blockingIssueCount > 0
+                ? `${readiness.blockingIssueCount} blocking issue(s) must be resolved before the compliance result is submission-ready.`
                 : "The latest governed compliance result is available below."}
             </div>
           </div>
@@ -219,7 +281,7 @@ export function ComplianceOverviewTab({
 
       <Panel
         title="Open data issues"
-        subtitle="These are the persistent issues currently blocking or slowing this building’s path to review and submission."
+        subtitle="These are the persistent issues currently blocking or slowing this building's path to review and submission."
       >
         {activeIssues.length === 0 ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
@@ -244,7 +306,9 @@ export function ComplianceOverviewTab({
                     <div>
                       <div className="font-medium text-slate-900">{issue.title}</div>
                       <div className="mt-1 text-sm text-slate-500">
-                        {issue.reportingYear ? `Reporting year ${issue.reportingYear}` : "Current building state"}
+                        {issue.reportingYear
+                          ? `Reporting year ${issue.reportingYear}`
+                          : "Current building state"}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -318,39 +382,53 @@ export function ComplianceOverviewTab({
         )}
       </Panel>
 
+      <ArtifactWorkspacePanel buildingId={building.id} />
+
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel
           title="Benchmarking engine result"
           subtitle="Latest persisted benchmarking computation and QA gate."
         >
-          {!benchmarkEngine || !building.latestBenchmarkSubmission ? (
+          {!readiness.evaluations.benchmark ? (
             <div className="text-sm text-slate-500">
               No benchmarking engine result has been recorded yet.
             </div>
           ) : (
             <div className="space-y-4 text-sm text-slate-700">
               <div className="grid gap-4 md:grid-cols-2">
-                <SummaryItem label="Reporting year" value={String(building.latestBenchmarkSubmission.reportingYear)} />
-                <SummaryItem label="Rule version" value={benchmarkEngine.ruleVersion ?? "Not recorded"} />
-                <SummaryItem label="Metric used" value={metricLabel(benchmarkEngine.metricUsed)} />
+                <SummaryItem
+                  label="Reporting year"
+                  value={String(readiness.evaluations.benchmark.reportingYear ?? "Not recorded")}
+                />
+                <SummaryItem
+                  label="Rule version"
+                  value={readiness.evaluations.benchmark.ruleVersion ?? "Not recorded"}
+                />
+                <SummaryItem
+                  label="Metric used"
+                  value={metricLabel(readiness.evaluations.benchmark.metricUsed)}
+                />
                 <SummaryItem
                   label="Decision"
                   value={decisionLabel({
-                    status: benchmarkEngine.status,
-                    meetsStandard: benchmarkEngine.decision.meetsStandard,
-                    blocked: benchmarkEngine.decision.blocked,
+                    status: readiness.evaluations.benchmark.status,
+                    meetsStandard: readiness.evaluations.benchmark.decision.meetsStandard,
+                    blocked: readiness.evaluations.benchmark.decision.blocked,
                   })}
                 />
                 <SummaryItem
                   label="Reason codes"
-                  value={summarizeReasonCodes(benchmarkEngine.reasonCodes)}
+                  value={readiness.evaluations.benchmark.reasonSummary}
                 />
                 <SummaryItem
-                  label="Last evaluation"
+                  label="Last readiness evaluation"
                   value={formatDate(
-                    building.latestBenchmarkSubmission.complianceRun?.executedAt ??
-                      building.latestBenchmarkSubmission.readinessEvaluatedAt,
+                    readiness.artifacts.benchmarkSubmission?.lastReadinessEvaluatedAt,
                   )}
+                />
+                <SummaryItem
+                  label="Last compliance evaluation"
+                  value={formatDate(readiness.evaluations.benchmark.lastComplianceEvaluatedAt)}
                 />
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -358,19 +436,20 @@ export function ComplianceOverviewTab({
                   Input snapshot summary
                 </div>
                 <div className="mt-2 text-sm text-slate-600">
-                  Submission status {building.latestBenchmarkSubmission.status.toLowerCase().replaceAll("_", " ")}.
-                  Scope{" "}
-                  {typeof benchmarkInput.readiness?.summary === "object" &&
-                  benchmarkInput.readiness?.summary &&
-                  typeof (benchmarkInput.readiness.summary as Record<string, unknown>).scopeState ===
-                    "string"
-                    ? String(
-                        (benchmarkInput.readiness.summary as Record<string, unknown>).scopeState,
-                      )
+                  Submission status{" "}
+                  {readiness.artifacts.benchmarkSubmission?.status
+                    .toLowerCase()
+                    .replaceAll("_", " ") ?? "not recorded"}
+                  . Latest readiness check recorded on{" "}
+                  {formatDate(readiness.artifacts.benchmarkSubmission?.lastReadinessEvaluatedAt)}.
+                  {readiness.artifacts.benchmarkPacket ? (
+                    <>
+                      {" "}Verification packet{" "}
+                      {readiness.artifacts.benchmarkPacket.status
                         .toLowerCase()
-                        .replaceAll("_", " ")
-                    : "not recorded"}
-                  .
+                        .replaceAll("_", " ")}.
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -381,7 +460,7 @@ export function ComplianceOverviewTab({
           title="BEPS engine result"
           subtitle="Latest persisted BEPS evaluation and governed decision path."
         >
-          {!bepsEngine || !building.latestBepsFiling ? (
+          {!readiness.evaluations.beps ? (
             <div className="text-sm text-slate-500">
               No BEPS engine result has been recorded yet.
             </div>
@@ -390,25 +469,31 @@ export function ComplianceOverviewTab({
               <div className="grid gap-4 md:grid-cols-2">
                 <SummaryItem
                   label="Cycle / filing year"
-                  value={`${building.latestBepsFiling.complianceCycle ?? building.complianceCycle} / ${building.latestBepsFiling.filingYear ?? "Not recorded"}`}
+                  value={`${readiness.evaluations.beps.complianceCycle ?? building.complianceCycle} / ${readiness.evaluations.beps.filingYear ?? "Not recorded"}`}
                 />
-                <SummaryItem label="Rule version" value={bepsEngine.ruleVersion ?? "Not recorded"} />
-                <SummaryItem label="Metric used" value={metricLabel(bepsEngine.metricUsed)} />
+                <SummaryItem
+                  label="Rule version"
+                  value={readiness.evaluations.beps.ruleVersion ?? "Not recorded"}
+                />
+                <SummaryItem
+                  label="Metric used"
+                  value={metricLabel(readiness.evaluations.beps.metricUsed)}
+                />
                 <SummaryItem
                   label="Decision"
                   value={decisionLabel({
-                    status: bepsEngine.status,
-                    meetsStandard: bepsEngine.decision.meetsStandard,
-                    blocked: bepsEngine.decision.blocked,
+                    status: readiness.evaluations.beps.status,
+                    meetsStandard: readiness.evaluations.beps.decision.meetsStandard,
+                    blocked: readiness.evaluations.beps.decision.blocked,
                   })}
                 />
                 <SummaryItem
                   label="Reason codes"
-                  value={summarizeReasonCodes(bepsEngine.reasonCodes)}
+                  value={readiness.evaluations.beps.reasonSummary}
                 />
                 <SummaryItem
-                  label="Last evaluation"
-                  value={formatDate(building.latestBepsFiling.complianceRun?.executedAt)}
+                  label="Last compliance evaluation"
+                  value={formatDate(readiness.evaluations.beps.lastComplianceEvaluatedAt)}
                 />
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -416,20 +501,163 @@ export function ComplianceOverviewTab({
                   Input snapshot summary
                 </div>
                 <div className="mt-2 text-sm text-slate-600">
-                  Filing status {building.latestBepsFiling.status.toLowerCase().replaceAll("_", " ")}.
-                  Overall result{" "}
-                  {typeof bepsInput.evaluation?.overallStatus === "string"
-                    ? String(bepsInput.evaluation.overallStatus)
-                        .toLowerCase()
-                        .replaceAll("_", " ")
-                    : "not recorded"}
+                  Filing status{" "}
+                  {readiness.artifacts.bepsFiling?.status
+                    .toLowerCase()
+                    .replaceAll("_", " ") ?? "not recorded"}
+                  . Packet{" "}
+                  {readiness.artifacts.bepsPacket?.status
+                    .toLowerCase()
+                    .replaceAll("_", " ") ?? "not started"}
                   .
+                  {readiness.artifacts.bepsPacket?.generatedAt ? (
+                    <> Last packet generated on {formatDate(readiness.artifacts.bepsPacket.generatedAt)}.</>
+                  ) : null}
                 </div>
               </div>
             </div>
           )}
         </Panel>
       </div>
+
+      <Panel
+        title="Penalty estimate"
+        subtitle="This estimate is taken from the latest governed BEPS compliance context and persisted as a penalty run."
+      >
+        {!penaltySummary ? (
+          <div className="text-sm text-slate-500">
+            Penalty estimate is unavailable right now.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Current penalty estimate
+                </div>
+                <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                  {formatMoney(penaltySummary.currentEstimatedPenalty)}
+                </div>
+                <div className="mt-2">
+                  <StatusBadge
+                    label={getPenaltyStatusDisplay(penaltySummary.status).label}
+                    tone={getPenaltyStatusDisplay(penaltySummary.status).tone}
+                  />
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Penalty basis
+                </div>
+                <div className="mt-2 text-sm font-medium text-slate-900">
+                  {penaltySummary.basis.label}
+                </div>
+                <div className="mt-2 text-sm text-slate-600">
+                  {penaltySummary.basis.explanation}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Governing context
+                </div>
+                <div className="mt-2 text-sm text-slate-700">
+                  Filing year {penaltySummary.governingContext.filingYear ?? "Not recorded"}
+                  {" | "}
+                  {penaltySummary.governingContext.basisPathway
+                    ? penaltySummary.governingContext.basisPathway.replaceAll("_", " ")
+                    : "No pathway basis"}
+                </div>
+                <div className="mt-2 text-sm text-slate-600">
+                  Rule version {penaltySummary.governingContext.ruleVersion ?? "Not recorded"}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Key drivers
+                </div>
+                <div className="mt-3 space-y-2 text-sm text-slate-700">
+                  {penaltySummary.keyDrivers.map((driver) => (
+                    <div
+                      key={driver.code}
+                      className="flex items-start justify-between gap-3"
+                    >
+                      <div className="text-slate-500">{driver.label}</div>
+                      <div className="text-right font-medium text-slate-900">
+                        {driver.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Scenario deltas
+                </div>
+                {penaltySummary.scenarios.length === 0 ? (
+                  <div className="mt-3 text-sm text-slate-500">
+                    No governed scenario deltas are available from the current compliance context.
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {penaltySummary.scenarios.map((scenario) => (
+                      <div
+                        key={scenario.code}
+                        className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"
+                      >
+                        <div className="font-medium text-slate-900">{scenario.label}</div>
+                        <div className="mt-1 text-slate-600">{scenario.description}</div>
+                        <div className="mt-2 flex flex-wrap gap-4">
+                          <div className="text-slate-700">
+                            Estimate:{" "}
+                            <span className="font-medium text-slate-900">
+                              {formatMoney(scenario.estimatedPenalty)}
+                            </span>
+                          </div>
+                          <div className="text-slate-700">
+                            Delta:{" "}
+                            <span className="font-medium text-slate-900">
+                              {formatMoney(scenario.deltaFromCurrent)}
+                            </span>
+                          </div>
+                        </div>
+                        {scenario.metricChange ? (
+                          <div className="mt-2 text-slate-600">
+                            {scenario.metricChange.label}: {scenario.metricChange.from} to{" "}
+                            {scenario.metricChange.to}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 text-sm text-slate-600">
+              <SummaryItem
+                label="Penalty calculated"
+                value={formatDate(penaltySummary.calculatedAt)}
+              />
+              <SummaryItem
+                label="Last BEPS compliance evaluation"
+                value={formatDate(penaltySummary.timestamps.lastComplianceEvaluatedAt)}
+              />
+              <SummaryItem
+                label="Last readiness evaluation"
+                value={formatDate(penaltySummary.timestamps.lastReadinessEvaluatedAt)}
+              />
+              <SummaryItem
+                label="Last packet generated"
+                value={formatDate(penaltySummary.timestamps.lastPacketGeneratedAt)}
+              />
+            </div>
+          </div>
+        )}
+      </Panel>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel

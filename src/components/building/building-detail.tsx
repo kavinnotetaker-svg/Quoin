@@ -33,7 +33,10 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
     id: buildingId,
   });
 
-  const reportingYear = data?.latestBenchmarkSubmission?.reportingYear ?? defaultReportingYear();
+  const reportingYear =
+    data?.readinessSummary.evaluations.benchmark?.reportingYear ??
+    data?.readinessSummary.artifacts.benchmarkSubmission?.reportingYear ??
+    defaultReportingYear();
   const verificationChecklist = trpc.benchmarking.getVerificationChecklist.useQuery(
     { buildingId, reportingYear },
     {
@@ -134,6 +137,8 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
           onSuccess={() => {
             utils.building.get.invalidate({ id: buildingId });
             utils.building.list.invalidate();
+            utils.building.portfolioWorklist.invalidate();
+            utils.building.getArtifactWorkspace.invalidate({ buildingId });
             utils.building.complianceHistory.invalidate({ buildingId });
             utils.benchmarking.getVerificationChecklist.invalidate({
               buildingId,

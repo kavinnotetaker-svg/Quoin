@@ -6,6 +6,7 @@ import {
   LATEST_SNAPSHOT_ORDER,
 } from "@/server/lib/compliance-snapshots";
 import { dedupeEnergyReadings } from "@/server/lib/energy-readings";
+import { getBuildingGovernedOperationalSummary } from "@/server/compliance/governed-operational-summary";
 import {
   screenForExemptions,
   type FinancialDistressIndicators,
@@ -18,6 +19,216 @@ import {
  * Actual PDF rendering uses Playwright .pdf() from HTML templates (Phase B).
  * This router assembles the data needed for those templates.
  */
+
+const governedPenaltySummarySchema = z.object({
+  status: z.enum(["ESTIMATED", "NOT_APPLICABLE", "INSUFFICIENT_CONTEXT"]),
+  currentEstimatedPenalty: z.number().nullable(),
+  calculatedAt: z.string(),
+  basis: z.object({
+    label: z.string(),
+    explanation: z.string(),
+  }),
+  governingContext: z.object({
+    filingYear: z.number().nullable(),
+    complianceCycle: z.string().nullable(),
+    ruleVersion: z.string().nullable(),
+    basisPathway: z.string().nullable(),
+  }),
+  timestamps: z.object({
+    lastReadinessEvaluatedAt: z.string().nullable(),
+    lastComplianceEvaluatedAt: z.string().nullable(),
+    lastPacketGeneratedAt: z.string().nullable(),
+    lastPacketFinalizedAt: z.string().nullable(),
+  }),
+  scenarios: z.array(
+    z.object({
+      code: z.string(),
+      label: z.string(),
+      estimatedPenalty: z.number(),
+      deltaFromCurrent: z.number(),
+    }),
+  ),
+}).nullable();
+
+const governedEvaluationSummarySchema = z.object({
+  scope: z.enum(["BENCHMARKING", "BEPS"]),
+  recordId: z.string(),
+  status: z.string().nullable(),
+  applicability: z.string().nullable(),
+  qaVerdict: z.string().nullable(),
+  ruleVersion: z.string().nullable(),
+  metricUsed: z.string().nullable(),
+  reasonCodes: z.array(z.string()),
+  reasonSummary: z.string(),
+  decision: z.object({
+    meetsStandard: z.boolean().nullable(),
+    blocked: z.boolean(),
+    insufficientData: z.boolean(),
+  }),
+  reportingYear: z.number().nullable(),
+  filingYear: z.number().nullable(),
+  complianceCycle: z.string().nullable(),
+  complianceRunId: z.string().nullable(),
+  lastComplianceEvaluatedAt: z.string().nullable(),
+}).nullable();
+
+const governedArtifactSummarySchema = z.object({
+  scope: z.enum(["BENCHMARKING", "BEPS"]),
+  sourceRecordId: z.string().nullable(),
+  sourceRecordStatus: z.string().nullable(),
+  latestArtifactId: z.string().nullable(),
+  latestArtifactStatus: z.enum([
+    "NOT_STARTED",
+    "DRAFT",
+    "GENERATED",
+    "STALE",
+    "FINALIZED",
+  ]),
+  reportingYear: z.number().nullable(),
+  filingYear: z.number().nullable(),
+  complianceCycle: z.string().nullable(),
+  lastGeneratedAt: z.string().nullable(),
+  lastFinalizedAt: z.string().nullable(),
+});
+
+const governedSubmissionWorkflowSummarySchema = z.object({
+  id: z.string(),
+  workflowType: z.enum(["BENCHMARK_VERIFICATION", "BEPS_FILING"]),
+  state: z.enum([
+    "NOT_STARTED",
+    "DRAFT",
+    "READY_FOR_REVIEW",
+    "APPROVED_FOR_SUBMISSION",
+    "SUBMITTED",
+    "COMPLETED",
+    "NEEDS_CORRECTION",
+    "SUPERSEDED",
+  ]),
+  linkedArtifactId: z.string().nullable(),
+  linkedArtifactVersion: z.number().nullable(),
+  linkedArtifactStatus: z.string().nullable(),
+  latestTransitionAt: z.string().nullable(),
+  readyForReviewAt: z.string().nullable(),
+  approvedAt: z.string().nullable(),
+  submittedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  needsCorrectionAt: z.string().nullable(),
+  supersededAt: z.string().nullable(),
+  supersededById: z.string().nullable(),
+  latestNotes: z.string().nullable(),
+  allowedTransitions: z.array(
+    z.object({
+      nextState: z.enum([
+        "READY_FOR_REVIEW",
+        "APPROVED_FOR_SUBMISSION",
+        "SUBMITTED",
+        "COMPLETED",
+        "NEEDS_CORRECTION",
+      ]),
+      label: z.string(),
+    }),
+  ),
+  nextAction: z.object({
+    title: z.string(),
+    reason: z.string(),
+  }),
+}).nullable();
+
+const governedOperationalSummarySchema = z.object({
+  buildingId: z.string(),
+  readinessSummary: z.object({
+    state: z.enum([
+      "DATA_INCOMPLETE",
+      "READY_FOR_REVIEW",
+      "READY_TO_SUBMIT",
+      "SUBMITTED",
+    ]),
+    blockingIssueCount: z.number(),
+    warningIssueCount: z.number(),
+    primaryStatus: z.string(),
+    qaVerdict: z.string().nullable(),
+    reasonCodes: z.array(z.string()),
+    reasonSummary: z.string(),
+    nextAction: z.object({
+      title: z.string(),
+      reason: z.string(),
+      href: z.string(),
+    }),
+    lastReadinessEvaluatedAt: z.string().nullable(),
+    lastComplianceEvaluatedAt: z.string().nullable(),
+    lastPacketGeneratedAt: z.string().nullable(),
+    lastPacketFinalizedAt: z.string().nullable(),
+    evaluations: z.object({
+      benchmark: governedEvaluationSummarySchema,
+      beps: governedEvaluationSummarySchema,
+    }),
+    artifacts: z.object({
+      benchmarkSubmission: z.object({
+        id: z.string(),
+        status: z.string(),
+        reportingYear: z.number(),
+        complianceRunId: z.string().nullable(),
+        lastReadinessEvaluatedAt: z.string().nullable(),
+        lastComplianceEvaluatedAt: z.string().nullable(),
+      }).nullable(),
+      benchmarkPacket: z.object({
+        id: z.string(),
+        status: z.string(),
+        reportingYear: z.number().nullable(),
+        filingYear: z.number().nullable(),
+        complianceCycle: z.string().nullable(),
+        generatedAt: z.string(),
+        finalizedAt: z.string().nullable(),
+      }).nullable(),
+      bepsFiling: z.object({
+        id: z.string(),
+        status: z.string(),
+        filingYear: z.number().nullable(),
+        complianceCycle: z.string().nullable(),
+        complianceRunId: z.string().nullable(),
+        lastComplianceEvaluatedAt: z.string().nullable(),
+      }).nullable(),
+      bepsPacket: z.object({
+        id: z.string(),
+        status: z.string(),
+        reportingYear: z.number().nullable(),
+        filingYear: z.number().nullable(),
+        complianceCycle: z.string().nullable(),
+        generatedAt: z.string(),
+        finalizedAt: z.string().nullable(),
+      }).nullable(),
+    }),
+  }),
+  activeIssueCounts: z.object({
+    blocking: z.number(),
+    warning: z.number(),
+  }),
+  complianceSummary: z.object({
+    primaryStatus: z.string(),
+    qaVerdict: z.string().nullable(),
+    reasonCodes: z.array(z.string()),
+    reasonSummary: z.string(),
+    benchmark: governedEvaluationSummarySchema,
+    beps: governedEvaluationSummarySchema,
+  }),
+  penaltySummary: governedPenaltySummarySchema,
+  artifactSummary: z.object({
+    benchmark: governedArtifactSummarySchema,
+    beps: governedArtifactSummarySchema,
+  }),
+  submissionSummary: z.object({
+    benchmark: governedSubmissionWorkflowSummarySchema,
+    beps: governedSubmissionWorkflowSummarySchema,
+  }),
+  timestamps: z.object({
+    lastReadinessEvaluatedAt: z.string().nullable(),
+    lastComplianceEvaluatedAt: z.string().nullable(),
+    lastPenaltyCalculatedAt: z.string().nullable(),
+    lastArtifactGeneratedAt: z.string().nullable(),
+    lastArtifactFinalizedAt: z.string().nullable(),
+    lastSubmissionTransitionAt: z.string().nullable(),
+  }),
+});
 
 const reportOutputSchema = z.object({
   buildingId: z.string(),
@@ -35,6 +246,8 @@ const reportOutputSchema = z.object({
     dataQualityScore: z.number().nullable(),
     snapshotDate: z.string().nullable(),
   }),
+  governedPenalty: governedPenaltySummarySchema,
+  governedOperationalSummary: governedOperationalSummarySchema,
   energyHistory: z.array(
     z.object({
       periodStart: z.string(),
@@ -88,8 +301,14 @@ const exemptionReportSchema = z.object({
     supportingEvidence: z.array(z.string()),
   }),
   penaltyContext: z.object({
-    maxPenaltyExposure: z.number(),
+    legacyStatutoryMaximum: z.number(),
+    currentEstimateStatus: z.enum([
+      "ESTIMATED",
+      "NOT_APPLICABLE",
+      "INSUFFICIENT_CONTEXT",
+    ]),
     currentEstimatedPenalty: z.number().nullable(),
+    currentEstimateBasis: z.string(),
     penaltySavingsIfExempt: z.number().nullable(),
   }),
   supportingSnapshots: z.array(
@@ -144,6 +363,11 @@ export const reportRouter = router({
       const latestSnapshot = await getLatestComplianceSnapshot(ctx.tenantDb, {
         buildingId: input.buildingId,
       });
+      const governedSummary = await getBuildingGovernedOperationalSummary({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+      });
+      const penaltySummary = governedSummary.penaltySummary;
 
       const twoYearsAgo = new Date();
       twoYearsAgo.setMonth(twoYearsAgo.getMonth() - 24);
@@ -194,10 +418,35 @@ export const reportRouter = router({
           complianceStatus:
             latestSnapshot?.complianceStatus ?? "PENDING_DATA",
           complianceGap: latestSnapshot?.complianceGap ?? null,
-          estimatedPenalty: latestSnapshot?.estimatedPenalty ?? null,
+          estimatedPenalty: penaltySummary?.currentEstimatedPenalty ?? null,
           dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
           snapshotDate: latestSnapshot?.snapshotDate?.toISOString() ?? null,
         },
+        governedPenalty: penaltySummary
+          ? {
+              status: penaltySummary.status,
+              currentEstimatedPenalty: penaltySummary.currentEstimatedPenalty,
+              calculatedAt: penaltySummary.calculatedAt,
+              basis: {
+                label: penaltySummary.basis.label,
+                explanation: penaltySummary.basis.explanation,
+              },
+              governingContext: {
+                filingYear: penaltySummary.governingContext.filingYear,
+                complianceCycle: penaltySummary.governingContext.complianceCycle,
+                ruleVersion: penaltySummary.governingContext.ruleVersion,
+                basisPathway: penaltySummary.governingContext.basisPathway,
+              },
+              timestamps: penaltySummary.timestamps,
+              scenarios: penaltySummary.scenarios.map((scenario) => ({
+                code: scenario.code,
+                label: scenario.label,
+                estimatedPenalty: scenario.estimatedPenalty,
+                deltaFromCurrent: scenario.deltaFromCurrent,
+              })),
+            }
+          : null,
+        governedOperationalSummary: governedSummary,
         energyHistory: dedupedReadings.map(
           (r: {
             id: string;
@@ -269,6 +518,11 @@ export const reportRouter = router({
       const latestSnapshot = await getLatestComplianceSnapshot(ctx.tenantDb, {
         buildingId: input.buildingId,
       });
+      const governedSummary = await getBuildingGovernedOperationalSummary({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+      });
+      const penaltySummary = governedSummary.penaltySummary;
 
       const snapshots = await ctx.tenantDb.complianceSnapshot.findMany({
         where: { buildingId: input.buildingId },
@@ -363,8 +617,8 @@ export const reportRouter = router({
       }
 
       // Penalty context
-      const maxPenalty = building.maxPenaltyExposure;
-      const currentPenalty = latestSnapshot?.estimatedPenalty ?? null;
+      const legacyStatutoryMaximum = building.maxPenaltyExposure;
+      const currentPenalty = penaltySummary?.currentEstimatedPenalty ?? null;
 
       // Filing checklist
       const checklist = buildFilingChecklist({
@@ -405,8 +659,11 @@ export const reportRouter = router({
           supportingEvidence: financialEvidence,
         },
         penaltyContext: {
-          maxPenaltyExposure: maxPenalty,
+          legacyStatutoryMaximum,
+          currentEstimateStatus: penaltySummary?.status ?? "INSUFFICIENT_CONTEXT",
           currentEstimatedPenalty: currentPenalty,
+          currentEstimateBasis:
+            penaltySummary?.basis.label ?? "No governed penalty run recorded",
           penaltySavingsIfExempt: currentPenalty,
         },
         supportingSnapshots: snapshots.map(

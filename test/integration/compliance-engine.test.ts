@@ -704,7 +704,7 @@ describe("compliance engine", () => {
 
     expect(evaluated.engineResult.qa.verdict).toBe("FAIL");
     expect(evaluated.engineResult.status).toBe("BLOCKED");
-    expect(evaluated.readiness.status).toBe("READY");
+    expect(evaluated.readiness.status).toBe("BLOCKED");
     expect(evaluated.benchmarkSubmission.status).toBe("BLOCKED");
     expect(evaluated.engineResult.reasonCodes).toContain("QA_GATE_FAILED");
   });

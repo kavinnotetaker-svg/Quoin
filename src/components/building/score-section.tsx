@@ -1,23 +1,28 @@
 import { StatusBadge, getComplianceStatusDisplay } from "@/components/internal/status-helpers";
 
+interface GovernedPenaltySummary {
+  status: "ESTIMATED" | "NOT_APPLICABLE" | "INSUFFICIENT_CONTEXT";
+  currentEstimatedPenalty: number | null;
+  basisLabel: string;
+}
+
 interface ScoreSectionProps {
   energyStarScore: number | null;
   complianceStatus: string;
-  estimatedPenalty: number | null;
+  penaltySummary: GovernedPenaltySummary | null;
   bepsTargetScore: number;
-  grossSquareFeet: number;
+  legacyStatutoryMaximum?: number | null;
   snapshotDate: string | Date | null;
 }
 
 export function ScoreSection({
   energyStarScore,
   complianceStatus,
-  estimatedPenalty,
+  penaltySummary,
   bepsTargetScore,
-  grossSquareFeet,
+  legacyStatutoryMaximum = null,
   snapshotDate,
 }: ScoreSectionProps) {
-  const maxPenaltyExposure = Math.min(grossSquareFeet * 10, 7_500_000);
   const compliance = getComplianceStatusDisplay(complianceStatus);
   const gap =
     energyStarScore != null ? energyStarScore - bepsTargetScore : null;
@@ -35,6 +40,25 @@ export function ScoreSection({
         year: "numeric",
       })}`
     : "";
+  const penaltyText =
+    penaltySummary?.status === "ESTIMATED" &&
+    penaltySummary.currentEstimatedPenalty != null
+      ? `$${penaltySummary.currentEstimatedPenalty.toLocaleString()}`
+      : penaltySummary?.status === "NOT_APPLICABLE"
+        ? "$0"
+        : "Unavailable";
+  const penaltyTone =
+    penaltySummary?.status === "ESTIMATED" &&
+    penaltySummary.currentEstimatedPenalty != null &&
+    penaltySummary.currentEstimatedPenalty > 0
+      ? "text-red-600"
+      : "text-slate-900";
+  const penaltyNote =
+    penaltySummary?.status === "ESTIMATED"
+      ? penaltySummary.basisLabel
+      : penaltySummary?.status === "NOT_APPLICABLE"
+        ? "No governed penalty applies in the current context."
+        : "Insufficient governed context for a current estimate.";
 
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
@@ -70,23 +94,15 @@ export function ScoreSection({
       </div>
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-500">
-          Estimated Penalty Exposure
+          Current Penalty Estimate
         </p>
-        <p
-          className={`mt-1 text-3xl font-bold tracking-tight ${
-            estimatedPenalty && estimatedPenalty > 0
-              ? "text-red-600"
-              : "text-slate-900"
-          }`}
-        >
-          {estimatedPenalty != null ? `$${estimatedPenalty.toLocaleString()}` : "$0"}
-        </p>
-        <p className="mt-1 text-sm font-medium text-slate-500">
-          Current estimate from the latest compliance snapshot. This is not the statutory maximum.
-        </p>
-        <p className="mt-1 text-xs text-slate-400">
-          Max statutory penalty: ${maxPenaltyExposure.toLocaleString()}
-        </p>
+        <p className={`mt-1 text-3xl font-bold tracking-tight ${penaltyTone}`}>{penaltyText}</p>
+        <p className="mt-1 text-sm font-medium text-slate-500">{penaltyNote}</p>
+        {legacyStatutoryMaximum != null ? (
+          <p className="mt-1 text-xs text-slate-400">
+            Legacy statutory ceiling: ${legacyStatutoryMaximum.toLocaleString()}
+          </p>
+        ) : null}
       </div>
     </div>
   );

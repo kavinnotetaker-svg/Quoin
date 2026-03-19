@@ -173,6 +173,17 @@ export function DashboardContent() {
           (!building.latestSnapshot && statusFilter === "PENDING_DATA"),
       )
     : b.buildings;
+  const penaltySummaries = trpc.building.listPenaltySummaries.useQuery(
+    {
+      buildingIds: filtered.map((building) => building.id),
+    },
+    {
+      enabled: filtered.length > 0,
+    },
+  );
+  const penaltySummariesByBuildingId = new Map(
+    (penaltySummaries.data ?? []).map((entry) => [entry.buildingId, entry.summary]),
+  );
 
   return (
     <div className="space-y-8">
@@ -194,9 +205,9 @@ export function DashboardContent() {
               s.nonCompliant > 0 ? "rgb(220, 38, 38)" : undefined,
           },
           {
-            label: "Estimated penalty exposure",
+            label: "Current penalty exposure",
             value: `$${s.totalPenaltyExposure.toLocaleString()}`,
-            subtitle: "From the latest compliance snapshot for each building",
+            subtitle: "From current governed penalty runs",
           },
           {
             label: "Average latest score",
@@ -270,7 +281,10 @@ export function DashboardContent() {
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
         {view === "table" ? (
-          <BuildingTable buildings={filtered} />
+          <BuildingTable
+            buildings={filtered}
+            penaltySummariesByBuildingId={penaltySummariesByBuildingId}
+          />
         ) : (
           <BuildingMap buildings={filtered} />
         )}

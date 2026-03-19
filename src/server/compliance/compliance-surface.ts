@@ -1,4 +1,8 @@
-import type { PrimaryComplianceSurfaceStatus } from "@/components/internal/status-helpers";
+export type PrimaryComplianceSurfaceStatus =
+  | "DATA_INCOMPLETE"
+  | "READY"
+  | "COMPLIANT"
+  | "NON_COMPLIANT";
 
 type RecordLike = Record<string, unknown>;
 

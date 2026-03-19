@@ -14,13 +14,22 @@ import {
   getBuildingWorkflowSummary,
   listPortfolioWorkflowSummaries,
 } from "@/server/compliance/building-workflow";
+import { getPortfolioWorklist } from "@/server/compliance/portfolio-worklist";
 import {
-  deriveBuildingReadinessSummary,
-  getBuildingIssueSummary,
   listBuildingDataIssues,
   listPortfolioDataIssues,
   updateDataIssueStatus,
 } from "@/server/compliance/data-issues";
+import {
+  getBuildingGovernedOperationalSummary,
+  listBuildingGovernedOperationalSummaries,
+} from "@/server/compliance/governed-operational-summary";
+import { getBuildingArtifactWorkspace } from "@/server/compliance/compliance-artifacts";
+import {
+  getOrCreatePenaltySummary,
+  listPenaltySummaries,
+} from "@/server/compliance/penalties";
+import { transitionSubmissionWorkflow } from "@/server/compliance/submission-workflows";
 
 const createBuildingInput = z.object({
   name: z.string().min(1).max(200),
@@ -48,10 +57,43 @@ const listBuildingsInput = z.object({
   search: z.string().max(200).optional(),
 });
 
+const portfolioWorklistInput = z.object({
+  search: z.string().max(200).optional(),
+  readinessState: z
+    .enum(["DATA_INCOMPLETE", "READY_FOR_REVIEW", "READY_TO_SUBMIT", "SUBMITTED"])
+    .optional(),
+  hasBlockingIssues: z.boolean().optional(),
+  hasPenaltyExposure: z.boolean().optional(),
+  artifactStatus: z
+    .enum(["NOT_STARTED", "GENERATED", "STALE", "FINALIZED"])
+    .optional(),
+  nextAction: z
+    .enum([
+      "RESOLVE_BLOCKING_ISSUES",
+      "REGENERATE_ARTIFACT",
+      "FINALIZE_ARTIFACT",
+      "REVIEW_COMPLIANCE_RESULT",
+      "SUBMIT_ARTIFACT",
+      "MONITOR_SUBMISSION",
+    ])
+    .optional(),
+  sortBy: z
+    .enum(["PRIORITY", "NAME", "PENALTY", "LAST_COMPLIANCE_EVALUATED"])
+    .default("PRIORITY"),
+});
+
 const dataIssueActionStatusSchema = z.enum([
   "IN_PROGRESS",
   "RESOLVED",
   "DISMISSED",
+]);
+
+const submissionWorkflowTransitionSchema = z.enum([
+  "READY_FOR_REVIEW",
+  "APPROVED_FOR_SUBMISSION",
+  "SUBMITTED",
+  "COMPLETED",
+  "NEEDS_CORRECTION",
 ]);
 
 async function ensureTenantBuilding(
@@ -129,116 +171,36 @@ export const buildingRouter = router({
               orderBy: LATEST_SNAPSHOT_ORDER,
               take: 1,
             },
-            benchmarkSubmissions: {
-              orderBy: [{ reportingYear: "desc" }, { updatedAt: "desc" }],
-              take: 1,
-              include: {
-                complianceRun: {
-                  select: {
-                    id: true,
-                    executedAt: true,
-                    status: true,
-                  },
-                },
-              },
-            },
-            filingRecords: {
-              where: {
-                filingType: "BEPS_COMPLIANCE",
-              },
-              orderBy: [{ filingYear: "desc" }, { updatedAt: "desc" }],
-              take: 1,
-              include: {
-                complianceRun: {
-                  select: {
-                    id: true,
-                    executedAt: true,
-                    status: true,
-                  },
-                },
-                packets: {
-                  orderBy: [{ generatedAt: "desc" }, { version: "desc" }],
-                  take: 1,
-                  select: {
-                    status: true,
-                  },
-                },
-              },
-            },
           },
         }),
         ctx.tenantDb.building.count({ where }),
       ]);
 
       const buildingIds = buildings.map((building) => building.id);
-      const activeIssues = buildingIds.length
-        ? await prisma.dataIssue.findMany({
-            where: {
-              organizationId: ctx.organizationId,
-              buildingId: {
-                in: buildingIds,
-              },
-              status: {
-                in: ["OPEN", "IN_PROGRESS"],
-              },
-            },
-            select: {
-              id: true,
-              buildingId: true,
-              issueType: true,
-              severity: true,
-              status: true,
-              title: true,
-              description: true,
-              requiredAction: true,
-            },
-            orderBy: [{ severity: "desc" }, { detectedAt: "asc" }],
-          })
-        : [];
-
-      const issuesByBuildingId = new Map<string, typeof activeIssues>();
-      for (const issue of activeIssues) {
-        const existing = issuesByBuildingId.get(issue.buildingId) ?? [];
-        existing.push(issue);
-        issuesByBuildingId.set(issue.buildingId, existing);
-      }
+      const governedSummaries = await listBuildingGovernedOperationalSummaries({
+        organizationId: ctx.organizationId,
+        buildingIds,
+      });
 
       return {
-        buildings: buildings.map((b) => ({
-          ...b,
-          latestSnapshot: b.complianceSnapshots[0] ?? null,
-          latestBenchmarkSubmission: b.benchmarkSubmissions[0] ?? null,
-          latestBepsFiling: b.filingRecords[0] ?? null,
-          readinessSummary: deriveBuildingReadinessSummary({
-            buildingId: b.id,
-            openIssues: issuesByBuildingId.get(b.id) ?? [],
-            latestBenchmarkSubmission: b.benchmarkSubmissions[0]
-              ? {
-                  id: b.benchmarkSubmissions[0].id,
-                  status: b.benchmarkSubmissions[0].status,
-                  reportingYear: b.benchmarkSubmissions[0].reportingYear,
-                  complianceRunId: b.benchmarkSubmissions[0].complianceRunId,
-                }
-              : null,
-            latestBepsFiling: b.filingRecords[0]
-              ? {
-                  id: b.filingRecords[0].id,
-                  status: b.filingRecords[0].status,
-                  filingYear: b.filingRecords[0].filingYear,
-                  complianceRunId: b.filingRecords[0].complianceRunId,
-                }
-              : null,
-            latestBepsPacketStatus: b.filingRecords[0]?.packets[0]?.status ?? null,
-          }),
-          activeIssueCounts: {
-            blocking: (issuesByBuildingId.get(b.id) ?? []).filter(
-              (issue) => issue.severity === "BLOCKING",
-            ).length,
-            warning: (issuesByBuildingId.get(b.id) ?? []).filter(
-              (issue) => issue.severity === "WARNING",
-            ).length,
-          },
-        })),
+        buildings: buildings.map((b) => {
+          const governedSummary = governedSummaries.get(b.id);
+          if (!governedSummary) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Building readiness state is unavailable",
+            });
+          }
+
+          return {
+            ...b,
+            latestSnapshot: b.complianceSnapshots[0] ?? null,
+            readinessSummary: governedSummary.readinessSummary,
+            issueSummary: governedSummary.issueSummary,
+            activeIssueCounts: governedSummary.activeIssueCounts,
+            governedSummary,
+          };
+        }),
         pagination: {
           page,
           pageSize,
@@ -258,38 +220,6 @@ export const buildingRouter = router({
             complianceSnapshots: {
               orderBy: LATEST_SNAPSHOT_ORDER,
               take: 1,
-            },
-            benchmarkSubmissions: {
-              orderBy: [{ reportingYear: "desc" }, { updatedAt: "desc" }],
-              take: 1,
-              include: {
-                complianceRun: {
-                  include: {
-                    calculationManifest: true,
-                  },
-                },
-              },
-            },
-            filingRecords: {
-              where: {
-                filingType: "BEPS_COMPLIANCE",
-              },
-              orderBy: [{ filingYear: "desc" }, { updatedAt: "desc" }],
-              take: 1,
-              include: {
-                complianceRun: {
-                  include: {
-                    calculationManifest: true,
-                  },
-                },
-                packets: {
-                  orderBy: [{ generatedAt: "desc" }, { version: "desc" }],
-                  take: 1,
-                  select: {
-                    status: true,
-                  },
-                },
-              },
             },
             auditLogs: {
               orderBy: { timestamp: "desc" },
@@ -317,18 +247,96 @@ export const buildingRouter = router({
         });
       }
 
+      const governedSummary = await getBuildingGovernedOperationalSummary({
+        organizationId: ctx.organizationId,
+        buildingId: input.id,
+      });
+
       return {
         ...building,
         latestSnapshot: building.complianceSnapshots[0] ?? null,
-        latestBenchmarkSubmission: building.benchmarkSubmissions[0] ?? null,
-        latestBepsFiling: building.filingRecords[0] ?? null,
         recentAuditLogs: building.auditLogs,
         workflowSummary,
-        issueSummary: await getBuildingIssueSummary({
-          organizationId: ctx.organizationId,
-          buildingId: input.id,
-        }),
+        readinessSummary: governedSummary.readinessSummary,
+        issueSummary: governedSummary.issueSummary,
+        governedSummary,
       };
+    }),
+
+  getPenaltySummary: tenantProcedure
+    .input(z.object({ buildingId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+
+      return getOrCreatePenaltySummary({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        requestId: ctx.requestId ?? null,
+      });
+    }),
+
+  getArtifactWorkspace: tenantProcedure
+    .input(z.object({ buildingId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+
+      return getBuildingArtifactWorkspace({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+      });
+    }),
+
+  portfolioWorklist: tenantProcedure
+    .input(portfolioWorklistInput)
+    .query(async ({ ctx, input }) =>
+      getPortfolioWorklist({
+        organizationId: ctx.organizationId,
+        search: input.search,
+        readinessState: input.readinessState,
+        hasBlockingIssues: input.hasBlockingIssues,
+        hasPenaltyExposure: input.hasPenaltyExposure,
+        artifactStatus: input.artifactStatus,
+        nextAction: input.nextAction,
+        sortBy: input.sortBy,
+      }),
+    ),
+
+  listPenaltySummaries: tenantProcedure
+    .input(
+      z.object({
+        buildingIds: z.array(z.string()).max(100),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const uniqueBuildingIds = Array.from(new Set(input.buildingIds)).filter(Boolean);
+
+      if (uniqueBuildingIds.length === 0) {
+        return [];
+      }
+
+      const tenantBuildings = await ctx.tenantDb.building.findMany({
+        where: {
+          id: {
+            in: uniqueBuildingIds,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (tenantBuildings.length !== uniqueBuildingIds.length) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "One or more buildings were not found",
+        });
+      }
+
+      return listPenaltySummaries({
+        organizationId: ctx.organizationId,
+        buildingIds: uniqueBuildingIds,
+        requestId: ctx.requestId ?? null,
+      });
     }),
 
   listIssues: tenantProcedure
@@ -379,6 +387,29 @@ export const buildingRouter = router({
         nextStatus: input.nextStatus,
         actorType: "USER",
         actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
+    }),
+
+  transitionSubmissionWorkflow: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        workflowId: z.string(),
+        nextState: submissionWorkflowTransitionSchema,
+        notes: z.string().max(5000).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      return transitionSubmissionWorkflow({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        workflowId: input.workflowId,
+        nextState: input.nextState,
+        notes: input.notes ?? null,
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
         requestId: ctx.requestId ?? null,
       });
     }),
@@ -488,10 +519,13 @@ export const buildingRouter = router({
         );
         await tx.$executeRawUnsafe(`SET LOCAL ROLE quoin_app`);
 
+        await tx.submissionWorkflowEvent.deleteMany({ where: childScope });
+        await tx.submissionWorkflow.deleteMany({ where: childScope });
         await tx.filingPacket.deleteMany({ where: childScope });
         await tx.filingRecordEvent.deleteMany({ where: childScope });
         await tx.benchmarkPacket.deleteMany({ where: childScope });
         await tx.financingPacket.deleteMany({ where: childScope });
+        await tx.penaltyRun.deleteMany({ where: childScope });
         await tx.financingCaseCandidate.deleteMany({ where: childScope });
         await tx.dataIssue.deleteMany({ where: childScope });
         await tx.benchmarkRequestItem.deleteMany({ where: childScope });
@@ -645,6 +679,15 @@ export const buildingRouter = router({
       },
     });
 
+    const penaltySummaries = await listPenaltySummaries({
+      organizationId: ctx.organizationId,
+      buildingIds: buildings.map((building) => building.id),
+      requestId: ctx.requestId ?? null,
+    });
+    const penaltyByBuildingId = new Map(
+      penaltySummaries.map((entry) => [entry.buildingId, entry.summary]),
+    );
+
     const stats = {
       totalBuildings: buildings.length,
       nonCompliant: 0,
@@ -679,8 +722,10 @@ export const buildingRouter = router({
             stats.pendingData++;
             break;
         }
-        if (snapshot.estimatedPenalty) {
-          stats.totalPenaltyExposure += snapshot.estimatedPenalty;
+        const governedPenalty =
+          penaltyByBuildingId.get(building.id)?.currentEstimatedPenalty ?? null;
+        if (governedPenalty != null) {
+          stats.totalPenaltyExposure += governedPenalty;
         }
         if (snapshot.energyStarScore != null) {
           scoreSum += snapshot.energyStarScore;

@@ -96,10 +96,25 @@ export function getPacketStatusDisplay(status: string | null | undefined) {
       return { label: "Generated", tone: "info" as const };
     case "STALE":
       return { label: "Needs refresh", tone: "warning" as const };
+    case "NOT_STARTED":
+      return { label: "Not started", tone: "muted" as const };
     case "DRAFT":
       return { label: "Draft", tone: "muted" as const };
     case "NONE":
       return { label: "Not started", tone: "muted" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
+export function getPenaltySummaryStatusDisplay(status: string | null | undefined) {
+  switch (status) {
+    case "ESTIMATED":
+      return { label: "Estimated", tone: "warning" as const };
+    case "NOT_APPLICABLE":
+      return { label: "Not applicable", tone: "muted" as const };
+    case "INSUFFICIENT_CONTEXT":
+      return { label: "Insufficient context", tone: "muted" as const };
     default:
       return { label: humanizeToken(status), tone: "muted" as const };
   }

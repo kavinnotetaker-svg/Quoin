@@ -63,7 +63,7 @@ async function main() {
     runCommand("npx prisma generate", {
       DATABASE_URL: testUrl,
     });
-    runCommand("npx vitest run test/integration", {
+    runCommand("npx vitest run test/integration --maxWorkers 1 --no-file-parallelism", {
       DATABASE_URL: testUrl,
     });
   } finally {

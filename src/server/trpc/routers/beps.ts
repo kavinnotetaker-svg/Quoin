@@ -729,6 +729,7 @@ export const bepsRouter = router({
         packetType: input.packetType,
         createdByType: "USER",
         createdById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 
@@ -750,6 +751,7 @@ export const bepsRouter = router({
         packetType: input.packetType,
         createdByType: "USER",
         createdById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 
@@ -848,6 +850,9 @@ export const bepsRouter = router({
         filingRecordId: input.filingRecordId,
         packetType: input.packetType,
         format: input.format,
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 });

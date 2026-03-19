@@ -10,8 +10,12 @@ import {
 interface Snapshot {
   energyStarScore: number | null;
   complianceStatus: string;
-  estimatedPenalty: number | null;
   snapshotDate: string | Date;
+}
+
+interface PenaltySummary {
+  status: "ESTIMATED" | "NOT_APPLICABLE" | "INSUFFICIENT_CONTEXT";
+  currentEstimatedPenalty: number | null;
 }
 
 interface BuildingRow {
@@ -22,19 +26,35 @@ interface BuildingRow {
   updatedAt: string | Date;
 }
 
-function formatPenalty(amount: number | null | undefined) {
-  if (!amount || amount === 0) {
+function formatPenalty(summary: PenaltySummary | null | undefined) {
+  if (!summary) {
+    return {
+      text: "Unavailable",
+      color: "var(--muted-foreground)",
+      note: "Governed estimate not loaded",
+    };
+  }
+
+  if (summary.status === "NOT_APPLICABLE") {
     return {
       text: "$0",
       color: "var(--muted-foreground)",
-      note: "No current penalty estimate",
+      note: "Not applicable under governed context",
+    };
+  }
+
+  if (summary.status === "INSUFFICIENT_CONTEXT" || summary.currentEstimatedPenalty == null) {
+    return {
+      text: "Unavailable",
+      color: "var(--muted-foreground)",
+      note: "Insufficient governed context",
     };
   }
 
   return {
-    text: `$${amount.toLocaleString()}`,
+    text: `$${summary.currentEstimatedPenalty.toLocaleString()}`,
     color: "rgb(220, 38, 38)",
-    note: "Latest estimate",
+    note: "Current governed estimate",
   };
 }
 
@@ -70,7 +90,13 @@ const PROPERTY_LABELS: Record<string, string> = {
   OTHER: "Other",
 };
 
-export function BuildingTable({ buildings }: { buildings: BuildingRow[] }) {
+export function BuildingTable({
+  buildings,
+  penaltySummariesByBuildingId,
+}: {
+  buildings: BuildingRow[];
+  penaltySummariesByBuildingId: Map<string, PenaltySummary>;
+}) {
   if (buildings.length === 0) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
@@ -104,7 +130,9 @@ export function BuildingTable({ buildings }: { buildings: BuildingRow[] }) {
           <tbody className="divide-y divide-slate-100">
             {buildings.map((building) => {
               const snapshot = building.latestSnapshot;
-              const penalty = formatPenalty(snapshot?.estimatedPenalty);
+              const penalty = formatPenalty(
+                penaltySummariesByBuildingId.get(building.id),
+              );
               const freshness = relativeTime(
                 snapshot?.snapshotDate ?? building.updatedAt,
               );
