@@ -272,5 +272,9 @@ describe("building penalty consistency", () => {
     expect(report.governedOperationalSummary.penaltySummary?.currentEstimatedPenalty).toBe(
       275000,
     );
+    expect(report.sections.penalty.currentEstimatedPenalty).toBe(275000);
+    expect(report.evidencePackage.traceability.penaltyRunId).toBe(
+      detail.governedSummary.penaltySummary?.id ?? null,
+    );
   });
 });

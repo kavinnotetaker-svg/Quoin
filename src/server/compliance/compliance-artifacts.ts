@@ -49,6 +49,13 @@ export interface OperationalArtifactVersion {
   lastExportFormat: ArtifactExportFormat | null;
 }
 
+export interface OperationalArtifactLatestExport {
+  artifactId: string;
+  version: number;
+  exportedAt: string;
+  format: ArtifactExportFormat | null;
+}
+
 export interface OperationalArtifactSourceContext {
   readinessState: BuildingReadinessState;
   primaryStatus: string;
@@ -76,6 +83,7 @@ export interface OperationalArtifactWorkflow {
   canFinalize: boolean;
   exportFormats: ArtifactExportFormat[];
   latestArtifact: OperationalArtifactVersion | null;
+  latestExport: OperationalArtifactLatestExport | null;
   history: OperationalArtifactVersion[];
   submissionWorkflow: SubmissionWorkflowDetail | null;
   blockersCount: number;
@@ -150,6 +158,27 @@ function buildArtifactVersion(
     exportAvailable: true,
     lastExportedAt: exportMetadata?.exportedAt ?? null,
     lastExportFormat: exportMetadata?.format ?? null,
+  };
+}
+
+function buildLatestExportSummary(
+  versions: OperationalArtifactVersion[],
+): OperationalArtifactLatestExport | null {
+  const latestExportedVersion = versions
+    .filter((version) => version.lastExportedAt)
+    .sort((left, right) =>
+      (right.lastExportedAt ?? "").localeCompare(left.lastExportedAt ?? ""),
+    )[0];
+
+  if (!latestExportedVersion?.lastExportedAt) {
+    return null;
+  }
+
+  return {
+    artifactId: latestExportedVersion.id,
+    version: latestExportedVersion.version,
+    exportedAt: latestExportedVersion.lastExportedAt,
+    format: latestExportedVersion.lastExportFormat,
   };
 }
 
@@ -329,6 +358,7 @@ export async function getBuildingArtifactWorkspace(params: {
         benchmarkManifest?.disposition !== "BLOCKED",
       exportFormats: ["JSON", "MARKDOWN", "PDF"],
       latestArtifact: benchmarkLatestVersion,
+      latestExport: buildLatestExportSummary(benchmarkVersions),
       history: benchmarkVersions,
       submissionWorkflow: benchmarkWorkflow,
       blockersCount: Array.isArray(benchmarkManifest?.blockers)
@@ -357,6 +387,7 @@ export async function getBuildingArtifactWorkspace(params: {
         bepsLatest?.status === "GENERATED" && bepsManifest?.disposition !== "BLOCKED",
       exportFormats: ["JSON", "MARKDOWN", "PDF"],
       latestArtifact: bepsLatestVersion,
+      latestExport: buildLatestExportSummary(bepsVersions),
       history: bepsVersions,
       submissionWorkflow: bepsWorkflow,
       blockersCount: Array.isArray(bepsManifest?.blockers) ? bepsManifest.blockers.length : 0,

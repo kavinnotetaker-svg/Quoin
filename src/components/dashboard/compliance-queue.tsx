@@ -243,6 +243,10 @@ export function ComplianceQueue() {
             value: data.aggregate.withPenaltyExposure,
           },
           { label: "Operational risk", value: data.aggregate.withOperationalRisk },
+          {
+            label: "Retrofit opportunities",
+            value: data.aggregate.withActionableRetrofits,
+          },
           { label: "Sync attention", value: data.aggregate.withSyncAttention },
           { label: "Draft artifacts", value: data.aggregate.withDraftArtifacts },
           {
@@ -528,6 +532,17 @@ export function ComplianceQueue() {
                                   item.anomalySummary.totalEstimatedPenaltyImpactUsd,
                                 )} added risk`
                               : ""}
+                          </div>
+                        ) : null}
+                        {item.retrofitSummary.topOpportunity ? (
+                          <div className="mt-2 text-[12px] text-zinc-500">
+                            Top retrofit: {item.retrofitSummary.topOpportunity.name}
+                            {" | "}
+                            {formatMoney(
+                              item.retrofitSummary.topOpportunity
+                                .estimatedAvoidedPenalty,
+                            )}{" "}
+                            avoided
                           </div>
                         ) : null}
                       </td>

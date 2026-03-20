@@ -153,6 +153,65 @@ export function ComplianceOverviewTab({
           penaltyImpactStatus: string;
         }>;
       };
+      retrofitSummary: {
+        activeCount: number;
+        highestPriorityBand: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
+        topOpportunity: {
+          candidateId: string;
+          name: string;
+          projectType: string;
+          priorityScore: number;
+          priorityBand: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+          estimatedAvoidedPenalty: number | null;
+          estimatedAvoidedPenaltyStatus: string;
+          estimatedAnnualSavingsKbtu: number | null;
+          netProjectCost: number;
+          estimatedOperationalRiskReduction: {
+            energyImpactKbtu: number | null;
+            penaltyImpactUsd: number | null;
+            status: string;
+            explanation: string;
+          };
+          basis: {
+            summary: string;
+            explanation: string;
+            assumptions: string[];
+          };
+          reasonCodes: string[];
+          rationale: {
+            deadlineDate: string | null;
+            monthsUntilDeadline: number | null;
+            anomalyContextCount: number;
+          };
+        } | null;
+        opportunities: Array<{
+          candidateId: string;
+          name: string;
+          projectType: string;
+          priorityScore: number;
+          priorityBand: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+          estimatedAvoidedPenalty: number | null;
+          estimatedAvoidedPenaltyStatus: string;
+          netProjectCost: number;
+          estimatedOperationalRiskReduction: {
+            energyImpactKbtu: number | null;
+            penaltyImpactUsd: number | null;
+            status: string;
+            explanation: string;
+          };
+          basis: {
+            summary: string;
+            explanation: string;
+            assumptions: string[];
+          };
+          reasonCodes: string[];
+          rationale: {
+            deadlineDate: string | null;
+            monthsUntilDeadline: number | null;
+            anomalyContextCount: number;
+          };
+        }>;
+      };
       runtimeSummary: {
         needsAttention: boolean;
         attentionCount: number;
@@ -373,6 +432,7 @@ export function ComplianceOverviewTab({
   const readiness = building.readinessSummary;
   const penaltySummary = building.governedSummary.penaltySummary;
   const anomalySummary = building.governedSummary.anomalySummary;
+  const retrofitSummary = building.governedSummary.retrofitSummary;
   const runtimeSummary = building.governedSummary.runtimeSummary;
   const operationalAnomalies = building.operationalAnomalies;
   const benchmarkReportingYear = readiness.evaluations.benchmark?.reportingYear ?? null;
@@ -1199,6 +1259,133 @@ export function ComplianceOverviewTab({
                 label="Last packet generated"
                 value={formatDate(penaltySummary.timestamps.lastPacketGeneratedAt)}
               />
+            </div>
+          </div>
+        )}
+      </Panel>
+
+      <Panel
+        title="Retrofit priorities"
+        subtitle="These retrofit opportunities are ranked as governed decision-support from the current penalty context, explicit retrofit assumptions, and aligned operational anomalies."
+      >
+        {retrofitSummary.activeCount === 0 ? (
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600">
+            No active retrofit opportunities have been prioritized for this building yet.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Active opportunities
+                </div>
+                <div className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
+                  {retrofitSummary.activeCount}
+                </div>
+              </div>
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Highest priority band
+                </div>
+                <div className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
+                  {retrofitSummary.highestPriorityBand ?? "Not ranked"}
+                </div>
+              </div>
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Top avoided penalty
+                </div>
+                <div className="mt-2 text-lg font-semibold tracking-tight text-zinc-900">
+                  {formatMoney(
+                    retrofitSummary.topOpportunity?.estimatedAvoidedPenalty ?? null,
+                  )}
+                </div>
+              </div>
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Top risk reduction
+                </div>
+                <div className="mt-2 text-lg font-semibold tracking-tight text-zinc-900">
+                  {formatMoney(
+                    retrofitSummary.topOpportunity?.estimatedOperationalRiskReduction
+                      .penaltyImpactUsd ?? null,
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {retrofitSummary.opportunities.map((opportunity) => (
+                <div
+                  key={opportunity.candidateId}
+                  className="rounded-lg border border-zinc-200 bg-white p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium text-zinc-900">{opportunity.name}</div>
+                      <div className="mt-1 text-sm text-zinc-500">
+                        {opportunity.projectType.toLowerCase().replaceAll("_", " ")}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge
+                        label={opportunity.priorityBand.toLowerCase()}
+                        tone={
+                          opportunity.priorityBand === "CRITICAL" ||
+                          opportunity.priorityBand === "HIGH"
+                            ? "danger"
+                            : opportunity.priorityBand === "MEDIUM"
+                              ? "warning"
+                              : "muted"
+                        }
+                      />
+                      <StatusBadge
+                        label={opportunity.estimatedAvoidedPenaltyStatus
+                          .toLowerCase()
+                          .replaceAll("_", " ")}
+                        tone={
+                          opportunity.estimatedAvoidedPenaltyStatus === "ESTIMATED"
+                            ? "warning"
+                            : "muted"
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 text-sm text-zinc-600">
+                    {opportunity.basis.summary}
+                  </div>
+                  <div className="mt-3 grid gap-4 md:grid-cols-4 text-sm text-zinc-700">
+                    <SummaryItem
+                      label="Priority score"
+                      value={String(opportunity.priorityScore)}
+                    />
+                    <SummaryItem
+                      label="Net cost"
+                      value={formatMoney(opportunity.netProjectCost)}
+                    />
+                    <SummaryItem
+                      label="Avoided penalty"
+                      value={formatMoney(opportunity.estimatedAvoidedPenalty)}
+                    />
+                    <SummaryItem
+                      label="Risk reduction"
+                      value={formatMoney(
+                        opportunity.estimatedOperationalRiskReduction.penaltyImpactUsd,
+                      )}
+                    />
+                  </div>
+                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+                    {opportunity.basis.explanation}
+                  </div>
+                  {opportunity.basis.assumptions.length > 0 ? (
+                    <div className="mt-3 space-y-1 text-sm text-zinc-600">
+                      {opportunity.basis.assumptions.map((assumption) => (
+                        <div key={assumption}>{assumption}</div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
             </div>
           </div>
         )}

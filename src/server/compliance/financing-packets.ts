@@ -228,7 +228,9 @@ function buildFinancingPacketWarnings(input: {
   if (
     input.candidateRows.some(
       (row) =>
-        row.ranking == null || row.ranking.estimatedAvoidedPenalty <= 0,
+        row.ranking == null ||
+        row.ranking.estimatedAvoidedPenalty == null ||
+        row.ranking.estimatedAvoidedPenalty <= 0,
     )
   ) {
     warnings.push({

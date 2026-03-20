@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "node scripts/start-server.mjs",
     "lint": "next lint",
-    "typecheck": "node scripts/clean-next-types.mjs && tsc --noEmit",
+    "typecheck": "node scripts/clean-next-types.mjs && tsc --project tsconfig.typecheck.json --noEmit --incremental false",
     "prisma:format": "prisma format",
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",

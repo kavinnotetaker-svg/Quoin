@@ -59,20 +59,16 @@ function makeContext(overrides: Partial<RankingContext> = {}): RankingContext {
       siteEui: 80,
       sourceEui: 150,
     },
-    latestFiling: {
+    latestComplianceContext: {
       id: "filing-1",
       filingYear: 2026,
       complianceCycle: "CYCLE_1",
       complianceRunId: "run-1",
-      filingPayload: {
-        bepsEvaluation: {
-          alternativeCompliance: {
-            recommended: {
-              amountDue: 900000,
-            },
-          },
-        },
-      },
+    },
+    penaltySummary: {
+      status: "ESTIMATED",
+      currentEstimatedPenalty: 900000,
+      calculatedAt: "2026-03-09T00:00:00.000Z",
     },
     anomalies: [],
     deadlineDate: new Date("2026-12-31T00:00:00.000Z"),
@@ -100,7 +96,9 @@ describe("retrofit optimization", () => {
       now: new Date("2026-03-10T00:00:00.000Z"),
     });
 
-    expect(highBenefit.estimatedAvoidedPenalty).toBeGreaterThan(lowBenefit.estimatedAvoidedPenalty);
+    expect(highBenefit.estimatedAvoidedPenalty ?? -1).toBeGreaterThan(
+      lowBenefit.estimatedAvoidedPenalty ?? -1,
+    );
     expect(highBenefit.priorityScore).toBeGreaterThan(lowBenefit.priorityScore);
   });
 
@@ -166,6 +164,10 @@ describe("retrofit optimization", () => {
             id: "anomaly-1",
             anomalyType: "UNUSUAL_CONSUMPTION_SPIKE",
             severity: "HIGH",
+            title: "Consumption spike",
+            estimatedEnergyImpactKbtu: null,
+            estimatedPenaltyImpactUsd: null,
+            penaltyImpactStatus: "INSUFFICIENT_CONTEXT",
           },
         ],
       }),
@@ -175,5 +177,52 @@ describe("retrofit optimization", () => {
     expect(ranked.rationale.anomalyContextCount).toBe(1);
     expect(ranked.reasonCodes).toContain(RETROFIT_RANK_REASON_CODES.anomalyContextPresent);
     expect(ranked.sourceRefs.some((sourceRef) => sourceRef.recordType === "OPERATIONAL_ANOMALY")).toBe(true);
+    expect(ranked.estimatedOperationalRiskReduction.penaltyImpactUsd).toBeNull();
+    expect(ranked.estimatedOperationalRiskReduction.status).toBe("INSUFFICIENT_CONTEXT");
+  });
+
+  it("omits avoided penalty when no governed penalty summary exists", () => {
+    const ranked = rankRetrofitCandidateData({
+      candidate: makeCandidate(),
+      context: makeContext({
+        penaltySummary: null,
+      }),
+      now: new Date("2026-03-10T00:00:00.000Z"),
+    });
+
+    expect(ranked.estimatedAvoidedPenalty).toBeNull();
+    expect(ranked.estimatedAvoidedPenaltyStatus).toBe("INSUFFICIENT_CONTEXT");
+    expect(ranked.priorityScore).toBeGreaterThan(0);
+    expect(ranked.basis.assumptions).toContain(
+      "Avoided penalty is omitted because no current governed penalty estimate is available.",
+    );
+  });
+
+  it("uses anomaly penalty impact as operational risk reduction when aligned anomaly context exists", () => {
+    const ranked = rankRetrofitCandidateData({
+      candidate: makeCandidate({
+        sourceMetadata: {
+          sourceAnomalyIds: ["anomaly-1"],
+        },
+      }),
+      context: makeContext({
+        anomalies: [
+          {
+            id: "anomaly-1",
+            anomalyType: "UNUSUAL_CONSUMPTION_SPIKE",
+            severity: "HIGH",
+            title: "Consumption spike",
+            estimatedEnergyImpactKbtu: 15000,
+            estimatedPenaltyImpactUsd: 12000,
+            penaltyImpactStatus: "ESTIMATED",
+          },
+        ],
+      }),
+      now: new Date("2026-03-10T00:00:00.000Z"),
+    });
+
+    expect(ranked.estimatedOperationalRiskReduction.penaltyImpactUsd).toBe(12000);
+    expect(ranked.estimatedOperationalRiskReduction.energyImpactKbtu).toBe(15000);
+    expect(ranked.estimatedOperationalRiskReduction.status).toBe("ESTIMATED");
   });
 });

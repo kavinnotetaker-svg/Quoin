@@ -309,6 +309,7 @@ vi.mock("@/lib/trpc", () => ({
               withPenaltyExposure: 1,
               withSyncAttention: 1,
               withOperationalRisk: 1,
+              withActionableRetrofits: 1,
               withDraftArtifacts: 1,
               finalizedAwaitingNextAction: 0,
             },
@@ -340,6 +341,11 @@ vi.mock("@/lib/trpc", () => ({
                   totalEstimatedPenaltyImpactUsd: null,
                   penaltyImpactStatus: "INSUFFICIENT_CONTEXT",
                   needsAttention: true,
+                },
+                retrofitSummary: {
+                  activeCount: 0,
+                  highestPriorityBand: null,
+                  topOpportunity: null,
                 },
                 artifacts: {
                   benchmark: {
@@ -426,6 +432,17 @@ vi.mock("@/lib/trpc", () => ({
                   totalEstimatedPenaltyImpactUsd: 18000,
                   penaltyImpactStatus: "ESTIMATED",
                   needsAttention: true,
+                },
+                retrofitSummary: {
+                  activeCount: 2,
+                  highestPriorityBand: "CRITICAL",
+                  topOpportunity: {
+                    name: "Retro-commissioning",
+                    priorityScore: 88,
+                    estimatedAvoidedPenalty: 120000,
+                    estimatedAvoidedPenaltyStatus: "ESTIMATED",
+                    estimatedOperationalRiskReductionPenalty: 18000,
+                  },
                 },
                 artifacts: {
                   benchmark: {
@@ -546,11 +563,13 @@ describe("consultant-facing screens", () => {
     expect(markup).toContain("2222 Filing Tower");
     expect(markup).toContain("$300,000");
     expect(markup).toContain("Operational risk");
+    expect(markup).toContain("Retrofit opportunities");
     expect(markup).toContain("Sync attention");
     expect(markup).toContain("Draft artifacts");
     expect(markup).toContain("Approved");
     expect(markup).toContain("Bulk operator actions");
     expect(markup).toContain("Bulk retry PM sync");
+    expect(markup).toContain("Top retrofit: Retro-commissioning");
   });
 
   it("renders the compliance overview with engine result fields", () => {
@@ -630,6 +649,86 @@ describe("consultant-facing screens", () => {
                   estimatedPenalty: 0,
                   deltaFromCurrent: -300000,
                   metricChange: null,
+                },
+              ],
+            },
+            retrofitSummary: {
+              activeCount: 2,
+              highestPriorityBand: "CRITICAL",
+              topOpportunity: {
+                candidateId: "retrofit-1",
+                name: "Retro-commissioning",
+                projectType: "RETRO_COMMISSIONING",
+                priorityScore: 88,
+                priorityBand: "CRITICAL",
+                estimatedAvoidedPenalty: 120000,
+                estimatedAvoidedPenaltyStatus: "ESTIMATED",
+                estimatedAnnualSavingsKbtu: 450000,
+                netProjectCost: 90000,
+                estimatedOperationalRiskReduction: {
+                  energyImpactKbtu: 12000,
+                  penaltyImpactUsd: 18000,
+                  status: "ESTIMATED",
+                  explanation:
+                    "Operational risk reduction is estimated from the active anomaly impacts aligned to this retrofit opportunity.",
+                },
+                basis: {
+                  summary:
+                    "Prioritized from governed penalty exposure, explicit retrofit impact assumptions, and aligned anomaly risk.",
+                  explanation:
+                    "Retrofit ranking is decision-support only. It uses the latest governed penalty summary when available, current compliance timing, explicit retrofit inputs, and aligned operational anomaly signals. It does not alter the compliance engine result.",
+                  assumptions: [
+                    "Avoided penalty is estimated by scaling the latest governed penalty exposure by the retrofit's expected BEPS improvement share.",
+                    "Cost efficiency uses the stated annual savings together with avoided penalty when available.",
+                    "Operational risk reduction is estimated from the active anomaly impacts aligned to this retrofit opportunity.",
+                  ],
+                },
+                reasonCodes: [
+                  "HIGH_AVOIDED_PENALTY",
+                  "LOW_NET_COST_FOR_BENEFIT",
+                  "ANOMALY_CONTEXT_PRESENT",
+                ],
+                rationale: {
+                  deadlineDate: "2026-12-31T00:00:00.000Z",
+                  monthsUntilDeadline: 9,
+                  anomalyContextCount: 1,
+                },
+              },
+              opportunities: [
+                {
+                  candidateId: "retrofit-1",
+                  name: "Retro-commissioning",
+                  projectType: "RETRO_COMMISSIONING",
+                  priorityScore: 88,
+                  priorityBand: "CRITICAL",
+                  estimatedAvoidedPenalty: 120000,
+                  estimatedAvoidedPenaltyStatus: "ESTIMATED",
+                  netProjectCost: 90000,
+                  estimatedOperationalRiskReduction: {
+                    energyImpactKbtu: 12000,
+                    penaltyImpactUsd: 18000,
+                    status: "ESTIMATED",
+                    explanation:
+                      "Operational risk reduction is estimated from the active anomaly impacts aligned to this retrofit opportunity.",
+                  },
+                  basis: {
+                    summary:
+                      "Prioritized from governed penalty exposure, explicit retrofit impact assumptions, and aligned anomaly risk.",
+                    explanation:
+                      "Retrofit ranking is decision-support only. It uses the latest governed penalty summary when available, current compliance timing, explicit retrofit inputs, and aligned operational anomaly signals. It does not alter the compliance engine result.",
+                    assumptions: [
+                      "Avoided penalty is estimated by scaling the latest governed penalty exposure by the retrofit's expected BEPS improvement share.",
+                    ],
+                  },
+                  reasonCodes: [
+                    "HIGH_AVOIDED_PENALTY",
+                    "LOW_NET_COST_FOR_BENEFIT",
+                  ],
+                  rationale: {
+                    deadlineDate: "2026-12-31T00:00:00.000Z",
+                    monthsUntilDeadline: 9,
+                    anomalyContextCount: 1,
+                  },
                 },
               ],
             },
@@ -902,6 +1001,10 @@ describe("consultant-facing screens", () => {
     expect(markup).toContain("Penalty estimate");
     expect(markup).toContain("$300,000");
     expect(markup).toContain("Meet target");
+    expect(markup).toContain("Retrofit priorities");
+    expect(markup).toContain("Retro-commissioning");
+    expect(markup).toContain("Top risk reduction");
+    expect(markup).toContain("Risk reduction");
     expect(markup).toContain("Operational anomalies");
     expect(markup).toContain("Persistent baseload increased above prior operating pattern");
     expect(markup).toContain("Integration runtime health");
@@ -984,10 +1087,14 @@ describe("consultant-facing screens", () => {
     );
 
     expect(reportSource).not.toContain("@/server/");
-    expect(reportSource).toContain("governedOperationalSummary.penaltySummary");
+    expect(reportSource).toContain("const sections = report.sections");
+    expect(reportSource).toContain("const evidencePackage = report.evidencePackage");
+    expect(reportSource).toContain("Governed report summary");
+    expect(reportSource).toContain("Evidence package");
     expect(reportSource).toContain("legacyStatutoryMaximum");
     expect(reportSource).toContain("operatorAccess.canManage");
-    expect(reportSource).not.toContain("complianceData.estimatedPenalty),");
+    expect(reportSource).not.toContain("submissionPayload");
+    expect(reportSource).not.toContain("filingPayload");
     expect(scoreSectionSource).not.toContain("Math.min(grossSquareFeet * 10, 7_500_000)");
     expect(scoreSectionSource).toContain("legacyStatutoryMaximum");
   });
@@ -1004,5 +1111,21 @@ describe("consultant-facing screens", () => {
     expect(queueSource).not.toContain("filingPayload");
     expect(queueSource).toContain("building.portfolioWorklist.useQuery");
     expect(queueSource).toContain("building.bulkOperatePortfolio.useMutation");
+  });
+
+  it("keeps retrofit prioritization authority on the server", () => {
+    const retrofitSource = readFileSync(
+      "C:\\Quoin\\src\\components\\building\\retrofit-tab.tsx",
+      "utf8",
+    );
+    const overviewSource = readFileSync(
+      "C:\\Quoin\\src\\components\\building\\compliance-overview-tab.tsx",
+      "utf8",
+    );
+
+    expect(retrofitSource).not.toContain("@/server/");
+    expect(retrofitSource).toContain("trpc.retrofit.rankBuilding.useQuery");
+    expect(overviewSource).not.toContain("@/server/");
+    expect(overviewSource).toContain("building.governedSummary.retrofitSummary");
   });
 });

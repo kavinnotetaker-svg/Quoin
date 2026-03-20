@@ -491,6 +491,34 @@ describe("financing packets", () => {
         },
       },
     });
+
+    await prisma.penaltyRun.create({
+      data: {
+        organizationId: orgA.id,
+        buildingId: buildingA.id,
+        calculationMode: "CURRENT_BEPS_EXPOSURE",
+        inputSnapshotRef: "financing-test",
+        inputSnapshotHash: `financing-penalty-${scope}`,
+        implementationKey: "penalty-engine/beps-v1",
+        baselineResultPayload: {
+          status: "ESTIMATED",
+          currentEstimatedPenalty: 900000,
+          currency: "USD",
+          basis: {
+            code: "TEST",
+            label: "Test governed estimate",
+            explanation: "Seeded penalty context for financing packet tests.",
+          },
+          governingContext: {},
+          artifacts: {},
+          timestamps: {
+            lastPenaltyCalculatedAt: "2026-03-02T00:00:00.000Z",
+          },
+          keyDrivers: [],
+        },
+        scenarioResultsPayload: [],
+      },
+    });
   });
 
   afterAll(async () => {
@@ -531,6 +559,11 @@ describe("financing packets", () => {
         },
       });
       await prisma.filingRecord.deleteMany({
+        where: {
+          buildingId: { in: [buildingA.id, buildingB.id] },
+        },
+      });
+      await prisma.penaltyRun.deleteMany({
         where: {
           buildingId: { in: [buildingA.id, buildingB.id] },
         },

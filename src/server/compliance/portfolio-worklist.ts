@@ -74,6 +74,20 @@ export interface PortfolioWorklistItem {
     penaltyImpactStatus: "ESTIMATED" | "INSUFFICIENT_CONTEXT" | "NOT_APPLICABLE";
     needsAttention: boolean;
   };
+  retrofitSummary: {
+    activeCount: number;
+    highestPriorityBand: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
+    topOpportunity: {
+      name: string;
+      priorityScore: number;
+      estimatedAvoidedPenalty: number | null;
+      estimatedAvoidedPenaltyStatus:
+        | "ESTIMATED"
+        | "INSUFFICIENT_CONTEXT"
+        | "NOT_APPLICABLE";
+      estimatedOperationalRiskReductionPenalty: number | null;
+    } | null;
+  };
   artifacts: {
     benchmark: PortfolioWorklistArtifactSummary;
     beps: PortfolioWorklistArtifactSummary;
@@ -113,6 +127,7 @@ export interface PortfolioWorklistAggregate {
   withPenaltyExposure: number;
   withSyncAttention: number;
   withOperationalRisk: number;
+  withActionableRetrofits: number;
   withDraftArtifacts: number;
   finalizedAwaitingNextAction: number;
 }
@@ -356,6 +371,9 @@ function toAggregate(items: PortfolioWorklistItem[]): PortfolioWorklistAggregate
       if (item.flags.needsAnomalyAttention) {
         acc.withOperationalRisk += 1;
       }
+      if (item.retrofitSummary.topOpportunity != null) {
+        acc.withActionableRetrofits += 1;
+      }
       if (
         item.artifacts.benchmark.status === "GENERATED" ||
         item.artifacts.benchmark.status === "STALE" ||
@@ -385,6 +403,7 @@ function toAggregate(items: PortfolioWorklistItem[]): PortfolioWorklistAggregate
       withPenaltyExposure: 0,
       withSyncAttention: 0,
       withOperationalRisk: 0,
+      withActionableRetrofits: 0,
       withDraftArtifacts: 0,
       finalizedAwaitingNextAction: 0,
     },
@@ -481,6 +500,23 @@ export async function getPortfolioWorklist(
           governedSummary.anomalySummary.totalEstimatedPenaltyImpactUsd,
         penaltyImpactStatus: governedSummary.anomalySummary.penaltyImpactStatus,
         needsAttention: governedSummary.anomalySummary.needsAttention,
+      },
+      retrofitSummary: {
+        activeCount: governedSummary.retrofitSummary.activeCount,
+        highestPriorityBand: governedSummary.retrofitSummary.highestPriorityBand,
+        topOpportunity: governedSummary.retrofitSummary.topOpportunity
+          ? {
+              name: governedSummary.retrofitSummary.topOpportunity.name,
+              priorityScore: governedSummary.retrofitSummary.topOpportunity.priorityScore,
+              estimatedAvoidedPenalty:
+                governedSummary.retrofitSummary.topOpportunity.estimatedAvoidedPenalty,
+              estimatedAvoidedPenaltyStatus:
+                governedSummary.retrofitSummary.topOpportunity.estimatedAvoidedPenaltyStatus,
+              estimatedOperationalRiskReductionPenalty:
+                governedSummary.retrofitSummary.topOpportunity
+                  .estimatedOperationalRiskReduction.penaltyImpactUsd,
+            }
+          : null,
       },
       artifacts: {
         benchmark: benchmarkArtifact,

@@ -12,6 +12,10 @@ import {
   LATEST_SNAPSHOT_ORDER,
 } from "@/server/lib/compliance-snapshots";
 import { getECMDatabase } from "@/server/pipelines/pathway-analysis/ecm-scorer";
+import {
+  listStoredPenaltySummaries,
+  type PenaltySummary,
+} from "./penalties";
 import { getActiveBepsCycleContext } from "./beps/cycle-registry";
 import { resolveGovernedFilingYear } from "./beps/config";
 
@@ -68,11 +72,26 @@ export interface RetrofitCandidateRanking {
   estimatedSiteEuiReduction: number | null;
   estimatedSourceEuiReduction: number | null;
   estimatedBepsImpactPct: number;
-  estimatedAvoidedPenalty: number;
+  estimatedAvoidedPenalty: number | null;
+  estimatedAvoidedPenaltyStatus:
+    | "ESTIMATED"
+    | "INSUFFICIENT_CONTEXT"
+    | "NOT_APPLICABLE";
+  estimatedOperationalRiskReduction: {
+    energyImpactKbtu: number | null;
+    penaltyImpactUsd: number | null;
+    status: "ESTIMATED" | "INSUFFICIENT_CONTEXT" | "NOT_APPLICABLE";
+    explanation: string;
+  };
   paybackProxyYears: number | null;
   priorityScore: number;
   priorityBand: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   reasonCodes: RetrofitRankReasonCode[];
+  basis: {
+    summary: string;
+    explanation: string;
+    assumptions: string[];
+  };
   rankingBreakdown: {
     avoidedPenaltyScore: number;
     complianceImpactScore: number;
@@ -84,12 +103,21 @@ export interface RetrofitCandidateRanking {
     anomalyContextScore: number;
   };
   rationale: {
-    currentPenaltyExposure: number;
+    currentPenaltyExposure: number | null;
     deadlineDate: string | null;
     monthsUntilDeadline: number | null;
     anomalyContextCount: number;
+    anomalyEstimatedPenaltyRisk: number | null;
+    penaltyCalculatedAt: string | null;
   };
   sourceRefs: RetrofitRankingSourceRef[];
+}
+
+export interface BuildingRetrofitOpportunitySummary {
+  activeCount: number;
+  highestPriorityBand: RetrofitCandidateRanking["priorityBand"] | null;
+  topOpportunity: RetrofitCandidateRanking | null;
+  opportunities: RetrofitCandidateRanking[];
 }
 
 const retrofitCandidateListSelect = {
@@ -145,17 +173,24 @@ export interface RankingContext {
     siteEui: number | null;
     sourceEui: number | null;
   } | null;
-  latestFiling: {
+  latestComplianceContext: {
     id: string;
     filingYear: number | null;
     complianceCycle: ComplianceCycle | null;
     complianceRunId: string | null;
-    filingPayload: unknown;
   } | null;
+  penaltySummary: Pick<
+    PenaltySummary,
+    "status" | "currentEstimatedPenalty" | "calculatedAt"
+  > | null;
   anomalies: Array<{
     id: string;
     anomalyType: string;
     severity: string;
+    title: string;
+    estimatedEnergyImpactKbtu: number | null;
+    estimatedPenaltyImpactUsd: number | null;
+    penaltyImpactStatus: "ESTIMATED" | "INSUFFICIENT_CONTEXT" | "NOT_APPLICABLE";
   }>;
   deadlineDate: Date | null;
 }
@@ -289,22 +324,37 @@ function humanizeProjectType(projectType: RetrofitProjectType) {
     .join(" ");
 }
 
-function getCurrentPenaltyExposure(latestFiling: RankingContext["latestFiling"], maxPenaltyExposure: number) {
-  if (!latestFiling) {
-    return maxPenaltyExposure;
+function getCurrentPenaltyExposure(
+  penaltySummary: RankingContext["penaltySummary"],
+) {
+  if (!penaltySummary) {
+    return {
+      amount: null,
+      status: "INSUFFICIENT_CONTEXT" as const,
+    };
   }
 
-  const filingPayload = toRecord(latestFiling.filingPayload);
-  const evaluation = toRecord(filingPayload["bepsEvaluation"]);
-  const alternativeCompliance = toRecord(evaluation["alternativeCompliance"]);
-  const recommended = toRecord(alternativeCompliance["recommended"]);
-  const pathwayResults = toRecord(evaluation["pathwayResults"]);
+  if (penaltySummary.status === "NOT_APPLICABLE") {
+    return {
+      amount: 0,
+      status: "NOT_APPLICABLE" as const,
+    };
+  }
 
-  return (
-    getNumber(recommended["amountDue"]) ??
-    getNumber(pathwayResults["estimatedPenalty"]) ??
-    maxPenaltyExposure
-  );
+  if (
+    penaltySummary.status === "ESTIMATED" &&
+    penaltySummary.currentEstimatedPenalty != null
+  ) {
+    return {
+      amount: penaltySummary.currentEstimatedPenalty,
+      status: "ESTIMATED" as const,
+    };
+  }
+
+  return {
+    amount: null,
+    status: "INSUFFICIENT_CONTEXT" as const,
+  };
 }
 
 function getProjectDefault(projectType: RetrofitProjectType) {
@@ -386,7 +436,7 @@ function deriveCandidateDefaults(input: {
 }
 
 function resolveDeadlineDate(input: {
-  latestFiling: RankingContext["latestFiling"];
+  latestComplianceContext: RankingContext["latestComplianceContext"];
   cycleContext: Awaited<ReturnType<typeof getActiveBepsCycleContext>>;
 }) {
   const factorCycle = toRecord(input.cycleContext.factorConfig.cycle);
@@ -399,7 +449,7 @@ function resolveDeadlineDate(input: {
   }
 
   const filingYear =
-    input.latestFiling?.filingYear ??
+    input.latestComplianceContext?.filingYear ??
     resolveGovernedFilingYear(
       input.cycleContext.registry.complianceCycle,
       input.cycleContext.ruleConfig,
@@ -408,6 +458,14 @@ function resolveDeadlineDate(input: {
     );
 
   return new Date(Date.UTC(filingYear, 11, 31));
+}
+
+async function tryGetActiveBepsCycleContext(cycle: ComplianceCycle) {
+  try {
+    return await getActiveBepsCycleContext(cycle);
+  } catch {
+    return null;
+  }
 }
 
 function monthsUntilDate(now: Date, target: Date | null) {
@@ -486,6 +544,11 @@ function calculateAnomalyContextScore(input: {
       count: 0,
       sourceRefs: [] as RetrofitRankingSourceRef[],
       hasContext: false,
+      estimatedEnergyImpactKbtu: null,
+      estimatedPenaltyImpactUsd: null,
+      reductionStatus: "NOT_APPLICABLE" as const,
+      explanation:
+        "No active anomaly signals are currently aligned with this retrofit opportunity.",
     };
   }
 
@@ -493,15 +556,52 @@ function calculateAnomalyContextScore(input: {
     (anomaly) => anomaly.severity === "HIGH" || anomaly.severity === "CRITICAL",
   ).length;
   const score = clamp(4 + highSeverityCount * 2 + matchingAnomalies.length, 0, 10);
+  const estimatedEnergyImpactKbtu = matchingAnomalies.reduce<number | null>(
+    (sum, anomaly) =>
+      anomaly.estimatedEnergyImpactKbtu == null
+        ? sum
+        : (sum ?? 0) + anomaly.estimatedEnergyImpactKbtu,
+    null,
+  );
+  const estimatedPenaltyAnomalies = matchingAnomalies.filter(
+    (anomaly) => anomaly.penaltyImpactStatus === "ESTIMATED",
+  );
+  const estimatedPenaltyImpactUsd =
+    estimatedPenaltyAnomalies.length === 0
+      ? null
+      : round(
+          estimatedPenaltyAnomalies.reduce(
+            (sum, anomaly) => sum + (anomaly.estimatedPenaltyImpactUsd ?? 0),
+            0,
+          ),
+          2,
+        );
+  const reductionStatus =
+    estimatedPenaltyAnomalies.length > 0
+      ? ("ESTIMATED" as const)
+      : matchingAnomalies.every(
+            (anomaly) => anomaly.penaltyImpactStatus === "NOT_APPLICABLE",
+          )
+        ? ("NOT_APPLICABLE" as const)
+        : ("INSUFFICIENT_CONTEXT" as const);
 
   return {
     score,
     count: matchingAnomalies.length,
     hasContext: true,
+    estimatedEnergyImpactKbtu,
+    estimatedPenaltyImpactUsd,
+    reductionStatus,
+    explanation:
+      reductionStatus === "ESTIMATED"
+        ? "Operational risk reduction is estimated from the active anomaly impacts aligned to this retrofit opportunity."
+        : reductionStatus === "NOT_APPLICABLE"
+          ? "Aligned anomalies are present, but they do not currently imply additional penalty-linked operational risk."
+          : "Aligned anomalies are present, but their penalty-linked operational risk cannot be quantified cleanly from current governed context.",
     sourceRefs: matchingAnomalies.map((anomaly) => ({
       recordType: "OPERATIONAL_ANOMALY" as const,
       recordId: anomaly.id,
-      label: anomaly.anomalyType,
+      label: anomaly.title,
     })),
   };
 }
@@ -523,10 +623,7 @@ export function rankRetrofitCandidateData(input: {
   now?: Date;
 }): RetrofitCandidateRanking {
   const now = input.now ?? new Date();
-  const currentPenaltyExposure = getCurrentPenaltyExposure(
-    input.context.latestFiling,
-    input.context.building.maxPenaltyExposure,
-  );
+  const currentPenaltyExposure = getCurrentPenaltyExposure(input.context.penaltySummary);
   const netProjectCost = Math.max(
     input.candidate.estimatedCapex - input.candidate.estimatedIncentiveAmount,
     0,
@@ -542,9 +639,11 @@ export function rankRetrofitCandidateData(input: {
     grossSquareFeet: input.context.building.grossSquareFeet,
   });
   const estimatedAvoidedPenalty =
-    currentPenaltyExposure > 0
-      ? round(currentPenaltyExposure * estimatedBepsImpactPct, 2)
-      : 0;
+    currentPenaltyExposure.status === "ESTIMATED" &&
+    currentPenaltyExposure.amount != null &&
+    currentPenaltyExposure.amount > 0
+      ? round(currentPenaltyExposure.amount * estimatedBepsImpactPct, 2)
+      : null;
 
   const currentAnnualKbtu =
     input.context.latestSnapshot?.siteEui != null
@@ -576,7 +675,7 @@ export function rankRetrofitCandidateData(input: {
     input.candidate.complianceCycle === input.context.building.complianceCycle;
   const benefitCostRatio =
     netProjectCost > 0
-      ? (estimatedAvoidedPenalty + (annualSavingsUsd ?? 0) * 3) / netProjectCost
+      ? ((estimatedAvoidedPenalty ?? 0) + (annualSavingsUsd ?? 0) * 3) / netProjectCost
       : 2;
   const confidenceScore =
     input.candidate.confidenceBand === "HIGH"
@@ -591,8 +690,18 @@ export function rankRetrofitCandidateData(input: {
 
   const rankingBreakdown = {
     avoidedPenaltyScore:
-      currentPenaltyExposure > 0
-        ? round(clamp((estimatedAvoidedPenalty / currentPenaltyExposure) * 25, 0, 25), 2)
+      currentPenaltyExposure.status === "ESTIMATED" &&
+      currentPenaltyExposure.amount != null &&
+      currentPenaltyExposure.amount > 0 &&
+      estimatedAvoidedPenalty != null
+        ? round(
+            clamp(
+              (estimatedAvoidedPenalty / currentPenaltyExposure.amount) * 25,
+              0,
+              25,
+            ),
+            2,
+          )
         : 0,
     complianceImpactScore: round(clamp(estimatedBepsImpactPct * 20, 0, 20), 2),
     energyImpactScore: round(clamp(energyImpactFraction * 15, 0, 15), 2),
@@ -613,11 +722,16 @@ export function rankRetrofitCandidateData(input: {
   );
 
   const reasonCodes: RetrofitRankReasonCode[] = [];
-  if (currentPenaltyExposure <= 0) {
+  if (currentPenaltyExposure.status === "NOT_APPLICABLE") {
     reasonCodes.push(RETROFIT_RANK_REASON_CODES.noCurrentPenaltyExposure);
-  } else if (estimatedAvoidedPenalty >= currentPenaltyExposure * 0.25 || estimatedAvoidedPenalty >= 100000) {
+  } else if (
+    currentPenaltyExposure.amount != null &&
+    estimatedAvoidedPenalty != null &&
+    (estimatedAvoidedPenalty >= currentPenaltyExposure.amount * 0.25 ||
+      estimatedAvoidedPenalty >= 100000)
+  ) {
     reasonCodes.push(RETROFIT_RANK_REASON_CODES.highAvoidedPenalty);
-  } else if (estimatedAvoidedPenalty > 0) {
+  } else if (estimatedAvoidedPenalty != null && estimatedAvoidedPenalty > 0) {
     reasonCodes.push(RETROFIT_RANK_REASON_CODES.moderateAvoidedPenalty);
   }
 
@@ -664,18 +778,18 @@ export function rankRetrofitCandidateData(input: {
       recordId: input.context.building.id,
       label: input.context.building.name,
     },
-    ...(input.context.latestFiling
+    ...(input.context.latestComplianceContext
       ? [
           {
             recordType: "FILING_RECORD" as const,
-            recordId: input.context.latestFiling.id,
-            label: `BEPS filing ${input.context.latestFiling.filingYear ?? "current"}`,
+            recordId: input.context.latestComplianceContext.id,
+            label: `BEPS filing ${input.context.latestComplianceContext.filingYear ?? "current"}`,
           },
-          ...(input.context.latestFiling.complianceRunId
+          ...(input.context.latestComplianceContext.complianceRunId
             ? [
                 {
                   recordType: "COMPLIANCE_RUN" as const,
-                  recordId: input.context.latestFiling.complianceRunId,
+                  recordId: input.context.latestComplianceContext.complianceRunId,
                   label: "BEPS compliance run",
                 },
               ]
@@ -706,16 +820,47 @@ export function rankRetrofitCandidateData(input: {
     estimatedSourceEuiReduction: input.candidate.estimatedSourceEuiReduction,
     estimatedBepsImpactPct: round(estimatedBepsImpactPct * 100, 2),
     estimatedAvoidedPenalty,
+    estimatedAvoidedPenaltyStatus: currentPenaltyExposure.status,
+    estimatedOperationalRiskReduction: {
+      energyImpactKbtu: anomalyContext.estimatedEnergyImpactKbtu,
+      penaltyImpactUsd: anomalyContext.estimatedPenaltyImpactUsd,
+      status: anomalyContext.reductionStatus,
+      explanation: anomalyContext.explanation,
+    },
     paybackProxyYears,
     priorityScore,
     priorityBand: getPriorityBand(priorityScore),
     reasonCodes: dedupeReasonCodes(reasonCodes),
+    basis: {
+      summary:
+        estimatedAvoidedPenalty != null
+          ? "Prioritized from governed penalty exposure, explicit retrofit impact assumptions, and aligned anomaly risk."
+          : "Prioritized from explicit energy, timing, and anomaly assumptions because governed avoided-penalty context is not currently available.",
+      explanation:
+        "Retrofit ranking is decision-support only. It uses the latest governed penalty summary when available, current compliance timing, explicit retrofit inputs, and aligned operational anomaly signals. It does not alter the compliance engine result.",
+      assumptions: [
+        estimatedAvoidedPenalty != null
+          ? "Avoided penalty is estimated by scaling the latest governed penalty exposure by the retrofit's expected BEPS improvement share."
+          : "Avoided penalty is omitted because no current governed penalty estimate is available.",
+        annualSavingsUsd != null
+          ? "Cost efficiency uses the stated annual savings together with avoided penalty when available."
+          : "Cost efficiency uses available capital cost and compliance impact only because annual savings were not provided.",
+        anomalyContext.hasContext
+          ? anomalyContext.explanation
+          : "No aligned operational anomalies are currently increasing this opportunity's risk-reduction value.",
+      ],
+    },
     rankingBreakdown,
     rationale: {
-      currentPenaltyExposure: round(currentPenaltyExposure, 2),
+      currentPenaltyExposure:
+        currentPenaltyExposure.amount != null
+          ? round(currentPenaltyExposure.amount, 2)
+          : null,
       deadlineDate: deadlineDate?.toISOString() ?? null,
       monthsUntilDeadline,
       anomalyContextCount: anomalyContext.count,
+      anomalyEstimatedPenaltyRisk: anomalyContext.estimatedPenaltyImpactUsd,
+      penaltyCalculatedAt: input.context.penaltySummary?.calculatedAt ?? null,
     },
     sourceRefs: dedupeSourceRefs(sourceRefs),
   };
@@ -729,7 +874,8 @@ async function buildRankingContexts(params: {
     return new Map<string, RankingContext>();
   }
 
-  const [buildings, latestSnapshots, filingRecords, anomalies] = await Promise.all([
+  const [buildings, latestSnapshots, filingRecords, anomalies, penaltySummaries] =
+    await Promise.all([
     prisma.building.findMany({
       where: {
         organizationId: params.organizationId,
@@ -789,7 +935,15 @@ async function buildRankingContexts(params: {
         buildingId: true,
         anomalyType: true,
         severity: true,
+        title: true,
+        estimatedEnergyImpactKbtu: true,
+        estimatedPenaltyImpactUsd: true,
+        penaltyImpactStatus: true,
       },
+    }),
+    listStoredPenaltySummaries({
+      organizationId: params.organizationId,
+      buildingIds: params.buildingIds,
     }),
   ]);
 
@@ -814,19 +968,29 @@ async function buildRankingContexts(params: {
       id: anomaly.id,
       anomalyType: anomaly.anomalyType,
       severity: anomaly.severity,
+      title: anomaly.title,
+      estimatedEnergyImpactKbtu: anomaly.estimatedEnergyImpactKbtu,
+      estimatedPenaltyImpactUsd: anomaly.estimatedPenaltyImpactUsd,
+      penaltyImpactStatus: anomaly.penaltyImpactStatus,
     });
     anomaliesByBuilding.set(anomaly.buildingId, existing);
   }
+  const penaltyByBuilding = new Map(
+    penaltySummaries.map((entry) => [entry.buildingId, entry.summary]),
+  );
 
-  const cycleContexts = new Map<ComplianceCycle, Awaited<ReturnType<typeof getActiveBepsCycleContext>>>();
+  const cycleContexts = new Map<
+    ComplianceCycle,
+    Awaited<ReturnType<typeof tryGetActiveBepsCycleContext>>
+  >();
   for (const cycle of Array.from(new Set(buildings.map((building) => building.complianceCycle)))) {
-    cycleContexts.set(cycle, await getActiveBepsCycleContext(cycle));
+    cycleContexts.set(cycle, await tryGetActiveBepsCycleContext(cycle));
   }
 
   const contexts = new Map<string, RankingContext>();
   for (const building of buildings) {
     const filingCandidates = filingsByBuilding.get(building.id) ?? [];
-    const latestFiling =
+    const latestComplianceContext =
       filingCandidates.find((candidate) => candidate.complianceCycle === building.complianceCycle) ??
       filingCandidates[0] ??
       null;
@@ -835,12 +999,21 @@ async function buildRankingContexts(params: {
     contexts.set(building.id, {
       building,
       latestSnapshot: latestSnapshotByBuilding.get(building.id) ?? null,
-      latestFiling,
+      latestComplianceContext,
+      penaltySummary:
+        penaltyByBuilding.get(building.id) != null
+          ? {
+              status: penaltyByBuilding.get(building.id)!.status,
+              currentEstimatedPenalty:
+                penaltyByBuilding.get(building.id)!.currentEstimatedPenalty,
+              calculatedAt: penaltyByBuilding.get(building.id)!.calculatedAt,
+            }
+          : null,
       anomalies: anomaliesByBuilding.get(building.id) ?? [],
       deadlineDate:
         cycleContext != null
           ? resolveDeadlineDate({
-              latestFiling,
+              latestComplianceContext,
               cycleContext,
             })
           : null,
@@ -964,13 +1137,15 @@ export async function upsertRetrofitCandidateRecord(input: UpsertRetrofitCandida
   let targetFilingYear =
     input.targetFilingYear ?? existing?.targetFilingYear ?? null;
   if (targetFilingYear == null && complianceCycle != null) {
-    const cycleContext = await getActiveBepsCycleContext(complianceCycle);
-    targetFilingYear = resolveGovernedFilingYear(
-      complianceCycle,
-      cycleContext.ruleConfig,
-      cycleContext.factorConfig,
-      null,
-    );
+    const cycleContext = await tryGetActiveBepsCycleContext(complianceCycle);
+    if (cycleContext) {
+      targetFilingYear = resolveGovernedFilingYear(
+        complianceCycle,
+        cycleContext.ruleConfig,
+        cycleContext.factorConfig,
+        null,
+      );
+    }
   }
 
   const sourceMetadata = {
@@ -1149,6 +1324,90 @@ export async function rankRetrofitCandidatesAcrossPortfolio(params: {
       return left.candidateId.localeCompare(right.candidateId);
     })
     .slice(0, params.limit ?? 100);
+}
+
+function emptyRetrofitOpportunitySummary(): BuildingRetrofitOpportunitySummary {
+  return {
+    activeCount: 0,
+    highestPriorityBand: null,
+    topOpportunity: null,
+    opportunities: [],
+  };
+}
+
+export async function listBuildingRetrofitOpportunitySummaries(params: {
+  organizationId: string;
+  buildingIds: string[];
+  topLimit?: number;
+}) {
+  const buildingIds = Array.from(new Set(params.buildingIds)).filter(Boolean);
+  if (buildingIds.length === 0) {
+    return new Map<string, BuildingRetrofitOpportunitySummary>();
+  }
+
+  const candidates = await prisma.retrofitCandidate.findMany({
+    where: {
+      organizationId: params.organizationId,
+      buildingId: { in: buildingIds },
+      status: "ACTIVE",
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    select: retrofitCandidateListSelect,
+  });
+  const contexts = await buildRankingContexts({
+    organizationId: params.organizationId,
+    buildingIds,
+  });
+
+  const rankingsByBuilding = new Map<string, RetrofitCandidateRanking[]>();
+  for (const candidate of candidates) {
+    const context = contexts.get(candidate.buildingId);
+    if (!context) {
+      continue;
+    }
+
+    const ranked = rankRetrofitCandidateData({ candidate, context });
+    const existing = rankingsByBuilding.get(candidate.buildingId) ?? [];
+    existing.push(ranked);
+    rankingsByBuilding.set(candidate.buildingId, existing);
+  }
+
+  return new Map(
+    buildingIds.map((buildingId) => {
+      const rankings = (rankingsByBuilding.get(buildingId) ?? []).sort((left, right) => {
+        if (right.priorityScore !== left.priorityScore) {
+          return right.priorityScore - left.priorityScore;
+        }
+        return (right.estimatedAvoidedPenalty ?? 0) - (left.estimatedAvoidedPenalty ?? 0);
+      });
+
+      return [
+        buildingId,
+        rankings.length === 0
+          ? emptyRetrofitOpportunitySummary()
+          : {
+              activeCount: rankings.length,
+              highestPriorityBand: rankings[0]?.priorityBand ?? null,
+              topOpportunity: rankings[0] ?? null,
+              opportunities: rankings.slice(0, params.topLimit ?? 3),
+            },
+      ] satisfies [string, BuildingRetrofitOpportunitySummary];
+    }),
+  );
+}
+
+export async function getBuildingRetrofitOpportunitySummary(params: {
+  organizationId: string;
+  buildingId: string;
+  topLimit?: number;
+}) {
+  const summaries = await listBuildingRetrofitOpportunitySummaries({
+    organizationId: params.organizationId,
+    buildingIds: [params.buildingId],
+    topLimit: params.topLimit,
+  });
+
+  return summaries.get(params.buildingId) ?? emptyRetrofitOpportunitySummary();
 }
 
 export async function getRetrofitCandidateRankingDetail(params: {

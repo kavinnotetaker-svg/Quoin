@@ -7,6 +7,7 @@ import { ComplianceOverviewTab } from "./compliance-overview-tab";
 import { BenchmarkingTab } from "./benchmarking-tab";
 import { VerificationRequestsTab } from "./verification-requests-tab";
 import { BepsTab } from "./beps-tab";
+import { RetrofitTab } from "./retrofit-tab";
 import { UploadModal } from "./upload-modal";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -19,6 +20,7 @@ const TABS: Tab[] = [
   { key: "overview", label: "Overview" },
   { key: "benchmarking", label: "Benchmarking" },
   { key: "beps", label: "BEPS" },
+  { key: "retrofit", label: "Retrofit" },
 ];
 
 function defaultReportingYear() {
@@ -147,6 +149,8 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
             )}
 
             {activeTab === "beps" && <BepsTab buildingId={buildingId} />}
+
+            {activeTab === "retrofit" && <RetrofitTab buildingId={buildingId} />}
           </motion.div>
         </AnimatePresence>
       </div>

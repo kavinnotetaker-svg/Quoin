@@ -678,6 +678,7 @@ describe("portfolio worklist", () => {
     expect(result.aggregate.readyToSubmit).toBe(1);
     expect(result.aggregate.withPenaltyExposure).toBe(2);
     expect(result.aggregate.withSyncAttention).toBe(0);
+    expect(result.aggregate.withActionableRetrofits).toBeGreaterThanOrEqual(0);
     expect(result.aggregate.withDraftArtifacts).toBe(0);
     expect(result.aggregate.finalizedAwaitingNextAction).toBe(1);
 
@@ -775,6 +776,12 @@ describe("portfolio worklist", () => {
     );
     expect(report.governedOperationalSummary.timestamps.lastComplianceEvaluatedAt).toBe(
       buildingDetail.governedSummary.timestamps.lastComplianceEvaluatedAt,
+    );
+    expect(report.sections.compliance.primaryStatus).toBe(
+      row?.complianceSummary.primaryStatus,
+    );
+    expect(report.sections.artifacts.beps.latestArtifactStatus).toBe(
+      row?.artifacts.beps.status,
     );
   });
 });

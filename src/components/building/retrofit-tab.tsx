@@ -26,13 +26,16 @@ const PROJECT_TYPES = [
 ] as const;
 
 export function RetrofitTab({ buildingId }: { buildingId: string }) {
-  const [projectType, setProjectType] = useState<(typeof PROJECT_TYPES)[number]>("LED_LIGHTING_RETROFIT");
+  const [projectType, setProjectType] =
+    useState<(typeof PROJECT_TYPES)[number]>("LED_LIGHTING_RETROFIT");
   const [name, setName] = useState("");
   const [estimatedCapex, setEstimatedCapex] = useState("");
   const [estimatedAnnualSavingsUsd, setEstimatedAnnualSavingsUsd] = useState("");
   const [estimatedAnnualSavingsKbtu, setEstimatedAnnualSavingsKbtu] = useState("");
-  const [estimatedBepsImprovementPct, setEstimatedBepsImprovementPct] = useState("");
-  const [estimatedImplementationMonths, setEstimatedImplementationMonths] = useState("");
+  const [estimatedBepsImprovementPct, setEstimatedBepsImprovementPct] =
+    useState("");
+  const [estimatedImplementationMonths, setEstimatedImplementationMonths] =
+    useState("");
 
   const utils = trpc.useUtils();
   const candidates = trpc.retrofit.listCandidates.useQuery({ buildingId, limit: 50 });
@@ -48,7 +51,7 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
       utils.retrofit.listCandidates.invalidate({ buildingId, limit: 50 });
       utils.retrofit.rankBuilding.invalidate({ buildingId, limit: 50 });
       utils.building.get.invalidate({ id: buildingId });
-      utils.building.portfolioWorkflow.invalidate({ limit: 25 });
+      utils.building.portfolioWorklist.invalidate();
     },
   });
 
@@ -58,50 +61,97 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
 
   if (candidates.error || rankings.error) {
     const error = candidates.error ?? rankings.error;
-    return <ErrorState message="Retrofit ranking is unavailable." detail={error?.message} />;
+    return (
+      <ErrorState
+        message="Retrofit ranking is unavailable."
+        detail={error?.message}
+      />
+    );
   }
 
-  const inputClass = "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors";
+  const inputClass =
+    "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500";
   const labelClass = "mb-1.5 block text-[13px] font-medium text-zinc-700";
 
   return (
     <div className="space-y-6">
-      <Panel title="Retrofit planning" subtitle="Create and compare retrofit options so Quoin can rank the next practical project for this building.">
+      <Panel
+        title="Retrofit planning"
+        subtitle="Create and compare retrofit options so Quoin can rank the next practical project for this building."
+      >
         <div className="grid gap-5 xl:grid-cols-3">
           <label className="block text-sm">
             <span className={labelClass}>Project type</span>
-            <select value={projectType} onChange={(event) => setProjectType(event.target.value as (typeof PROJECT_TYPES)[number])} className={inputClass}>
+            <select
+              value={projectType}
+              onChange={(event) =>
+                setProjectType(event.target.value as (typeof PROJECT_TYPES)[number])
+              }
+              className={inputClass}
+            >
               {PROJECT_TYPES.map((type) => (
-                <option key={type} value={type}>{type.replace(/_/g, " ").toLowerCase()}</option>
+                <option key={type} value={type}>
+                  {type.replaceAll("_", " ").toLowerCase()}
+                </option>
               ))}
             </select>
           </label>
           <label className="block text-sm">
             <span className={labelClass}>Name</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} className={inputClass} placeholder="e.g., LED Upgrade" />
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className={inputClass}
+              placeholder="e.g., LED upgrade"
+            />
           </label>
           <label className="block text-sm">
             <span className={labelClass}>Capex</span>
-            <input value={estimatedCapex} onChange={(event) => setEstimatedCapex(event.target.value)} className={inputClass} placeholder="0.00" />
+            <input
+              value={estimatedCapex}
+              onChange={(event) => setEstimatedCapex(event.target.value)}
+              className={inputClass}
+              placeholder="0.00"
+            />
           </label>
           <label className="block text-sm">
             <span className={labelClass}>Annual savings (USD)</span>
-            <input value={estimatedAnnualSavingsUsd} onChange={(event) => setEstimatedAnnualSavingsUsd(event.target.value)} className={inputClass} placeholder="0.00" />
+            <input
+              value={estimatedAnnualSavingsUsd}
+              onChange={(event) => setEstimatedAnnualSavingsUsd(event.target.value)}
+              className={inputClass}
+              placeholder="0.00"
+            />
           </label>
           <label className="block text-sm">
             <span className={labelClass}>Annual savings (kBtu)</span>
-            <input value={estimatedAnnualSavingsKbtu} onChange={(event) => setEstimatedAnnualSavingsKbtu(event.target.value)} className={inputClass} placeholder="0" />
+            <input
+              value={estimatedAnnualSavingsKbtu}
+              onChange={(event) => setEstimatedAnnualSavingsKbtu(event.target.value)}
+              className={inputClass}
+              placeholder="0"
+            />
           </label>
           <label className="block text-sm">
             <span className={labelClass}>BEPS improvement (%)</span>
-            <input value={estimatedBepsImprovementPct} onChange={(event) => setEstimatedBepsImprovementPct(event.target.value)} className={inputClass} placeholder="0" />
+            <input
+              value={estimatedBepsImprovementPct}
+              onChange={(event) => setEstimatedBepsImprovementPct(event.target.value)}
+              className={inputClass}
+              placeholder="0"
+            />
           </label>
           <label className="block text-sm">
             <span className={labelClass}>Implementation months</span>
-            <input value={estimatedImplementationMonths} onChange={(event) => setEstimatedImplementationMonths(event.target.value)} className={inputClass} placeholder="0" />
+            <input
+              value={estimatedImplementationMonths}
+              onChange={(event) => setEstimatedImplementationMonths(event.target.value)}
+              className={inputClass}
+              placeholder="0"
+            />
           </label>
         </div>
-        <div className="mt-6 pt-5 border-t border-zinc-100 flex justify-end">
+        <div className="mt-6 flex justify-end border-t border-zinc-100 pt-5">
           <button
             onClick={() =>
               createCandidate.mutate({
@@ -109,10 +159,18 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
                 projectType,
                 name: name || undefined,
                 estimatedCapex: estimatedCapex ? Number(estimatedCapex) : undefined,
-                estimatedAnnualSavingsUsd: estimatedAnnualSavingsUsd ? Number(estimatedAnnualSavingsUsd) : undefined,
-                estimatedAnnualSavingsKbtu: estimatedAnnualSavingsKbtu ? Number(estimatedAnnualSavingsKbtu) : undefined,
-                estimatedBepsImprovementPct: estimatedBepsImprovementPct ? Number(estimatedBepsImprovementPct) : undefined,
-                estimatedImplementationMonths: estimatedImplementationMonths ? Number(estimatedImplementationMonths) : undefined,
+                estimatedAnnualSavingsUsd: estimatedAnnualSavingsUsd
+                  ? Number(estimatedAnnualSavingsUsd)
+                  : undefined,
+                estimatedAnnualSavingsKbtu: estimatedAnnualSavingsKbtu
+                  ? Number(estimatedAnnualSavingsKbtu)
+                  : undefined,
+                estimatedBepsImprovementPct: estimatedBepsImprovementPct
+                  ? Number(estimatedBepsImprovementPct)
+                  : undefined,
+                estimatedImplementationMonths: estimatedImplementationMonths
+                  ? Number(estimatedImplementationMonths)
+                  : undefined,
                 status: "ACTIVE",
               })
             }
@@ -125,23 +183,52 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
       </Panel>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel title="Candidate list" subtitle="Current retrofit ideas available for ranking on this building.">
+        <Panel
+          title="Candidate list"
+          subtitle="Current retrofit ideas available for governed ranking on this building."
+        >
           {!candidates.data || candidates.data.length === 0 ? (
             <EmptyState message="No retrofit candidates exist for this building yet." />
           ) : (
             <div className="space-y-3">
               {candidates.data.map((candidate) => (
-                <div key={candidate.id} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
-                  <div className="font-semibold text-[15px] tracking-tight text-zinc-900">{candidate.name}</div>
-                  <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
-                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.projectType}</span>
-                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.status}</span>
-                    <span className="bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{candidate.confidenceBand}</span>
+                <div
+                  key={candidate.id}
+                  className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="font-semibold text-[15px] tracking-tight text-zinc-900">
+                    {candidate.name}
                   </div>
-                  <div className="mt-4 grid gap-3 text-[13px] text-zinc-600 font-medium sm:grid-cols-3">
-                    <div>Capex: <span className="text-zinc-900">{formatMoney(candidate.estimatedCapex)}</span></div>
-                    <div>Savings: <span className="text-zinc-900">{formatMoney(candidate.estimatedAnnualSavingsUsd)}</span></div>
-                    <div>BEPS: <span className="text-zinc-900">{formatNumber(candidate.estimatedBepsImprovementPct)}%</span></div>
+                  <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                    <span className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 shadow-sm">
+                      {candidate.projectType}
+                    </span>
+                    <span className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 shadow-sm">
+                      {candidate.status}
+                    </span>
+                    <span className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 shadow-sm">
+                      {candidate.confidenceBand}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-3 text-[13px] font-medium text-zinc-600 sm:grid-cols-3">
+                    <div>
+                      Capex:{" "}
+                      <span className="text-zinc-900">
+                        {formatMoney(candidate.estimatedCapex)}
+                      </span>
+                    </div>
+                    <div>
+                      Savings:{" "}
+                      <span className="text-zinc-900">
+                        {formatMoney(candidate.estimatedAnnualSavingsUsd)}
+                      </span>
+                    </div>
+                    <div>
+                      BEPS:{" "}
+                      <span className="text-zinc-900">
+                        {formatNumber(candidate.estimatedBepsImprovementPct)}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -149,32 +236,84 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
           )}
         </Panel>
 
-        <Panel title="Recommended order" subtitle="Deterministic ranking based on avoided penalty, savings, timing, and confidence.">
+        <Panel
+          title="Recommended order"
+          subtitle="Deterministic ranking based on governed penalty context, explicit retrofit assumptions, timing, and aligned anomaly risk."
+        >
           {!rankings.data || rankings.data.length === 0 ? (
             <EmptyState message="No retrofit rankings are available yet." />
           ) : (
             <div className="space-y-3">
               {rankings.data.map((ranking) => (
-                <div key={ranking.candidateId} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="font-semibold text-[15px] tracking-tight text-zinc-900">{ranking.name}</div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md shadow-sm">{ranking.priorityBand}</div>
+                <div
+                  key={ranking.candidateId}
+                  className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="font-semibold text-[15px] tracking-tight text-zinc-900">
+                      {ranking.name}
+                    </div>
+                    <div className="rounded-md bg-emerald-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-700 shadow-sm">
+                      {ranking.priorityBand}
+                    </div>
                   </div>
-                  <div className="mt-4 grid gap-3 text-[13px] text-zinc-600 font-medium sm:grid-cols-2">
-                    <div>Priority score: <span className="text-zinc-900">{ranking.priorityScore}</span></div>
-                    <div>Avoided penalty: <span className="text-zinc-900">{formatMoney(ranking.estimatedAvoidedPenalty)}</span></div>
-                    <div>Net cost: <span className="text-zinc-900">{formatMoney(ranking.netProjectCost)}</span></div>
-                    <div>Payback: <span className="text-zinc-900">{ranking.paybackProxyYears ?? "—"} years</span></div>
+                  <div className="mt-4 grid gap-3 text-[13px] font-medium text-zinc-600 sm:grid-cols-2">
+                    <div>
+                      Priority score:{" "}
+                      <span className="text-zinc-900">{ranking.priorityScore}</span>
+                    </div>
+                    <div>
+                      Avoided penalty:{" "}
+                      <span className="text-zinc-900">
+                        {formatMoney(ranking.estimatedAvoidedPenalty)}
+                      </span>
+                    </div>
+                    <div>
+                      Net cost:{" "}
+                      <span className="text-zinc-900">
+                        {formatMoney(ranking.netProjectCost)}
+                      </span>
+                    </div>
+                    <div>
+                      Payback:{" "}
+                      <span className="text-zinc-900">
+                        {ranking.paybackProxyYears == null
+                          ? "Not available"
+                          : `${ranking.paybackProxyYears} years`}
+                      </span>
+                    </div>
+                    <div>
+                      Operational risk reduction:{" "}
+                      <span className="text-zinc-900">
+                        {formatMoney(
+                          ranking.estimatedOperationalRiskReduction.penaltyImpactUsd,
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      Avoided penalty basis:{" "}
+                      <span className="text-zinc-900">
+                        {ranking.estimatedAvoidedPenaltyStatus
+                          .toLowerCase()
+                          .replaceAll("_", " ")}
+                      </span>
+                    </div>
                   </div>
-                  {ranking.reasonCodes.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-zinc-100 flex flex-wrap gap-2">
+                  <div className="mt-3 text-[13px] text-zinc-600">
+                    {ranking.basis.summary}
+                  </div>
+                  {ranking.reasonCodes.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-100 pt-4">
                       {ranking.reasonCodes.map((reasonCode) => (
-                        <span key={reasonCode} className="rounded-md bg-zinc-50 border border-zinc-200 shadow-sm px-2 py-1 text-[11px] font-semibold text-zinc-600">
+                        <span
+                          key={reasonCode}
+                          className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-600 shadow-sm"
+                        >
                           {reasonCode}
                         </span>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ))}
             </div>

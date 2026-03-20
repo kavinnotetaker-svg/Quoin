@@ -25,6 +25,10 @@ import {
   listBuildingOperationalAnomalySummaries,
   type BuildingOperationalAnomalySummary,
 } from "@/server/compliance/operations-anomalies";
+import {
+  listBuildingRetrofitOpportunitySummaries,
+  type BuildingRetrofitOpportunitySummary,
+} from "@/server/compliance/retrofit-optimization";
 
 export type GovernedArtifactStatus =
   | "NOT_STARTED"
@@ -85,6 +89,7 @@ export interface BuildingGovernedOperationalSummary {
   reconciliationSummary: BuildingSourceReconciliationOverview;
   runtimeSummary: BuildingIntegrationRuntimeSummary;
   anomalySummary: BuildingOperationalAnomalySummary;
+  retrofitSummary: BuildingRetrofitOpportunitySummary;
   submissionSummary: GovernedSubmissionWorkflowSummary;
   timestamps: GovernedOperationalTimestamps;
 }
@@ -214,6 +219,7 @@ function buildGovernedOperationalSummary(input: {
   reconciliationSummary: BuildingSourceReconciliationOverview;
   runtimeSummary: BuildingIntegrationRuntimeSummary;
   anomalySummary: BuildingOperationalAnomalySummary;
+  retrofitSummary: BuildingRetrofitOpportunitySummary;
 }): BuildingGovernedOperationalSummary {
   const readiness = input.operationalState.readinessSummary;
   const benchmarkArtifact = buildArtifactSummary(readiness, "BENCHMARKING");
@@ -240,6 +246,7 @@ function buildGovernedOperationalSummary(input: {
     reconciliationSummary: input.reconciliationSummary,
     runtimeSummary: input.runtimeSummary,
     anomalySummary: input.anomalySummary,
+    retrofitSummary: input.retrofitSummary,
     submissionSummary: {
       benchmark: input.benchmarkWorkflow,
       beps: input.bepsWorkflow,
@@ -274,7 +281,7 @@ export async function listBuildingGovernedOperationalSummaries(params: {
     return new Map<string, BuildingGovernedOperationalSummary>();
   }
 
-  const [operationalStates, penaltySummaries, runtimeSummaries, anomalySummaries] =
+  const [operationalStates, penaltySummaries, runtimeSummaries, anomalySummaries, retrofitSummaries] =
     await Promise.all([
       listBuildingOperationalStates({
         organizationId: params.organizationId,
@@ -291,6 +298,11 @@ export async function listBuildingGovernedOperationalSummaries(params: {
       listBuildingOperationalAnomalySummaries({
         organizationId: params.organizationId,
         buildingIds,
+      }),
+      listBuildingRetrofitOpportunitySummaries({
+        organizationId: params.organizationId,
+        buildingIds,
+        topLimit: 3,
       }),
     ]);
   const reconciliationSummaries = await listBuildingSourceReconciliationOverviews({
@@ -354,6 +366,12 @@ export async function listBuildingGovernedOperationalSummaries(params: {
           latestDetectedAt: null,
           needsAttention: false,
           topAnomalies: [],
+        },
+        retrofitSummary: retrofitSummaries.get(buildingId) ?? {
+          activeCount: 0,
+          highestPriorityBand: null,
+          topOpportunity: null,
+          opportunities: [],
         },
       }),
     );

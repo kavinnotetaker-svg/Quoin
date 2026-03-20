@@ -564,5 +564,24 @@ describe("governed compliance artifact workflow", () => {
     expect(workspace.bepsFiling.sourceRecordId).toBe(bepsFiling.id);
     expect((workspace as unknown as Record<string, unknown>).submissionPayload).toBeUndefined();
     expect((workspace as unknown as Record<string, unknown>).filingPayload).toBeUndefined();
+
+    const report = await createCaller(`artifact-report-${scope}`).report.getComplianceReport({
+      buildingId: building.id,
+    });
+
+    expect(report.sections.artifacts.benchmark.latestArtifactStatus).toBe("FINALIZED");
+    expect(report.sections.artifacts.beps.latestArtifactStatus).toBe("GENERATED");
+    expect(report.evidencePackage.packageVersion).toBe("governed-report-evidence-v1");
+    expect(report.evidencePackage.artifacts.benchmark.sourceRecordId).toBe(
+      benchmarkSubmission.id,
+    );
+    expect(report.evidencePackage.artifacts.beps.sourceRecordId).toBe(bepsFiling.id);
+    expect(report.evidencePackage.artifacts.beps.latestExport).toMatchObject({
+      artifactId: expect.any(String),
+      format: "JSON",
+      version: 1,
+    });
+    expect((report as unknown as Record<string, unknown>).submissionPayload).toBeUndefined();
+    expect((report as unknown as Record<string, unknown>).filingPayload).toBeUndefined();
   });
 });

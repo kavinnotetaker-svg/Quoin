@@ -14,6 +14,7 @@ describe("retrofit optimization", () => {
   let buildingB: { id: string };
   let filingA: { id: string };
   let filingB: { id: string };
+  let penaltyRunA: { id: string };
   let anomalyA: { id: string };
   let sourceArtifactA: { id: string };
   let sourceArtifactB: { id: string };
@@ -189,6 +190,35 @@ describe("retrofit optimization", () => {
       select: { id: true },
     });
 
+    penaltyRunA = await prisma.penaltyRun.create({
+      data: {
+        organizationId: orgA.id,
+        buildingId: buildingA.id,
+        calculationMode: "CURRENT_BEPS_EXPOSURE",
+        inputSnapshotRef: "retrofit-test",
+        inputSnapshotHash: `retrofit-penalty-${scope}`,
+        implementationKey: "penalty-engine/beps-v1",
+        baselineResultPayload: {
+          status: "ESTIMATED",
+          currentEstimatedPenalty: 800000,
+          currency: "USD",
+          basis: {
+            code: "TEST",
+            label: "Test governed estimate",
+            explanation: "Seeded penalty context for retrofit ranking tests.",
+          },
+          governingContext: {},
+          artifacts: {},
+          timestamps: {
+            lastPenaltyCalculatedAt: "2026-03-02T00:00:00.000Z",
+          },
+          keyDrivers: [],
+        },
+        scenarioResultsPayload: [],
+      },
+      select: { id: true },
+    });
+
     anomalyA = await prisma.operationalAnomaly.create({
       data: {
         organizationId: orgA.id,
@@ -249,6 +279,11 @@ describe("retrofit optimization", () => {
     await prisma.sourceArtifact.deleteMany({
       where: {
         id: { in: [sourceArtifactA.id, sourceArtifactB.id] },
+      },
+    });
+    await prisma.penaltyRun.deleteMany({
+      where: {
+        id: penaltyRunA.id,
       },
     });
     await prisma.operationalAnomaly.deleteMany({
@@ -358,7 +393,9 @@ describe("retrofit optimization", () => {
     });
     expect(ranked).toHaveLength(2);
     expect(ranked[0]?.candidateId).toBe(highBenefit.id);
-    expect(ranked[0]?.estimatedAvoidedPenalty).toBeGreaterThan(ranked[1]!.estimatedAvoidedPenalty);
+    expect(ranked[0]?.estimatedAvoidedPenalty ?? -1).toBeGreaterThan(
+      ranked[1]?.estimatedAvoidedPenalty ?? -1,
+    );
 
     const rationale = await callerA.retrofit.candidateRationale({
       candidateId: highBenefit.id,
@@ -371,6 +408,20 @@ describe("retrofit optimization", () => {
     });
     expect(portfolioRanked).toHaveLength(2);
     expect(portfolioRanked.every((entry) => entry.organizationId === orgA.id)).toBe(true);
+
+    const buildingDetail = await callerA.building.get({
+      id: buildingA.id,
+    });
+    expect(buildingDetail.governedSummary.retrofitSummary.activeCount).toBe(2);
+    expect(buildingDetail.governedSummary.retrofitSummary.topOpportunity?.candidateId).toBe(
+      highBenefit.id,
+    );
+
+    const worklist = await callerA.building.portfolioWorklist({});
+    const worklistItem = worklist.items.find((item) => item.buildingId === buildingA.id);
+    expect(worklistItem?.retrofitSummary.activeCount).toBe(2);
+    expect(worklistItem?.retrofitSummary.topOpportunity?.name).toBe(highBenefit.name);
+    expect(worklist.aggregate.withActionableRetrofits).toBeGreaterThanOrEqual(1);
   });
 
   it("enforces tenant-safe retrieval and update of retrofit candidates", async () => {

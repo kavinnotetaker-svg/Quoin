@@ -304,7 +304,7 @@ export function ReportsPage() {
           {selectedBuilding && complianceReport.data ? (
             <Panel
               title="Compliance Report"
-              subtitle="Current generated report payload from the report router."
+              subtitle="Governed compliance, penalty, evidence, and operational risk packaged for operator and customer-facing review."
               actions={
                 <button
                   onClick={() =>
@@ -320,183 +320,276 @@ export function ReportsPage() {
                 </button>
               }
             >
+              {(() => {
+                const report = complianceReport.data;
+                const sections = report.sections;
+                const evidencePackage = report.evidencePackage;
+
+                return (
+                  <>
               <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-                <div className="font-medium text-zinc-900">Latest governed operational summary</div>
+                <div className="font-medium text-zinc-900">Governed report summary</div>
                 <div className="mt-1 text-zinc-600">
                   Readiness{" "}
-                  {complianceReport.data.governedOperationalSummary.readinessSummary.state
+                  {sections.compliance.readinessState
                     .toLowerCase()
                     .replaceAll("_", " ")}
                   {" | "}Compliance{" "}
-                  {complianceReport.data.governedOperationalSummary.complianceSummary.primaryStatus
+                  {sections.compliance.primaryStatus
                     .toLowerCase()
                     .replaceAll("_", " ")}
                 </div>
                 <div className="mt-1 text-zinc-500">
                   Last readiness evaluation{" "}
                   {formatDate(
-                    complianceReport.data.governedOperationalSummary.timestamps
-                      .lastReadinessEvaluatedAt,
+                    evidencePackage.traceability.lastReadinessEvaluatedAt,
                   )}
                   {" | "}Last compliance evaluation{" "}
-                  {formatDate(
-                    complianceReport.data.governedOperationalSummary.timestamps
-                      .lastComplianceEvaluatedAt,
-                  )}
+                  {formatDate(evidencePackage.traceability.lastComplianceEvaluatedAt)}
                 </div>
               </div>
 
               <MetricGrid
                 items={[
                   {
+                    label: "Readiness",
+                    value: sections.compliance.readinessState,
+                  },
+                  {
                     label: "Compliance Status",
-                    value:
-                      complianceReport.data.governedOperationalSummary.complianceSummary
-                        .primaryStatus,
-                  },
-                  {
-                    label: "ENERGY STAR Score",
-                    value: complianceReport.data.complianceData.energyStarScore ?? "-",
-                  },
-                  {
-                    label: "Site EUI",
-                    value: complianceReport.data.complianceData.siteEui ?? "-",
+                    value: sections.compliance.primaryStatus,
                   },
                   {
                     label: "Current Penalty Estimate",
-                    value: formatMoney(
-                      complianceReport.data.governedOperationalSummary.penaltySummary
-                        ?.currentEstimatedPenalty,
-                    ),
+                    value: formatMoney(sections.penalty.currentEstimatedPenalty),
                     tone:
-                      complianceReport.data.governedOperationalSummary.penaltySummary
-                        ?.status === "ESTIMATED"
+                      sections.penalty.status === "ESTIMATED"
                         ? "danger"
+                        : "default",
+                  },
+                  {
+                    label: "Top Retrofit",
+                    value: sections.retrofits.topOpportunity?.name ?? "None",
+                    tone:
+                      sections.retrofits.topOpportunity?.priorityBand === "CRITICAL"
+                        ? "warning"
                         : "default",
                   },
                 ]}
               />
 
-              {complianceReport.data.governedOperationalSummary.penaltySummary ? (
-                <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-                  <div className="font-medium text-zinc-900">
-                    {
-                      complianceReport.data.governedOperationalSummary.penaltySummary.basis
-                        .label
-                    }
-                  </div>
-                  <div className="mt-1 text-zinc-600">
-                    {
-                      complianceReport.data.governedOperationalSummary.penaltySummary.basis
-                        .explanation
-                    }
-                  </div>
-                  <div className="mt-2 text-xs text-zinc-500">
-                    Calculated{" "}
-                    {formatDate(
-                      complianceReport.data.governedOperationalSummary.penaltySummary
-                        .calculatedAt,
-                    )}
-                    {" | "}Last compliance evaluation{" "}
-                    {formatDate(
-                      complianceReport.data.governedOperationalSummary.timestamps
-                        .lastComplianceEvaluatedAt,
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-500">
-                  No governed penalty run is available for this building yet.
-                </div>
-              )}
-
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
                   <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Artifact status
-                  </div>
-                  <div className="mt-2">
-                    Benchmark:{" "}
-                    {complianceReport.data.governedOperationalSummary.artifactSummary.benchmark.latestArtifactStatus
-                      .toLowerCase()
-                      .replaceAll("_", " ")}
-                  </div>
-                  <div className="mt-1">
-                    BEPS:{" "}
-                    {complianceReport.data.governedOperationalSummary.artifactSummary.beps.latestArtifactStatus
-                      .toLowerCase()
-                      .replaceAll("_", " ")}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Submission workflow
-                  </div>
-                  <div className="mt-2">
-                    Benchmark:{" "}
-                    {(complianceReport.data.governedOperationalSummary.submissionSummary.benchmark
-                      ?.state ?? "NOT_STARTED")
-                      .toLowerCase()
-                      .replaceAll("_", " ")}
-                  </div>
-                  <div className="mt-1">
-                    BEPS:{" "}
-                    {(complianceReport.data.governedOperationalSummary.submissionSummary.beps
-                      ?.state ?? "NOT_STARTED")
-                      .toLowerCase()
-                      .replaceAll("_", " ")}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Next action
+                    Compliance position
                   </div>
                   <div className="mt-2 font-medium text-zinc-900">
-                    {complianceReport.data.governedOperationalSummary.readinessSummary.nextAction.title}
+                    {sections.compliance.reasonSummary}
+                  </div>
+                  <div className="mt-2 text-zinc-600">
+                    Next step: {sections.compliance.nextAction.title}
+                  </div>
+                  <div className="mt-1 text-xs text-zinc-500">
+                    {sections.compliance.nextAction.reason}
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <div className="rounded border border-zinc-200 bg-zinc-50 p-3">
+                      <div className="text-xs uppercase tracking-wider text-zinc-500">
+                        Benchmarking
+                      </div>
+                      <div className="mt-1 font-medium text-zinc-900">
+                        {sections.compliance.benchmarkEvaluation?.reasonSummary ?? "No governed evaluation"}
+                      </div>
+                      <div className="mt-1 text-xs text-zinc-500">
+                        Rule {sections.compliance.benchmarkEvaluation?.ruleVersion ?? "-"}
+                      </div>
+                    </div>
+                    <div className="rounded border border-zinc-200 bg-zinc-50 p-3">
+                      <div className="text-xs uppercase tracking-wider text-zinc-500">
+                        BEPS
+                      </div>
+                      <div className="mt-1 font-medium text-zinc-900">
+                        {sections.compliance.bepsEvaluation?.reasonSummary ?? "No governed evaluation"}
+                      </div>
+                      <div className="mt-1 text-xs text-zinc-500">
+                        Rule {sections.compliance.bepsEvaluation?.ruleVersion ?? "-"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Penalty exposure
+                  </div>
+                  <div className="mt-2 font-medium text-zinc-900">
+                    {sections.penalty.basisLabel}
                   </div>
                   <div className="mt-1 text-zinc-600">
-                    {complianceReport.data.governedOperationalSummary.readinessSummary.nextAction.reason}
+                    {sections.penalty.basisExplanation}
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-500">
+                    Status {sections.penalty.status.toLowerCase().replaceAll("_", " ")}
+                    {" | "}Calculated {formatDate(sections.penalty.calculatedAt)}
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {sections.penalty.scenarios.length > 0 ? (
+                      sections.penalty.scenarios.map((scenario) => (
+                        <div key={scenario.code} className="rounded border border-zinc-200 bg-zinc-50 p-3">
+                          <div className="font-medium text-zinc-900">{scenario.label}</div>
+                          <div className="mt-1 text-xs text-zinc-500">
+                            Estimated penalty {formatMoney(scenario.estimatedPenalty)}
+                            {" | "}Delta {formatMoney(scenario.deltaFromCurrent)}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded border border-zinc-200 bg-zinc-50 p-3 text-zinc-500">
+                        No governed penalty scenarios are available for this building yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Source integrity
+                  </div>
+                  <div className="mt-2 font-medium text-zinc-900">
+                    {(sections.sourceData.reconciliationStatus ?? "UNKNOWN")
+                      .toLowerCase()
+                      .replaceAll("_", " ")}
+                    {" | "}Canonical source {sections.sourceData.canonicalSource ?? "Unresolved"}
+                  </div>
+                  <div className="mt-1 text-zinc-600">
+                    Conflicts {sections.sourceData.conflictCount}
+                    {" | "}Incomplete {sections.sourceData.incompleteCount}
+                    {" | "}Last reconciled {formatDate(sections.sourceData.lastReconciledAt)}
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-500">
+                    Portfolio Manager {sections.sourceData.portfolioManagerState.toLowerCase().replaceAll("_", " ")}
+                    {" | "}Green Button {sections.sourceData.greenButtonState.toLowerCase().replaceAll("_", " ")}
+                  </div>
+                  <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
+                    {sections.sourceData.runtimeNextActionTitle
+                      ? `${sections.sourceData.runtimeNextActionTitle}: ${sections.sourceData.runtimeNextActionReason}`
+                      : "No runtime recovery action is currently flagged."}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Operational risk and retrofit priorities
+                  </div>
+                  <div className="mt-2 font-medium text-zinc-900">
+                    Active anomalies {sections.anomalyRisk.activeCount}
+                    {" | "}Retrofit opportunities {sections.retrofits.activeCount}
+                  </div>
+                  <div className="mt-1 text-zinc-600">
+                    Estimated anomaly energy impact {sections.anomalyRisk.totalEstimatedEnergyImpactKbtu?.toLocaleString() ?? "-"} kBtu
+                    {" | "}Penalty-linked risk {formatMoney(sections.anomalyRisk.totalEstimatedPenaltyImpactUsd)}
+                  </div>
+                  <div className="mt-3 rounded border border-zinc-200 bg-zinc-50 p-3">
+                    <div className="font-medium text-zinc-900">
+                      {sections.retrofits.topOpportunity?.name ?? "No prioritized retrofit opportunity"}
+                    </div>
+                    <div className="mt-1 text-xs text-zinc-500">
+                      {sections.retrofits.topOpportunity
+                        ? `${sections.retrofits.topOpportunity.priorityBand} priority | Avoided penalty ${formatMoney(
+                            sections.retrofits.topOpportunity.estimatedAvoidedPenalty,
+                          )}`
+                        : "Retrofit prioritization is available once active governed opportunities are recorded."}
+                    </div>
+                    {sections.retrofits.topOpportunity ? (
+                      <div className="mt-1 text-xs text-zinc-600">
+                        {sections.retrofits.topOpportunity.basisSummary}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 <div>
-                  <h4 className="text-sm font-medium text-zinc-900">Energy History</h4>
+                  <h4 className="text-sm font-medium text-zinc-900">Evidence package</h4>
                   <div className="mt-2 space-y-2 text-sm text-zinc-700">
-                    {complianceReport.data.energyHistory.slice(0, 8).map((reading) => (
+                    {[
+                      {
+                        label: "Benchmark artifact",
+                        artifact: evidencePackage.artifacts.benchmark,
+                      },
+                      {
+                        label: "BEPS artifact",
+                        artifact: evidencePackage.artifacts.beps,
+                      },
+                    ].map(({ label, artifact }) => (
                       <div
-                        key={`${reading.periodStart}-${reading.periodEnd}-${reading.meterType}-${reading.source}`}
+                        key={label}
                         className="rounded border border-zinc-200 px-3 py-2"
                       >
-                        <div className="font-medium">{reading.meterType}</div>
+                        <div className="font-medium text-zinc-900">{label}</div>
                         <div className="text-xs text-zinc-500">
-                          {new Date(reading.periodStart).toLocaleDateString()} -{" "}
-                          {new Date(reading.periodEnd).toLocaleDateString()}
+                          Status {artifact.artifactStatus.toLowerCase().replaceAll("_", " ")}
+                          {" | "}Workflow {(artifact.workflow?.state ?? "NOT_STARTED").toLowerCase().replaceAll("_", " ")}
                         </div>
                         <div className="mt-1 text-xs text-zinc-600">
-                          {reading.consumptionKbtu.toLocaleString()} kBtu | {reading.source}
+                          Latest artifact v{artifact.latestArtifact?.version ?? "-"}
+                          {" | "}Generated {formatDate(artifact.latestArtifact?.generatedAt ?? null)}
+                          {" | "}Finalized {formatDate(artifact.latestArtifact?.finalizedAt ?? null)}
+                        </div>
+                        <div className="mt-1 text-xs text-zinc-600">
+                          Latest export {artifact.latestExport?.format ?? "none"}
+                          {" | "}Exported {formatDate(artifact.latestExport?.exportedAt ?? null)}
+                        </div>
+                        <div className="mt-1 text-xs text-zinc-500">
+                          Source record {artifact.sourceRecordId ?? "none"}
+                          {" | "}Compliance run {artifact.sourceContext.complianceRunId ?? "none"}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-zinc-900">Recent Pipeline Runs</h4>
+                  <h4 className="text-sm font-medium text-zinc-900">Evidence appendices</h4>
                   <div className="mt-2 space-y-2 text-sm text-zinc-700">
-                    {complianceReport.data.pipelineRuns.length === 0 ? (
-                      <EmptyState message="No pipeline runs were included in the report payload." />
-                    ) : (
-                      complianceReport.data.pipelineRuns.map((run) => (
-                        <div key={run.id} className="rounded border border-zinc-200 px-3 py-2">
-                          <div className="font-medium">{run.pipelineType}</div>
-                          <div className="text-xs text-zinc-500">{run.status}</div>
-                        </div>
-                      ))
-                    )}
+                    <div className="rounded border border-zinc-200 px-3 py-2">
+                      <div className="font-medium text-zinc-900">Recent energy history</div>
+                      <div className="mt-2 space-y-2">
+                        {report.energyHistory.slice(0, 6).map((reading) => (
+                          <div
+                            key={`${reading.periodStart}-${reading.periodEnd}-${reading.meterType}-${reading.source}`}
+                            className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2"
+                          >
+                            <div className="font-medium">{reading.meterType}</div>
+                            <div className="text-xs text-zinc-500">
+                              {new Date(reading.periodStart).toLocaleDateString()} -{" "}
+                              {new Date(reading.periodEnd).toLocaleDateString()}
+                            </div>
+                            <div className="mt-1 text-xs text-zinc-600">
+                              {reading.consumptionKbtu.toLocaleString()} kBtu | {reading.source}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded border border-zinc-200 px-3 py-2">
+                      <div className="font-medium text-zinc-900">Recent pipeline runs</div>
+                      <div className="mt-2 space-y-2">
+                        {report.pipelineRuns.length === 0 ? (
+                          <EmptyState message="No pipeline runs were included in the report payload." />
+                        ) : (
+                          report.pipelineRuns.map((run) => (
+                            <div key={run.id} className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                              <div className="font-medium">{run.pipelineType}</div>
+                              <div className="text-xs text-zinc-500">{run.status}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+                  </>
+                );
+              })()}
             </Panel>
           ) : null}
 

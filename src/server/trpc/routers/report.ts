@@ -19,6 +19,11 @@ import {
   validateFactorSetVersionCandidate,
   validateRuleVersionCandidate,
 } from "@/server/compliance/rule-publication";
+import {
+  getBuildingArtifactWorkspace,
+  type ArtifactExportFormat,
+  type OperationalArtifactWorkflow,
+} from "@/server/compliance/compliance-artifacts";
 
 /**
  * Report tRPC Router
@@ -238,6 +243,205 @@ const governedOperationalSummarySchema = z.object({
   }),
 });
 
+const reportArtifactEvidenceSchema = z.object({
+  kind: z.string(),
+  label: z.string(),
+  sourceRecordId: z.string().nullable(),
+  artifactStatus: z.string(),
+  disposition: z.string().nullable(),
+  blockersCount: z.number(),
+  warningCount: z.number(),
+  latestArtifact: z.object({
+    id: z.string(),
+    version: z.number(),
+    status: z.string(),
+    packetHash: z.string(),
+    generatedAt: z.string(),
+    finalizedAt: z.string().nullable(),
+    exportAvailable: z.boolean(),
+    lastExportedAt: z.string().nullable(),
+    lastExportFormat: z.enum(["JSON", "MARKDOWN", "PDF"]).nullable(),
+  }).nullable(),
+  latestExport: z.object({
+    artifactId: z.string(),
+    version: z.number(),
+    exportedAt: z.string(),
+    format: z.enum(["JSON", "MARKDOWN", "PDF"]).nullable(),
+  }).nullable(),
+  workflow: z.object({
+    id: z.string(),
+    state: z.string(),
+    latestTransitionAt: z.string().nullable(),
+    nextActionTitle: z.string(),
+    nextActionReason: z.string(),
+  }).nullable(),
+  sourceContext: z.object({
+    readinessState: z.string(),
+    primaryStatus: z.string(),
+    qaVerdict: z.string().nullable(),
+    reasonSummary: z.string(),
+    reportingYear: z.number().nullable(),
+    filingYear: z.number().nullable(),
+    complianceCycle: z.string().nullable(),
+    complianceRunId: z.string().nullable(),
+    readinessEvaluatedAt: z.string().nullable(),
+    complianceEvaluatedAt: z.string().nullable(),
+    penaltyRunId: z.string().nullable(),
+    penaltyEstimatedAt: z.string().nullable(),
+    currentEstimatedPenalty: z.number().nullable(),
+  }),
+});
+
+const reportSectionsSchema = z.object({
+  compliance: z.object({
+    readinessState: z.string(),
+    primaryStatus: z.string(),
+    qaVerdict: z.string().nullable(),
+    reasonSummary: z.string(),
+    nextAction: z.object({
+      title: z.string(),
+      reason: z.string(),
+      href: z.string(),
+    }),
+    latestSnapshot: z.object({
+      snapshotDate: z.string().nullable(),
+      energyStarScore: z.number().nullable(),
+      siteEui: z.number().nullable(),
+      sourceEui: z.number().nullable(),
+      weatherNormalizedSiteEui: z.number().nullable(),
+      complianceGap: z.number().nullable(),
+      dataQualityScore: z.number().nullable(),
+    }),
+    benchmarkEvaluation: governedEvaluationSummarySchema,
+    bepsEvaluation: governedEvaluationSummarySchema,
+  }),
+  penalty: z.object({
+    status: z.enum(["ESTIMATED", "NOT_APPLICABLE", "INSUFFICIENT_CONTEXT"]),
+    currentEstimatedPenalty: z.number().nullable(),
+    calculatedAt: z.string().nullable(),
+    basisLabel: z.string(),
+    basisExplanation: z.string(),
+    filingYear: z.number().nullable(),
+    complianceCycle: z.string().nullable(),
+    basisPathway: z.string().nullable(),
+    scenarios: z.array(
+      z.object({
+        code: z.string(),
+        label: z.string(),
+        estimatedPenalty: z.number(),
+        deltaFromCurrent: z.number(),
+      }),
+    ),
+  }),
+  artifacts: z.object({
+    benchmark: z.object({
+      latestArtifactStatus: z.string(),
+      workflowState: z.string(),
+      disposition: z.string().nullable(),
+      lastGeneratedAt: z.string().nullable(),
+      lastFinalizedAt: z.string().nullable(),
+      lastExportedAt: z.string().nullable(),
+      lastExportFormat: z.enum(["JSON", "MARKDOWN", "PDF"]).nullable(),
+      blockersCount: z.number(),
+      warningCount: z.number(),
+    }),
+    beps: z.object({
+      latestArtifactStatus: z.string(),
+      workflowState: z.string(),
+      disposition: z.string().nullable(),
+      lastGeneratedAt: z.string().nullable(),
+      lastFinalizedAt: z.string().nullable(),
+      lastExportedAt: z.string().nullable(),
+      lastExportFormat: z.enum(["JSON", "MARKDOWN", "PDF"]).nullable(),
+      blockersCount: z.number(),
+      warningCount: z.number(),
+    }),
+  }),
+  sourceData: z.object({
+    reconciliationStatus: z.string().nullable(),
+    canonicalSource: z.string().nullable(),
+    conflictCount: z.number(),
+    incompleteCount: z.number(),
+    lastReconciledAt: z.string().nullable(),
+    runtimeNeedsAttention: z.boolean(),
+    runtimeAttentionCount: z.number(),
+    runtimeNextActionTitle: z.string().nullable(),
+    runtimeNextActionReason: z.string().nullable(),
+    portfolioManagerState: z.string(),
+    greenButtonState: z.string(),
+  }),
+  anomalyRisk: z.object({
+    activeCount: z.number(),
+    highSeverityCount: z.number(),
+    totalEstimatedEnergyImpactKbtu: z.number().nullable(),
+    totalEstimatedPenaltyImpactUsd: z.number().nullable(),
+    penaltyImpactStatus: z.string(),
+    highestPriority: z.string().nullable(),
+    latestDetectedAt: z.string().nullable(),
+    topFindings: z.array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        severity: z.string(),
+        confidenceBand: z.string(),
+        explanation: z.string(),
+        estimatedEnergyImpactKbtu: z.number().nullable(),
+        estimatedPenaltyImpactUsd: z.number().nullable(),
+        penaltyImpactStatus: z.string(),
+      }),
+    ),
+  }),
+  retrofits: z.object({
+    activeCount: z.number(),
+    highestPriorityBand: z.string().nullable(),
+    topOpportunity: z.object({
+      candidateId: z.string(),
+      name: z.string(),
+      priorityBand: z.string(),
+      priorityScore: z.number(),
+      estimatedAvoidedPenalty: z.number().nullable(),
+      estimatedAvoidedPenaltyStatus: z.string(),
+      estimatedOperationalRiskReductionPenalty: z.number().nullable(),
+      basisSummary: z.string(),
+    }).nullable(),
+    opportunities: z.array(
+      z.object({
+        candidateId: z.string(),
+        name: z.string(),
+        priorityBand: z.string(),
+        priorityScore: z.number(),
+        estimatedAvoidedPenalty: z.number().nullable(),
+        estimatedAvoidedPenaltyStatus: z.string(),
+        netProjectCost: z.number(),
+        estimatedOperationalRiskReductionPenalty: z.number().nullable(),
+        basisSummary: z.string(),
+      }),
+    ),
+  }),
+});
+
+const reportEvidencePackageSchema = z.object({
+  packageVersion: z.literal("governed-report-evidence-v1"),
+  generatedAt: z.string(),
+  traceability: z.object({
+    readinessState: z.string(),
+    primaryStatus: z.string(),
+    penaltyRunId: z.string().nullable(),
+    penaltyCalculatedAt: z.string().nullable(),
+    reconciliationStatus: z.string().nullable(),
+    canonicalSource: z.string().nullable(),
+    lastReadinessEvaluatedAt: z.string().nullable(),
+    lastComplianceEvaluatedAt: z.string().nullable(),
+    lastArtifactGeneratedAt: z.string().nullable(),
+    lastArtifactFinalizedAt: z.string().nullable(),
+    lastSubmissionTransitionAt: z.string().nullable(),
+  }),
+  artifacts: z.object({
+    benchmark: reportArtifactEvidenceSchema,
+    beps: reportArtifactEvidenceSchema,
+  }),
+});
+
 const reportOutputSchema = z.object({
   buildingId: z.string(),
   buildingName: z.string(),
@@ -256,6 +460,8 @@ const reportOutputSchema = z.object({
   }),
   governedPenalty: governedPenaltySummarySchema,
   governedOperationalSummary: governedOperationalSummarySchema,
+  sections: reportSectionsSchema,
+  evidencePackage: reportEvidencePackageSchema,
   energyHistory: z.array(
     z.object({
       periodStart: z.string(),
@@ -275,6 +481,41 @@ const reportOutputSchema = z.object({
     }),
   ),
 });
+
+function toExportFormat(value: ArtifactExportFormat | null) {
+  return value;
+}
+
+function buildArtifactEvidenceSection(workflow: OperationalArtifactWorkflow) {
+  return {
+    kind: workflow.kind,
+    label: workflow.label,
+    sourceRecordId: workflow.sourceRecordId,
+    artifactStatus: workflow.status,
+    disposition: workflow.disposition,
+    blockersCount: workflow.blockersCount,
+    warningCount: workflow.warningCount,
+    latestArtifact: workflow.latestArtifact,
+    latestExport: workflow.latestExport
+      ? {
+          artifactId: workflow.latestExport.artifactId,
+          version: workflow.latestExport.version,
+          exportedAt: workflow.latestExport.exportedAt,
+          format: toExportFormat(workflow.latestExport.format),
+        }
+      : null,
+    workflow: workflow.submissionWorkflow
+      ? {
+          id: workflow.submissionWorkflow.id,
+          state: workflow.submissionWorkflow.state,
+          latestTransitionAt: workflow.submissionWorkflow.latestTransitionAt,
+          nextActionTitle: workflow.submissionWorkflow.nextAction.title,
+          nextActionReason: workflow.submissionWorkflow.nextAction.reason,
+        }
+      : null,
+    sourceContext: workflow.sourceContext,
+  };
+}
 
 const exemptionReportSchema = z.object({
   buildingId: z.string(),
@@ -454,10 +695,16 @@ export const reportRouter = router({
       const latestSnapshot = await getLatestComplianceSnapshot(ctx.tenantDb, {
         buildingId: input.buildingId,
       });
-      const governedSummary = await getBuildingGovernedOperationalSummary({
-        organizationId: ctx.organizationId,
-        buildingId: input.buildingId,
-      });
+      const [governedSummary, artifactWorkspace] = await Promise.all([
+        getBuildingGovernedOperationalSummary({
+          organizationId: ctx.organizationId,
+          buildingId: input.buildingId,
+        }),
+        getBuildingArtifactWorkspace({
+          organizationId: ctx.organizationId,
+          buildingId: input.buildingId,
+        }),
+      ]);
       const penaltySummary = governedSummary.penaltySummary;
 
       const twoYearsAgo = new Date();
@@ -494,6 +741,13 @@ export const reportRouter = router({
           completedAt: true,
         },
       });
+
+      const benchmarkEvidenceSection = buildArtifactEvidenceSection(
+        artifactWorkspace.benchmarkVerification,
+      );
+      const bepsEvidenceSection = buildArtifactEvidenceSection(
+        artifactWorkspace.bepsFiling,
+      );
 
       return {
         buildingId: building.id,
@@ -538,6 +792,199 @@ export const reportRouter = router({
             }
           : null,
         governedOperationalSummary: governedSummary,
+        sections: {
+          compliance: {
+            readinessState: governedSummary.readinessSummary.state,
+            primaryStatus: governedSummary.complianceSummary.primaryStatus,
+            qaVerdict: governedSummary.complianceSummary.qaVerdict,
+            reasonSummary: governedSummary.complianceSummary.reasonSummary,
+            nextAction: governedSummary.readinessSummary.nextAction,
+            latestSnapshot: {
+              snapshotDate: latestSnapshot?.snapshotDate?.toISOString() ?? null,
+              energyStarScore: latestSnapshot?.energyStarScore ?? null,
+              siteEui: latestSnapshot?.siteEui ?? null,
+              sourceEui: latestSnapshot?.sourceEui ?? null,
+              weatherNormalizedSiteEui:
+                latestSnapshot?.weatherNormalizedSiteEui ?? null,
+              complianceGap: latestSnapshot?.complianceGap ?? null,
+              dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
+            },
+            benchmarkEvaluation:
+              governedSummary.complianceSummary.benchmark ?? null,
+            bepsEvaluation: governedSummary.complianceSummary.beps ?? null,
+          },
+          penalty: {
+            status: penaltySummary?.status ?? "INSUFFICIENT_CONTEXT",
+            currentEstimatedPenalty:
+              penaltySummary?.currentEstimatedPenalty ?? null,
+            calculatedAt: penaltySummary?.calculatedAt ?? null,
+            basisLabel:
+              penaltySummary?.basis.label ?? "No governed penalty run recorded",
+            basisExplanation:
+              penaltySummary?.basis.explanation ??
+              "Penalty exposure has not been derived from a governed penalty run for this building.",
+            filingYear: penaltySummary?.governingContext.filingYear ?? null,
+            complianceCycle:
+              penaltySummary?.governingContext.complianceCycle ?? null,
+            basisPathway: penaltySummary?.governingContext.basisPathway ?? null,
+            scenarios: (penaltySummary?.scenarios ?? []).map((scenario) => ({
+              code: scenario.code,
+              label: scenario.label,
+              estimatedPenalty: scenario.estimatedPenalty,
+              deltaFromCurrent: scenario.deltaFromCurrent,
+            })),
+          },
+          artifacts: {
+            benchmark: {
+              latestArtifactStatus: benchmarkEvidenceSection.artifactStatus,
+              workflowState:
+                benchmarkEvidenceSection.workflow?.state ?? "NOT_STARTED",
+              disposition: benchmarkEvidenceSection.disposition,
+              lastGeneratedAt:
+                benchmarkEvidenceSection.latestArtifact?.generatedAt ?? null,
+              lastFinalizedAt:
+                benchmarkEvidenceSection.latestArtifact?.finalizedAt ?? null,
+              lastExportedAt:
+                benchmarkEvidenceSection.latestExport?.exportedAt ?? null,
+              lastExportFormat:
+                benchmarkEvidenceSection.latestExport?.format ?? null,
+              blockersCount: benchmarkEvidenceSection.blockersCount,
+              warningCount: benchmarkEvidenceSection.warningCount,
+            },
+            beps: {
+              latestArtifactStatus: bepsEvidenceSection.artifactStatus,
+              workflowState: bepsEvidenceSection.workflow?.state ?? "NOT_STARTED",
+              disposition: bepsEvidenceSection.disposition,
+              lastGeneratedAt:
+                bepsEvidenceSection.latestArtifact?.generatedAt ?? null,
+              lastFinalizedAt:
+                bepsEvidenceSection.latestArtifact?.finalizedAt ?? null,
+              lastExportedAt: bepsEvidenceSection.latestExport?.exportedAt ?? null,
+              lastExportFormat: bepsEvidenceSection.latestExport?.format ?? null,
+              blockersCount: bepsEvidenceSection.blockersCount,
+              warningCount: bepsEvidenceSection.warningCount,
+            },
+          },
+          sourceData: {
+            reconciliationStatus:
+              governedSummary.reconciliationSummary.status ?? null,
+            canonicalSource:
+              governedSummary.reconciliationSummary.canonicalSource ?? null,
+            conflictCount: governedSummary.reconciliationSummary.conflictCount,
+            incompleteCount:
+              governedSummary.reconciliationSummary.incompleteCount,
+            lastReconciledAt:
+              governedSummary.reconciliationSummary.lastReconciledAt,
+            runtimeNeedsAttention: governedSummary.runtimeSummary.needsAttention,
+            runtimeAttentionCount: governedSummary.runtimeSummary.attentionCount,
+            runtimeNextActionTitle:
+              governedSummary.runtimeSummary.nextAction?.title ?? null,
+            runtimeNextActionReason:
+              governedSummary.runtimeSummary.nextAction?.reason ?? null,
+            portfolioManagerState:
+              governedSummary.runtimeSummary.portfolioManager.currentState,
+            greenButtonState:
+              governedSummary.runtimeSummary.greenButton.currentState,
+          },
+          anomalyRisk: {
+            activeCount: governedSummary.anomalySummary.activeCount,
+            highSeverityCount: governedSummary.anomalySummary.highSeverityCount,
+            totalEstimatedEnergyImpactKbtu:
+              governedSummary.anomalySummary.totalEstimatedEnergyImpactKbtu,
+            totalEstimatedPenaltyImpactUsd:
+              governedSummary.anomalySummary.totalEstimatedPenaltyImpactUsd,
+            penaltyImpactStatus:
+              governedSummary.anomalySummary.penaltyImpactStatus,
+            highestPriority:
+              governedSummary.anomalySummary.highestPriority ?? null,
+            latestDetectedAt:
+              governedSummary.anomalySummary.latestDetectedAt,
+            topFindings: governedSummary.anomalySummary.topAnomalies.map(
+              (anomaly) => ({
+                id: anomaly.id,
+                title: anomaly.title,
+                severity: anomaly.severity,
+                confidenceBand: anomaly.confidenceBand,
+                explanation: anomaly.explanation,
+                estimatedEnergyImpactKbtu:
+                  anomaly.estimatedEnergyImpactKbtu,
+                estimatedPenaltyImpactUsd:
+                  anomaly.estimatedPenaltyImpactUsd,
+                penaltyImpactStatus: anomaly.penaltyImpactStatus,
+              }),
+            ),
+          },
+          retrofits: {
+            activeCount: governedSummary.retrofitSummary.activeCount,
+            highestPriorityBand:
+              governedSummary.retrofitSummary.highestPriorityBand,
+            topOpportunity: governedSummary.retrofitSummary.topOpportunity
+              ? {
+                  candidateId:
+                    governedSummary.retrofitSummary.topOpportunity.candidateId,
+                  name: governedSummary.retrofitSummary.topOpportunity.name,
+                  priorityBand:
+                    governedSummary.retrofitSummary.topOpportunity.priorityBand,
+                  priorityScore:
+                    governedSummary.retrofitSummary.topOpportunity.priorityScore,
+                  estimatedAvoidedPenalty:
+                    governedSummary.retrofitSummary.topOpportunity
+                      .estimatedAvoidedPenalty,
+                  estimatedAvoidedPenaltyStatus:
+                    governedSummary.retrofitSummary.topOpportunity
+                      .estimatedAvoidedPenaltyStatus,
+                  estimatedOperationalRiskReductionPenalty:
+                    governedSummary.retrofitSummary.topOpportunity
+                      .estimatedOperationalRiskReduction.penaltyImpactUsd,
+                  basisSummary:
+                    governedSummary.retrofitSummary.topOpportunity.basis.summary,
+                }
+              : null,
+            opportunities: governedSummary.retrofitSummary.opportunities.map(
+              (opportunity) => ({
+                candidateId: opportunity.candidateId,
+                name: opportunity.name,
+                priorityBand: opportunity.priorityBand,
+                priorityScore: opportunity.priorityScore,
+                estimatedAvoidedPenalty: opportunity.estimatedAvoidedPenalty,
+                estimatedAvoidedPenaltyStatus:
+                  opportunity.estimatedAvoidedPenaltyStatus,
+                netProjectCost: opportunity.netProjectCost,
+                estimatedOperationalRiskReductionPenalty:
+                  opportunity.estimatedOperationalRiskReduction.penaltyImpactUsd,
+                basisSummary: opportunity.basis.summary,
+              }),
+            ),
+          },
+        },
+        evidencePackage: {
+          packageVersion: "governed-report-evidence-v1",
+          generatedAt: new Date().toISOString(),
+          traceability: {
+            readinessState: governedSummary.readinessSummary.state,
+            primaryStatus: governedSummary.complianceSummary.primaryStatus,
+            penaltyRunId: penaltySummary?.id ?? null,
+            penaltyCalculatedAt: penaltySummary?.calculatedAt ?? null,
+            reconciliationStatus:
+              governedSummary.reconciliationSummary.status ?? null,
+            canonicalSource:
+              governedSummary.reconciliationSummary.canonicalSource ?? null,
+            lastReadinessEvaluatedAt:
+              governedSummary.timestamps.lastReadinessEvaluatedAt,
+            lastComplianceEvaluatedAt:
+              governedSummary.timestamps.lastComplianceEvaluatedAt,
+            lastArtifactGeneratedAt:
+              governedSummary.timestamps.lastArtifactGeneratedAt,
+            lastArtifactFinalizedAt:
+              governedSummary.timestamps.lastArtifactFinalizedAt,
+            lastSubmissionTransitionAt:
+              governedSummary.timestamps.lastSubmissionTransitionAt,
+          },
+          artifacts: {
+            benchmark: benchmarkEvidenceSection,
+            beps: bepsEvidenceSection,
+          },
+        },
         energyHistory: dedupedReadings.map(
           (r: {
             id: string;
