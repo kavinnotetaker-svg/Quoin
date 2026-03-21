@@ -21,6 +21,22 @@ export type PortfolioWorklistSort =
   | "PENALTY"
   | "LAST_COMPLIANCE_EVALUATED";
 
+export type PortfolioWorklistSubmissionState =
+  | SubmissionWorkflowSummary["state"]
+  | "NOT_STARTED";
+
+export type PortfolioWorklistTriageBucket =
+  | "COMPLIANCE_BLOCKER"
+  | "ARTIFACT_ATTENTION"
+  | "REVIEW_QUEUE"
+  | "SUBMISSION_QUEUE"
+  | "SYNC_ATTENTION"
+  | "OPERATIONAL_RISK"
+  | "RETROFIT_QUEUE"
+  | "MONITORING";
+
+export type PortfolioWorklistTriageUrgency = "NOW" | "NEXT" | "MONITOR";
+
 export type PortfolioWorklistNextActionCode =
   | "RESOLVE_BLOCKING_ISSUES"
   | "REFRESH_INTEGRATION"
@@ -38,8 +54,15 @@ export interface PortfolioWorklistArtifactSummary {
 }
 
 export interface PortfolioWorklistSubmissionSummary {
-  state: SubmissionWorkflowSummary["state"];
+  state: PortfolioWorklistSubmissionState;
   workflowId: string | null;
+  latestTransitionAt: string | null;
+}
+
+export interface PortfolioWorklistOverallSubmissionSummary {
+  state: PortfolioWorklistSubmissionState;
+  workflowId: string | null;
+  workflowType: "BENCHMARK" | "BEPS" | null;
   latestTransitionAt: string | null;
 }
 
@@ -94,8 +117,14 @@ export interface PortfolioWorklistItem {
   };
   runtime: BuildingIntegrationRuntimeSummary;
   submission: {
+    overall: PortfolioWorklistOverallSubmissionSummary;
     benchmark: PortfolioWorklistSubmissionSummary;
     beps: PortfolioWorklistSubmissionSummary;
+  };
+  triage: {
+    bucket: PortfolioWorklistTriageBucket;
+    urgency: PortfolioWorklistTriageUrgency;
+    cue: string;
   };
   timestamps: {
     lastReadinessEvaluatedAt: string | null;
@@ -130,11 +159,24 @@ export interface PortfolioWorklistAggregate {
   withActionableRetrofits: number;
   withDraftArtifacts: number;
   finalizedAwaitingNextAction: number;
+  needsAttentionNow: number;
+  reviewQueue: number;
+  submissionQueue: number;
+  syncQueue: number;
+  anomalyQueue: number;
+  retrofitQueue: number;
+}
+
+export interface PortfolioWorklistPageInfo {
+  returnedCount: number;
+  totalMatchingCount: number;
+  nextCursor: string | null;
 }
 
 export interface PortfolioWorklistResult {
   items: PortfolioWorklistItem[];
   aggregate: PortfolioWorklistAggregate;
+  pageInfo: PortfolioWorklistPageInfo;
 }
 
 interface PortfolioWorklistParams {
@@ -143,9 +185,35 @@ interface PortfolioWorklistParams {
   readinessState?: BuildingReadinessState;
   hasBlockingIssues?: boolean;
   hasPenaltyExposure?: boolean;
+  submissionState?: PortfolioWorklistSubmissionState;
+  needsSyncAttention?: boolean;
+  needsAnomalyAttention?: boolean;
+  hasRetrofitOpportunity?: boolean;
+  triageUrgency?: PortfolioWorklistTriageUrgency;
   artifactStatus?: WorklistArtifactStatus;
   nextAction?: PortfolioWorklistNextActionCode;
+  triageBucket?: PortfolioWorklistTriageBucket;
   sortBy?: PortfolioWorklistSort;
+  cursor?: string;
+  pageSize?: number;
+}
+
+function encodeCursor(offset: number) {
+  return Buffer.from(String(offset), "utf8").toString("base64");
+}
+
+function decodeCursor(cursor: string | undefined) {
+  if (!cursor) {
+    return 0;
+  }
+
+  try {
+    const decoded = Buffer.from(cursor, "base64").toString("utf8");
+    const parsed = Number.parseInt(decoded, 10);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+  } catch {
+    return 0;
+  }
 }
 
 function toWorklistArtifactStatus(value: string | null | undefined): WorklistArtifactStatus {
@@ -166,6 +234,14 @@ function deriveNextAction(
   const bepsPacketStatus = toWorklistArtifactStatus(readiness.artifacts.bepsPacket?.status);
   const benchmarkWorkflow = summary.submissionSummary.benchmark;
   const bepsWorkflow = summary.submissionSummary.beps;
+
+  if (readiness.blockingIssueCount > 0) {
+    return {
+      code: "RESOLVE_BLOCKING_ISSUES",
+      title: readiness.nextAction.title,
+      reason: readiness.nextAction.reason,
+    };
+  }
 
   if (
     benchmarkWorkflow?.state === "NEEDS_CORRECTION" ||
@@ -210,14 +286,6 @@ function deriveNextAction(
       code: "REVIEW_COMPLIANCE_RESULT",
       title: "Review the finalized artifact",
       reason: "A finalized governed artifact is ready for consultant review.",
-    };
-  }
-
-  if (readiness.blockingIssueCount > 0) {
-    return {
-      code: "RESOLVE_BLOCKING_ISSUES",
-      title: readiness.nextAction.title,
-      reason: readiness.nextAction.reason,
     };
   }
 
@@ -273,26 +341,155 @@ function deriveNextAction(
   }
 }
 
+function deriveOverallSubmissionSummary(summary: {
+  benchmark: PortfolioWorklistSubmissionSummary;
+  beps: PortfolioWorklistSubmissionSummary;
+}): PortfolioWorklistOverallSubmissionSummary {
+  const ordered = [
+    { workflowType: "BEPS" as const, ...summary.beps },
+    { workflowType: "BENCHMARK" as const, ...summary.benchmark },
+  ];
+
+  for (const state of [
+    "NEEDS_CORRECTION",
+    "APPROVED_FOR_SUBMISSION",
+    "READY_FOR_REVIEW",
+    "SUBMITTED",
+    "COMPLETED",
+    "DRAFT",
+  ] as const) {
+    const match = ordered.find((workflow) => workflow.state === state);
+    if (match) {
+      return {
+        state,
+        workflowId: match.workflowId,
+        workflowType: match.workflowType,
+        latestTransitionAt: match.latestTransitionAt,
+      };
+    }
+  }
+
+  return {
+    state: "NOT_STARTED",
+    workflowId: null,
+    workflowType: null,
+    latestTransitionAt: null,
+  };
+}
+
+function deriveTriage(input: {
+  readinessState: BuildingReadinessState;
+  blockingIssueCount: number;
+  nextAction: PortfolioWorklistItem["nextAction"];
+  flags: PortfolioWorklistItem["flags"];
+  submissionOverall: PortfolioWorklistOverallSubmissionSummary;
+  anomalySummary: PortfolioWorklistItem["anomalySummary"];
+  retrofitSummary: PortfolioWorklistItem["retrofitSummary"];
+}): PortfolioWorklistItem["triage"] {
+  if (input.flags.blocked) {
+    return {
+      bucket: "COMPLIANCE_BLOCKER",
+      urgency: "NOW",
+      cue:
+        input.blockingIssueCount === 1
+          ? "1 governed compliance blocker is preventing review."
+          : `${input.blockingIssueCount} governed compliance blockers are preventing review.`,
+    };
+  }
+
+  if (
+    input.flags.needsCorrection ||
+    input.nextAction.code === "REGENERATE_ARTIFACT" ||
+    input.nextAction.code === "FINALIZE_ARTIFACT"
+  ) {
+    return {
+      bucket: "ARTIFACT_ATTENTION",
+      urgency: "NOW",
+      cue:
+        input.submissionOverall.state === "NEEDS_CORRECTION"
+          ? "The latest governed artifact needs correction before submission can continue."
+          : "The current governed artifact needs consultant action before workflow can continue.",
+    };
+  }
+
+  if (input.flags.needsSyncAttention || input.nextAction.code === "REFRESH_INTEGRATION") {
+    return {
+      bucket: "SYNC_ATTENTION",
+      urgency: "NOW",
+      cue: "Upstream integration state needs attention before the building can progress cleanly.",
+    };
+  }
+
+  if (
+    input.nextAction.code === "REVIEW_COMPLIANCE_RESULT" ||
+    input.flags.readyForReview
+  ) {
+    return {
+      bucket: "REVIEW_QUEUE",
+      urgency: "NOW",
+      cue: "The latest governed result is ready for consultant review.",
+    };
+  }
+
+  if (
+    input.nextAction.code === "SUBMIT_ARTIFACT" ||
+    input.flags.readyToSubmit
+  ) {
+    return {
+      bucket: "SUBMISSION_QUEUE",
+      urgency: "NOW",
+      cue: "A governed artifact is approved and ready for submission operations.",
+    };
+  }
+
+  if (input.flags.needsAnomalyAttention) {
+    return {
+      bucket: "OPERATIONAL_RISK",
+      urgency: "NEXT",
+      cue:
+        input.anomalySummary.highSeverityCount > 0
+          ? "Operational anomalies are adding compliance or penalty risk."
+          : "Operational anomalies are present and should be reviewed.",
+    };
+  }
+
+  if (input.retrofitSummary.topOpportunity) {
+    return {
+      bucket: "RETROFIT_QUEUE",
+      urgency: "NEXT",
+      cue: "A prioritized retrofit opportunity is available for action planning.",
+    };
+  }
+
+  return {
+    bucket: "MONITORING",
+    urgency: input.readinessState === "SUBMITTED" ? "MONITOR" : "NEXT",
+    cue:
+      input.readinessState === "SUBMITTED"
+        ? "Submission has been recorded and is awaiting downstream outcome."
+        : "The building is in a stable governed state with no immediate queue action.",
+  };
+}
+
 function priorityRank(item: PortfolioWorklistItem) {
-  if (item.flags.blocked) {
-    return 0;
+  switch (item.triage.bucket) {
+    case "COMPLIANCE_BLOCKER":
+      return 0;
+    case "ARTIFACT_ATTENTION":
+      return 1;
+    case "REVIEW_QUEUE":
+      return 2;
+    case "SUBMISSION_QUEUE":
+      return 3;
+    case "SYNC_ATTENTION":
+      return 4;
+    case "OPERATIONAL_RISK":
+      return 5;
+    case "RETROFIT_QUEUE":
+      return 6;
+    default:
+      return 7;
   }
-  if (item.nextAction.code === "REGENERATE_ARTIFACT") {
-    return 1;
-  }
-  if (item.nextAction.code === "FINALIZE_ARTIFACT") {
-    return 2;
-  }
-  if (item.flags.readyForReview) {
-    return 3;
-  }
-  if (item.flags.readyToSubmit) {
-    return 4;
-  }
-  if (item.flags.submitted) {
-    return 5;
-  }
-  return 6;
 }
 
 function sortItems(items: PortfolioWorklistItem[], sortBy: PortfolioWorklistSort) {
@@ -391,6 +588,24 @@ function toAggregate(items: PortfolioWorklistItem[]): PortfolioWorklistAggregate
       ) {
         acc.finalizedAwaitingNextAction += 1;
       }
+      if (item.triage.urgency === "NOW") {
+        acc.needsAttentionNow += 1;
+      }
+      if (item.triage.bucket === "REVIEW_QUEUE") {
+        acc.reviewQueue += 1;
+      }
+      if (item.triage.bucket === "SUBMISSION_QUEUE") {
+        acc.submissionQueue += 1;
+      }
+      if (item.triage.bucket === "SYNC_ATTENTION") {
+        acc.syncQueue += 1;
+      }
+      if (item.triage.bucket === "OPERATIONAL_RISK") {
+        acc.anomalyQueue += 1;
+      }
+      if (item.triage.bucket === "RETROFIT_QUEUE") {
+        acc.retrofitQueue += 1;
+      }
       return acc;
     },
     {
@@ -406,6 +621,12 @@ function toAggregate(items: PortfolioWorklistItem[]): PortfolioWorklistAggregate
       withActionableRetrofits: 0,
       withDraftArtifacts: 0,
       finalizedAwaitingNextAction: 0,
+      needsAttentionNow: 0,
+      reviewQueue: 0,
+      submissionQueue: 0,
+      syncQueue: 0,
+      anomalyQueue: 0,
+      retrofitQueue: 0,
     },
   );
 }
@@ -467,6 +688,71 @@ export async function getPortfolioWorklist(
       generatedAt: governedSummary.artifactSummary.beps.lastGeneratedAt,
       finalizedAt: governedSummary.artifactSummary.beps.lastFinalizedAt,
     };
+    const submission = {
+      benchmark: {
+        state: governedSummary.submissionSummary.benchmark?.state ?? "NOT_STARTED",
+        workflowId: governedSummary.submissionSummary.benchmark?.id ?? null,
+        latestTransitionAt:
+          governedSummary.submissionSummary.benchmark?.latestTransitionAt ?? null,
+      },
+      beps: {
+        state: governedSummary.submissionSummary.beps?.state ?? "NOT_STARTED",
+        workflowId: governedSummary.submissionSummary.beps?.id ?? null,
+        latestTransitionAt:
+          governedSummary.submissionSummary.beps?.latestTransitionAt ?? null,
+      },
+    };
+    const submissionOverall = deriveOverallSubmissionSummary(submission);
+    const flags = {
+      blocked: readiness.state === "DATA_INCOMPLETE",
+      readyForReview: readiness.state === "READY_FOR_REVIEW",
+      readyToSubmit: readiness.state === "READY_TO_SUBMIT",
+      submitted: readiness.state === "SUBMITTED",
+      hasPenaltyExposure:
+        penaltySummary?.status === "ESTIMATED" &&
+        (penaltySummary.currentEstimatedPenalty ?? 0) > 0,
+      needsCorrection:
+        governedSummary.submissionSummary.benchmark?.state === "NEEDS_CORRECTION" ||
+        governedSummary.submissionSummary.beps?.state === "NEEDS_CORRECTION",
+      needsSyncAttention: governedSummary.runtimeSummary.needsAttention,
+      needsAnomalyAttention: governedSummary.anomalySummary.needsAttention,
+    };
+    const anomalySummary = {
+      activeCount: governedSummary.anomalySummary.activeCount,
+      highSeverityCount: governedSummary.anomalySummary.highSeverityCount,
+      totalEstimatedEnergyImpactKbtu:
+        governedSummary.anomalySummary.totalEstimatedEnergyImpactKbtu,
+      totalEstimatedPenaltyImpactUsd:
+        governedSummary.anomalySummary.totalEstimatedPenaltyImpactUsd,
+      penaltyImpactStatus: governedSummary.anomalySummary.penaltyImpactStatus,
+      needsAttention: governedSummary.anomalySummary.needsAttention,
+    };
+    const retrofitSummary = {
+      activeCount: governedSummary.retrofitSummary.activeCount,
+      highestPriorityBand: governedSummary.retrofitSummary.highestPriorityBand,
+      topOpportunity: governedSummary.retrofitSummary.topOpportunity
+        ? {
+            name: governedSummary.retrofitSummary.topOpportunity.name,
+            priorityScore: governedSummary.retrofitSummary.topOpportunity.priorityScore,
+            estimatedAvoidedPenalty:
+              governedSummary.retrofitSummary.topOpportunity.estimatedAvoidedPenalty,
+            estimatedAvoidedPenaltyStatus:
+              governedSummary.retrofitSummary.topOpportunity.estimatedAvoidedPenaltyStatus,
+            estimatedOperationalRiskReductionPenalty:
+              governedSummary.retrofitSummary.topOpportunity
+                .estimatedOperationalRiskReduction.penaltyImpactUsd,
+          }
+        : null,
+    };
+    const triage = deriveTriage({
+      readinessState: readiness.state,
+      blockingIssueCount: readiness.blockingIssueCount,
+      nextAction,
+      flags,
+      submissionOverall,
+      anomalySummary,
+      retrofitSummary,
+    });
 
     return {
       buildingId: building.id,
@@ -491,52 +777,19 @@ export async function getPortfolioWorklist(
             calculatedAt: penaltySummary.calculatedAt,
           }
         : null,
-      anomalySummary: {
-        activeCount: governedSummary.anomalySummary.activeCount,
-        highSeverityCount: governedSummary.anomalySummary.highSeverityCount,
-        totalEstimatedEnergyImpactKbtu:
-          governedSummary.anomalySummary.totalEstimatedEnergyImpactKbtu,
-        totalEstimatedPenaltyImpactUsd:
-          governedSummary.anomalySummary.totalEstimatedPenaltyImpactUsd,
-        penaltyImpactStatus: governedSummary.anomalySummary.penaltyImpactStatus,
-        needsAttention: governedSummary.anomalySummary.needsAttention,
-      },
-      retrofitSummary: {
-        activeCount: governedSummary.retrofitSummary.activeCount,
-        highestPriorityBand: governedSummary.retrofitSummary.highestPriorityBand,
-        topOpportunity: governedSummary.retrofitSummary.topOpportunity
-          ? {
-              name: governedSummary.retrofitSummary.topOpportunity.name,
-              priorityScore: governedSummary.retrofitSummary.topOpportunity.priorityScore,
-              estimatedAvoidedPenalty:
-                governedSummary.retrofitSummary.topOpportunity.estimatedAvoidedPenalty,
-              estimatedAvoidedPenaltyStatus:
-                governedSummary.retrofitSummary.topOpportunity.estimatedAvoidedPenaltyStatus,
-              estimatedOperationalRiskReductionPenalty:
-                governedSummary.retrofitSummary.topOpportunity
-                  .estimatedOperationalRiskReduction.penaltyImpactUsd,
-            }
-          : null,
-      },
+      anomalySummary,
+      retrofitSummary,
       artifacts: {
         benchmark: benchmarkArtifact,
         beps: bepsArtifact,
       },
       runtime: governedSummary.runtimeSummary,
       submission: {
-        benchmark: {
-          state: governedSummary.submissionSummary.benchmark?.state ?? "NOT_STARTED",
-          workflowId: governedSummary.submissionSummary.benchmark?.id ?? null,
-          latestTransitionAt:
-            governedSummary.submissionSummary.benchmark?.latestTransitionAt ?? null,
-        },
-        beps: {
-          state: governedSummary.submissionSummary.beps?.state ?? "NOT_STARTED",
-          workflowId: governedSummary.submissionSummary.beps?.id ?? null,
-          latestTransitionAt:
-            governedSummary.submissionSummary.beps?.latestTransitionAt ?? null,
-        },
+        overall: submissionOverall,
+        benchmark: submission.benchmark,
+        beps: submission.beps,
       },
+      triage,
       timestamps: {
         lastReadinessEvaluatedAt: governedSummary.timestamps.lastReadinessEvaluatedAt,
         lastComplianceEvaluatedAt: governedSummary.timestamps.lastComplianceEvaluatedAt,
@@ -545,20 +798,7 @@ export async function getPortfolioWorklist(
         lastArtifactFinalizedAt: governedSummary.timestamps.lastArtifactFinalizedAt,
         lastSubmissionTransitionAt: governedSummary.timestamps.lastSubmissionTransitionAt,
       },
-      flags: {
-        blocked: readiness.state === "DATA_INCOMPLETE",
-        readyForReview: readiness.state === "READY_FOR_REVIEW",
-        readyToSubmit: readiness.state === "READY_TO_SUBMIT",
-        submitted: readiness.state === "SUBMITTED",
-        hasPenaltyExposure:
-          penaltySummary?.status === "ESTIMATED" &&
-          (penaltySummary.currentEstimatedPenalty ?? 0) > 0,
-        needsCorrection:
-          governedSummary.submissionSummary.benchmark?.state === "NEEDS_CORRECTION" ||
-          governedSummary.submissionSummary.beps?.state === "NEEDS_CORRECTION",
-        needsSyncAttention: governedSummary.runtimeSummary.needsAttention,
-        needsAnomalyAttention: governedSummary.anomalySummary.needsAttention,
-      },
+      flags,
     };
   });
 
@@ -579,6 +819,33 @@ export async function getPortfolioWorklist(
       return false;
     }
     if (
+      params.submissionState &&
+      item.submission.overall.state !== params.submissionState
+    ) {
+      return false;
+    }
+    if (
+      params.needsSyncAttention != null &&
+      item.flags.needsSyncAttention !== params.needsSyncAttention
+    ) {
+      return false;
+    }
+    if (
+      params.needsAnomalyAttention != null &&
+      item.flags.needsAnomalyAttention !== params.needsAnomalyAttention
+    ) {
+      return false;
+    }
+    if (
+      params.hasRetrofitOpportunity != null &&
+      (item.retrofitSummary.topOpportunity != null) !== params.hasRetrofitOpportunity
+    ) {
+      return false;
+    }
+    if (params.triageUrgency && item.triage.urgency !== params.triageUrgency) {
+      return false;
+    }
+    if (
       params.artifactStatus &&
       !matchesArtifactStatus(item, params.artifactStatus)
     ) {
@@ -587,11 +854,25 @@ export async function getPortfolioWorklist(
     if (params.nextAction && item.nextAction.code !== params.nextAction) {
       return false;
     }
+    if (params.triageBucket && item.triage.bucket !== params.triageBucket) {
+      return false;
+    }
     return true;
   });
 
+  const sortedItems = sortItems(filteredItems, params.sortBy ?? "PRIORITY");
+  const pageSize = Math.min(Math.max(params.pageSize ?? 25, 1), 100);
+  const startIndex = decodeCursor(params.cursor);
+  const pagedItems = sortedItems.slice(startIndex, startIndex + pageSize);
+  const nextIndex = startIndex + pagedItems.length;
+
   return {
-    items: sortItems(filteredItems, params.sortBy ?? "PRIORITY"),
+    items: pagedItems,
     aggregate: toAggregate(items),
+    pageInfo: {
+      returnedCount: pagedItems.length,
+      totalMatchingCount: sortedItems.length,
+      nextCursor: nextIndex < sortedItems.length ? encodeCursor(nextIndex) : null,
+    },
   };
 }

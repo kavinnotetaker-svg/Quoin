@@ -299,6 +299,11 @@ vi.mock("@/lib/trpc", () => ({
               canManage: true,
               appRole: "ADMIN",
             },
+            pageInfo: {
+              returnedCount: 2,
+              totalMatchingCount: 2,
+              nextCursor: null,
+            },
             aggregate: {
               totalBuildings: 2,
               blocked: 1,
@@ -312,6 +317,12 @@ vi.mock("@/lib/trpc", () => ({
               withActionableRetrofits: 1,
               withDraftArtifacts: 1,
               finalizedAwaitingNextAction: 0,
+              needsAttentionNow: 2,
+              reviewQueue: 0,
+              submissionQueue: 1,
+              syncQueue: 0,
+              anomalyQueue: 0,
+              retrofitQueue: 0,
             },
             items: [
               {
@@ -370,6 +381,12 @@ vi.mock("@/lib/trpc", () => ({
                   },
                 },
                 submission: {
+                  overall: {
+                    state: "NOT_STARTED",
+                    workflowId: null,
+                    workflowType: null,
+                    latestTransitionAt: null,
+                  },
                   benchmark: {
                     state: "NOT_STARTED",
                     workflowId: null,
@@ -388,6 +405,11 @@ vi.mock("@/lib/trpc", () => ({
                   lastArtifactGeneratedAt: null,
                   lastArtifactFinalizedAt: null,
                   lastSubmissionTransitionAt: null,
+                },
+                triage: {
+                  bucket: "COMPLIANCE_BLOCKER",
+                  urgency: "NOW",
+                  cue: "2 governed compliance blockers are preventing review.",
                 },
                 flags: {
                   blocked: true,
@@ -467,6 +489,12 @@ vi.mock("@/lib/trpc", () => ({
                   },
                 },
                 submission: {
+                  overall: {
+                    state: "APPROVED_FOR_SUBMISSION",
+                    workflowId: "beps-workflow-1",
+                    workflowType: "BEPS",
+                    latestTransitionAt: "2026-03-17T15:15:00.000Z",
+                  },
                   benchmark: {
                     state: "NOT_STARTED",
                     workflowId: null,
@@ -485,6 +513,11 @@ vi.mock("@/lib/trpc", () => ({
                   lastArtifactGeneratedAt: "2026-03-17T14:00:00.000Z",
                   lastArtifactFinalizedAt: "2026-03-17T15:00:00.000Z",
                   lastSubmissionTransitionAt: "2026-03-17T15:15:00.000Z",
+                },
+                triage: {
+                  bucket: "SUBMISSION_QUEUE",
+                  urgency: "NOW",
+                  cue: "A governed artifact is approved and ready for submission operations.",
                 },
                 flags: {
                   blocked: false,
@@ -559,15 +592,26 @@ describe("consultant-facing screens", () => {
     const markup = renderToStaticMarkup(createElement(ComplianceQueue));
 
     expect(markup).toContain("Portfolio worklist");
+    expect(markup).toContain("Needs attention now");
+    expect(markup).toContain("Submission queue");
     expect(markup).toContain("Resolve missing utility months");
     expect(markup).toContain("2222 Filing Tower");
     expect(markup).toContain("$300,000");
     expect(markup).toContain("Operational risk");
     expect(markup).toContain("Retrofit opportunities");
     expect(markup).toContain("Sync attention");
+    expect(markup).toContain("All triage queues");
+    expect(markup).toContain("Any workflow state");
     expect(markup).toContain("Draft artifacts");
+    expect(markup).toContain("Showing 1-2 of 2 matching buildings");
+    expect(markup).toContain("Page 1 of 1");
+    expect(markup).toContain("Previous");
+    expect(markup).toContain("Next");
     expect(markup).toContain("Approved");
+    expect(markup).toContain("Needs attention now");
+    expect(markup).toContain("Primary queue: submission");
     expect(markup).toContain("Bulk operator actions");
+    expect(markup).toContain("Clear selection");
     expect(markup).toContain("Bulk retry PM sync");
     expect(markup).toContain("Top retrofit: Retro-commissioning");
   });
@@ -1076,6 +1120,28 @@ describe("consultant-facing screens", () => {
     expect(tableSource).toContain("Current governed estimate");
   });
 
+  it("keeps dashboard triage surfaces on the governed worklist path", () => {
+    const insightsSource = readFileSync(
+      "C:\\Quoin\\src\\components\\dashboard\\portfolio-insights.tsx",
+      "utf8",
+    );
+    const routerSource = readFileSync(
+      "C:\\Quoin\\src\\server\\trpc\\routers\\index.ts",
+      "utf8",
+    );
+    const buildingRouterSource = readFileSync(
+      "C:\\Quoin\\src\\server\\trpc\\routers\\building.ts",
+      "utf8",
+    );
+
+    expect(insightsSource).toContain("building.portfolioWorklist.useQuery");
+    expect(insightsSource).not.toContain("building.portfolioWorkflow.useQuery");
+    expect(insightsSource).not.toContain("portfolioRisk");
+    expect(routerSource).not.toContain("portfolioRisk:");
+    expect(buildingRouterSource).not.toContain("workflowSummary:");
+    expect(buildingRouterSource).not.toContain("portfolioWorkflow:");
+  });
+
   it("keeps report penalty displays on governed server data", () => {
     const reportSource = readFileSync(
       "C:\\Quoin\\src\\components\\reports\\reports-page.tsx",
@@ -1089,8 +1155,17 @@ describe("consultant-facing screens", () => {
     expect(reportSource).not.toContain("@/server/");
     expect(reportSource).toContain("const sections = report.sections");
     expect(reportSource).toContain("const evidencePackage = report.evidencePackage");
+    expect(reportSource).toContain("report.getComplianceReportArtifacts.useQuery");
+    expect(reportSource).toContain("report.getExemptionReportArtifacts.useQuery");
+    expect(reportSource).toContain("report.generateComplianceReportArtifact.useMutation");
+    expect(reportSource).toContain("report.generateExemptionReportArtifact.useMutation");
+    expect(reportSource).toContain("report.exportComplianceReportArtifact.useMutation");
+    expect(reportSource).toContain("report.exportExemptionReportArtifact.useMutation");
     expect(reportSource).toContain("Governed report summary");
     expect(reportSource).toContain("Evidence package");
+    expect(reportSource).toContain("Persisted governed reports");
+    expect(reportSource).toContain("Governed exemption summary");
+    expect(reportSource).toContain("Persisted exemption reports");
     expect(reportSource).toContain("legacyStatutoryMaximum");
     expect(reportSource).toContain("operatorAccess.canManage");
     expect(reportSource).not.toContain("submissionPayload");
@@ -1127,5 +1202,24 @@ describe("consultant-facing screens", () => {
     expect(retrofitSource).toContain("trpc.retrofit.rankBuilding.useQuery");
     expect(overviewSource).not.toContain("@/server/");
     expect(overviewSource).toContain("building.governedSummary.retrofitSummary");
+  });
+
+  it("keeps active building workflow surfaces off raw payload debug output", () => {
+    const benchmarkingSource = readFileSync(
+      "C:\\Quoin\\src\\components\\building\\benchmarking-tab.tsx",
+      "utf8",
+    );
+    const bepsSource = readFileSync(
+      "C:\\Quoin\\src\\components\\building\\beps-tab.tsx",
+      "utf8",
+    );
+    const verificationSource = readFileSync(
+      "C:\\Quoin\\src\\components\\building\\verification-requests-tab.tsx",
+      "utf8",
+    );
+
+    expect(benchmarkingSource).not.toContain("submissionPayload");
+    expect(bepsSource).not.toContain("filingPayload");
+    expect(verificationSource).not.toContain("submissionPayload");
   });
 });

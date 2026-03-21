@@ -473,17 +473,20 @@ enum RetrofitConfidenceBand {
   HIGH
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 enum FinancingCaseType {
   SINGLE_CANDIDATE
   BUNDLE
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 enum FinancingCaseStatus {
   DRAFT
   ACTIVE
   ARCHIVED
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 enum FinancingPacketStatus {
   DRAFT
   GENERATED
@@ -504,6 +507,19 @@ enum PipelineStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum GovernedReportType {
+  COMPLIANCE_REPORT
+  EXEMPTION_REPORT
+}
+
+enum ReportArtifactStatus {
+  GENERATED
+}
+
+enum ReportArtifactExportFormat {
+  JSON
 }
 
 // ─── Models ─────────────────────────────────────────────────────────────────
@@ -549,6 +565,7 @@ model Organization {
   jobs                                Job[]
   buildingSourceReconciliations       BuildingSourceReconciliation[]
   meterSourceReconciliations          MeterSourceReconciliation[]
+  reportArtifacts                     ReportArtifact[]
 
   @@map("organizations")
 }
@@ -648,6 +665,7 @@ model Building {
   meterReconciliations                MeterSourceReconciliation[]
   auditLogs                           AuditLog[]
   jobs                                Job[]
+  reportArtifacts                     ReportArtifact[]
 
   @@unique([id, organizationId])
   @@index([organizationId])
@@ -817,6 +835,34 @@ model AuditLog {
   @@index([buildingId, timestamp(sort: Desc)])
   @@index([action, timestamp(sort: Desc)])
   @@map("audit_logs")
+}
+
+model ReportArtifact {
+  id                 String                      @id @default(cuid())
+  organizationId     String                      @map("organization_id")
+  buildingId         String                      @map("building_id")
+  reportType         GovernedReportType          @map("report_type")
+  version            Int
+  status             ReportArtifactStatus        @default(GENERATED)
+  reportHash         String                      @map("report_hash")
+  sourceSummaryHash  String                      @map("source_summary_hash")
+  sourceLineage      Json                        @default("{}") @map("source_lineage")
+  payload            Json
+  generatedAt        DateTime                    @default(now()) @map("generated_at")
+  latestExportedAt   DateTime?                   @map("latest_exported_at")
+  latestExportFormat ReportArtifactExportFormat? @map("latest_export_format")
+  createdByType      ActorType                   @map("created_by_type")
+  createdById        String?                     @map("created_by_id")
+  createdAt          DateTime                    @default(now()) @map("created_at")
+  updatedAt          DateTime                    @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([buildingId, reportType, version])
+  @@index([organizationId, buildingId, reportType, generatedAt(sort: Desc)])
+  @@index([organizationId, reportType, generatedAt(sort: Desc)])
+  @@map("report_artifacts")
 }
 
 model BuildingSourceReconciliation {
@@ -1709,6 +1755,7 @@ model RetrofitCandidate {
   @@map("retrofit_candidates")
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 model FinancingCase {
   id                                String              @id @default(cuid())
   organizationId                    String              @map("organization_id")
@@ -1739,6 +1786,7 @@ model FinancingCase {
   @@map("financing_cases")
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 model FinancingCaseCandidate {
   id                  String   @id @default(cuid())
   organizationId      String   @map("organization_id")
@@ -1758,6 +1806,7 @@ model FinancingCaseCandidate {
   @@map("financing_case_candidates")
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 model FinancingPacket {
   id               String                @id @default(cuid())
   organizationId   String                @map("organization_id")

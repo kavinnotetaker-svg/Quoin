@@ -2139,89 +2139,6 @@ async function main(): Promise<void> {
         },
       });
 
-  const existingFinancingCase = await prisma.financingCase.findFirst({
-    where: {
-      organizationId: org1.id,
-      buildingId: org1Buildings[1].id,
-      name: "L Street lighting financing case",
-    },
-    select: { id: true },
-  });
-
-  const financingCase = existingFinancingCase
-    ? await prisma.financingCase.update({
-        where: {
-          id: existingFinancingCase.id,
-        },
-        data: {
-          organizationId: org1.id,
-          buildingId: org1Buildings[1].id,
-          name: "L Street lighting financing case",
-          description: "Seeded financing case tied to the top-ranked LED retrofit candidate.",
-          caseType: "SINGLE_CANDIDATE",
-          status: "ACTIVE",
-          complianceCycle: "CYCLE_1",
-          targetFilingYear: 2026,
-          estimatedCapex: seededRetrofitCandidate.estimatedCapex,
-          estimatedAnnualSavingsKbtu: seededRetrofitCandidate.estimatedAnnualSavingsKbtu,
-          estimatedAnnualSavingsUsd: seededRetrofitCandidate.estimatedAnnualSavingsUsd,
-          estimatedAvoidedPenalty: 60000,
-          estimatedComplianceImprovementPct:
-            seededRetrofitCandidate.estimatedBepsImprovementPct,
-          casePayload: {
-            seeded: true,
-            note: "Structural financing case seed for Sprint 14 validation.",
-          },
-          createdByType: "SYSTEM",
-          createdById: "seed",
-        },
-      })
-    : await prisma.financingCase.create({
-        data: {
-          organizationId: org1.id,
-          buildingId: org1Buildings[1].id,
-          name: "L Street lighting financing case",
-          description: "Seeded financing case tied to the top-ranked LED retrofit candidate.",
-          caseType: "SINGLE_CANDIDATE",
-          status: "ACTIVE",
-          complianceCycle: "CYCLE_1",
-          targetFilingYear: 2026,
-          estimatedCapex: seededRetrofitCandidate.estimatedCapex,
-          estimatedAnnualSavingsKbtu: seededRetrofitCandidate.estimatedAnnualSavingsKbtu,
-          estimatedAnnualSavingsUsd: seededRetrofitCandidate.estimatedAnnualSavingsUsd,
-          estimatedAvoidedPenalty: 60000,
-          estimatedComplianceImprovementPct:
-            seededRetrofitCandidate.estimatedBepsImprovementPct,
-          casePayload: {
-            seeded: true,
-            note: "Structural financing case seed for Sprint 14 validation.",
-          },
-          createdByType: "SYSTEM",
-          createdById: "seed",
-        },
-      });
-
-  await prisma.financingCaseCandidate.upsert({
-    where: {
-      financingCaseId_retrofitCandidateId: {
-        financingCaseId: financingCase.id,
-        retrofitCandidateId: seededRetrofitCandidate.id,
-      },
-    },
-    update: {
-      organizationId: org1.id,
-      buildingId: org1Buildings[1].id,
-      sortOrder: 0,
-    },
-    create: {
-      organizationId: org1.id,
-      buildingId: org1Buildings[1].id,
-      financingCaseId: financingCase.id,
-      retrofitCandidateId: seededRetrofitCandidate.id,
-      sortOrder: 0,
-    },
-  });
-
   console.log("Seed complete:");
   console.log("  Rule Packages: 3");
   console.log("  Rule Versions: 3");
@@ -2237,7 +2154,6 @@ async function main(): Promise<void> {
   console.log("  BEPS ACP Agreements: 1");
   console.log("  PM Sync States: 1");
   console.log("  Retrofit Candidates: 1");
-  console.log("  Financing Cases: 1");
 }
 
 main()

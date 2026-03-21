@@ -1,5 +1,6 @@
 /**
- * AHRA (Affordable Housing Retrofit Accelerator) Eligibility Screener
+ * Deprecated legacy capital-structuring eligibility support.
+ * AHRA screener is retained for historical/internal reference only and not part of the active Quoin product surface.
  *
  * DCSEU program providing technical assistance + IRA HER rebates for
  * affordable multifamily buildings.

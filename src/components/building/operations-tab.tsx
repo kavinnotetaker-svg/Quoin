@@ -24,21 +24,18 @@ export function OperationsTab({ buildingId }: { buildingId: string }) {
     onSuccess: () => {
       utils.operations.listBuildingAnomalies.invalidate({ buildingId, limit: 50 });
       utils.building.get.invalidate({ id: buildingId });
-      utils.building.portfolioWorkflow.invalidate({ limit: 25 });
     },
   });
   const acknowledge = trpc.operations.acknowledge.useMutation({
     onSuccess: () => {
       utils.operations.listBuildingAnomalies.invalidate({ buildingId, limit: 50 });
       utils.building.get.invalidate({ id: buildingId });
-      utils.building.portfolioWorkflow.invalidate({ limit: 25 });
     },
   });
   const dismiss = trpc.operations.dismiss.useMutation({
     onSuccess: () => {
       utils.operations.listBuildingAnomalies.invalidate({ buildingId, limit: 50 });
       utils.building.get.invalidate({ id: buildingId });
-      utils.building.portfolioWorkflow.invalidate({ limit: 25 });
     },
   });
 

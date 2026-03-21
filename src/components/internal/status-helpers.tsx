@@ -11,6 +11,15 @@ export type SubmissionReadinessSurfaceStatus =
   | "READY_FOR_REVIEW"
   | "READY_TO_SUBMIT"
   | "SUBMITTED";
+export type WorklistTriageBucket =
+  | "COMPLIANCE_BLOCKER"
+  | "ARTIFACT_ATTENTION"
+  | "REVIEW_QUEUE"
+  | "SUBMISSION_QUEUE"
+  | "SYNC_ATTENTION"
+  | "OPERATIONAL_RISK"
+  | "RETROFIT_QUEUE"
+  | "MONITORING";
 
 export function toneClasses(tone: StatusTone) {
   switch (tone) {
@@ -271,6 +280,31 @@ export function getSubmissionReadinessDisplay(
       return { label: "Submitted", tone: "muted" as const };
     default:
       return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
+export function getWorklistTriageDisplay(
+  bucket: WorklistTriageBucket | string | null | undefined,
+) {
+  switch (bucket) {
+    case "COMPLIANCE_BLOCKER":
+      return { label: "Compliance blocker", tone: "danger" as const };
+    case "ARTIFACT_ATTENTION":
+      return { label: "Artifact attention", tone: "warning" as const };
+    case "REVIEW_QUEUE":
+      return { label: "Review queue", tone: "info" as const };
+    case "SUBMISSION_QUEUE":
+      return { label: "Submission queue", tone: "success" as const };
+    case "SYNC_ATTENTION":
+      return { label: "Sync attention", tone: "warning" as const };
+    case "OPERATIONAL_RISK":
+      return { label: "Operational risk", tone: "warning" as const };
+    case "RETROFIT_QUEUE":
+      return { label: "Retrofit queue", tone: "info" as const };
+    case "MONITORING":
+      return { label: "Monitoring", tone: "muted" as const };
+    default:
+      return { label: humanizeToken(bucket), tone: "muted" as const };
   }
 }
 

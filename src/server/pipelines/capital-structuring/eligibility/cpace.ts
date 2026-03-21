@@ -1,5 +1,6 @@
 /**
- * C-PACE (Commercial Property Assessed Clean Energy) Eligibility Screener
+ * Deprecated legacy capital-structuring eligibility support.
+ * C-PACE screener is retained for historical/internal reference only and not part of the active Quoin product surface.
  *
  * Property tax assessment-secured financing via DC Green Bank.
  * Rules from BEPSGuard Doc4: SIR > 1.0, combined LTV ≤ 90%,

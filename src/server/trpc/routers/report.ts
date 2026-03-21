@@ -24,6 +24,15 @@ import {
   type ArtifactExportFormat,
   type OperationalArtifactWorkflow,
 } from "@/server/compliance/compliance-artifacts";
+import {
+  createReportArtifact,
+  getLatestReportArtifact,
+  getReportArtifactWorkspace,
+  markReportArtifactExported,
+  renderReportArtifactExport,
+  type GovernedReportArtifactLineage,
+} from "@/server/compliance/report-artifacts";
+import { prisma } from "@/server/lib/db";
 
 /**
  * Report tRPC Router
@@ -482,6 +491,93 @@ const reportOutputSchema = z.object({
   ),
 });
 
+const reportArtifactLineageSchema = z.object({
+  penaltyRunId: z.string().nullable(),
+  benchmarkArtifactId: z.string().nullable(),
+  bepsArtifactId: z.string().nullable(),
+  benchmarkWorkflowId: z.string().nullable(),
+  bepsWorkflowId: z.string().nullable(),
+  benchmarkSourceRecordId: z.string().nullable(),
+  bepsSourceRecordId: z.string().nullable(),
+  lastReadinessEvaluatedAt: z.string().nullable(),
+  lastComplianceEvaluatedAt: z.string().nullable(),
+  lastArtifactGeneratedAt: z.string().nullable(),
+  lastArtifactFinalizedAt: z.string().nullable(),
+  lastSubmissionTransitionAt: z.string().nullable(),
+});
+
+const governedReportTypeSchema = z.enum([
+  "COMPLIANCE_REPORT",
+  "EXEMPTION_REPORT",
+]);
+
+const reportArtifactSummarySchema = z.object({
+  id: z.string(),
+  reportType: governedReportTypeSchema,
+  version: z.number(),
+  status: z.enum(["GENERATED"]),
+  reportHash: z.string(),
+  sourceSummaryHash: z.string(),
+  generatedAt: z.string(),
+  latestExportedAt: z.string().nullable(),
+  latestExportFormat: z.enum(["JSON"]).nullable(),
+  createdByType: z.enum(["SYSTEM", "USER"]),
+  createdById: z.string().nullable(),
+  sourceLineage: reportArtifactLineageSchema,
+});
+
+const reportArtifactWorkspaceSchema = z.object({
+  buildingId: z.string(),
+  reportType: governedReportTypeSchema,
+  latestArtifact: reportArtifactSummarySchema.nullable(),
+  history: z.array(reportArtifactSummarySchema),
+});
+
+const reportArtifactExportSchema = z.object({
+  artifactId: z.string(),
+  version: z.number(),
+  format: z.enum(["JSON"]),
+  exportedAt: z.string().nullable(),
+  fileName: z.string(),
+  contentType: z.string(),
+  content: z.string(),
+});
+
+type ComplianceReportOutput = z.infer<typeof reportOutputSchema>;
+
+function buildReportArtifactLineageFromGovernedSummary(
+  governedSummary: z.infer<typeof governedOperationalSummarySchema>,
+): GovernedReportArtifactLineage {
+  const penaltyRunId =
+    ((governedSummary.penaltySummary as { id?: string | null } | null)?.id ??
+      null);
+
+  return {
+    penaltyRunId,
+    benchmarkArtifactId:
+      governedSummary.artifactSummary.benchmark?.latestArtifactId ?? null,
+    bepsArtifactId:
+      governedSummary.artifactSummary.beps?.latestArtifactId ?? null,
+    benchmarkWorkflowId:
+      governedSummary.submissionSummary.benchmark?.id ?? null,
+    bepsWorkflowId: governedSummary.submissionSummary.beps?.id ?? null,
+    benchmarkSourceRecordId:
+      governedSummary.artifactSummary.benchmark?.sourceRecordId ?? null,
+    bepsSourceRecordId:
+      governedSummary.artifactSummary.beps?.sourceRecordId ?? null,
+    lastReadinessEvaluatedAt:
+      governedSummary.timestamps.lastReadinessEvaluatedAt,
+    lastComplianceEvaluatedAt:
+      governedSummary.timestamps.lastComplianceEvaluatedAt,
+    lastArtifactGeneratedAt:
+      governedSummary.timestamps.lastArtifactGeneratedAt,
+    lastArtifactFinalizedAt:
+      governedSummary.timestamps.lastArtifactFinalizedAt,
+    lastSubmissionTransitionAt:
+      governedSummary.timestamps.lastSubmissionTransitionAt,
+  };
+}
+
 function toExportFormat(value: ArtifactExportFormat | null) {
   return value;
 }
@@ -514,6 +610,380 @@ function buildArtifactEvidenceSection(workflow: OperationalArtifactWorkflow) {
         }
       : null,
     sourceContext: workflow.sourceContext,
+  };
+}
+
+function buildComplianceReportArtifactLineage(
+  report: ComplianceReportOutput,
+): GovernedReportArtifactLineage {
+  return {
+    penaltyRunId: report.evidencePackage.traceability.penaltyRunId,
+    benchmarkArtifactId:
+      report.evidencePackage.artifacts.benchmark.latestArtifact?.id ?? null,
+    bepsArtifactId:
+      report.evidencePackage.artifacts.beps.latestArtifact?.id ?? null,
+    benchmarkWorkflowId:
+      report.governedOperationalSummary.submissionSummary.benchmark?.id ?? null,
+    bepsWorkflowId:
+      report.governedOperationalSummary.submissionSummary.beps?.id ?? null,
+    benchmarkSourceRecordId:
+      report.evidencePackage.artifacts.benchmark.sourceRecordId,
+    bepsSourceRecordId: report.evidencePackage.artifacts.beps.sourceRecordId,
+    lastReadinessEvaluatedAt:
+      report.evidencePackage.traceability.lastReadinessEvaluatedAt,
+    lastComplianceEvaluatedAt:
+      report.evidencePackage.traceability.lastComplianceEvaluatedAt,
+    lastArtifactGeneratedAt:
+      report.evidencePackage.traceability.lastArtifactGeneratedAt,
+    lastArtifactFinalizedAt:
+      report.evidencePackage.traceability.lastArtifactFinalizedAt,
+    lastSubmissionTransitionAt:
+      report.evidencePackage.traceability.lastSubmissionTransitionAt,
+  };
+}
+
+async function buildComplianceReportOutput(params: {
+  tenantDb: {
+    building: any;
+    energyReading: any;
+    pipelineRun: any;
+    complianceSnapshot: any;
+  };
+  organizationId: string;
+  buildingId: string;
+}): Promise<ComplianceReportOutput> {
+  const building = await params.tenantDb.building.findUnique({
+    where: { id: params.buildingId },
+  });
+  if (!building) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Building not found",
+    });
+  }
+
+  const latestSnapshot = await getLatestComplianceSnapshot(params.tenantDb, {
+    buildingId: params.buildingId,
+  });
+  const [governedSummary, artifactWorkspace] = await Promise.all([
+    getBuildingGovernedOperationalSummary({
+      organizationId: params.organizationId,
+      buildingId: params.buildingId,
+    }),
+    getBuildingArtifactWorkspace({
+      organizationId: params.organizationId,
+      buildingId: params.buildingId,
+    }),
+  ]);
+  const penaltySummary = governedSummary.penaltySummary;
+
+  const twoYearsAgo = new Date();
+  twoYearsAgo.setMonth(twoYearsAgo.getMonth() - 24);
+
+  const readings: Array<{
+    id: string;
+    periodStart: Date;
+    periodEnd: Date;
+    consumptionKbtu: number;
+    meterType: string;
+    source: string;
+    meterId: string | null;
+    ingestedAt: Date;
+  }> = await params.tenantDb.energyReading.findMany({
+    where: {
+      buildingId: params.buildingId,
+      periodStart: { gte: twoYearsAgo },
+    },
+    orderBy: [{ periodStart: "asc" }, { ingestedAt: "desc" }, { id: "desc" }],
+    select: {
+      id: true,
+      periodStart: true,
+      periodEnd: true,
+      consumptionKbtu: true,
+      meterType: true,
+      source: true,
+      meterId: true,
+      ingestedAt: true,
+    },
+  });
+  const dedupedReadings = dedupeEnergyReadings(readings);
+
+  const runs: Array<{
+    id: string;
+    pipelineType: string;
+    status: string;
+    startedAt: Date | null;
+    completedAt: Date | null;
+  }> = await params.tenantDb.pipelineRun.findMany({
+    where: { buildingId: params.buildingId },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      pipelineType: true,
+      status: true,
+      startedAt: true,
+      completedAt: true,
+    },
+  });
+
+  const benchmarkEvidenceSection = buildArtifactEvidenceSection(
+    artifactWorkspace.benchmarkVerification,
+  );
+  const bepsEvidenceSection = buildArtifactEvidenceSection(
+    artifactWorkspace.bepsFiling,
+  );
+
+  return {
+    buildingId: building.id,
+    buildingName: building.name,
+    address: building.address,
+    generatedAt: new Date().toISOString(),
+    complianceData: {
+      energyStarScore: latestSnapshot?.energyStarScore ?? null,
+      siteEui: latestSnapshot?.siteEui ?? null,
+      sourceEui: latestSnapshot?.sourceEui ?? null,
+      weatherNormalizedSiteEui:
+        latestSnapshot?.weatherNormalizedSiteEui ?? null,
+      complianceStatus:
+        latestSnapshot?.complianceStatus ?? "PENDING_DATA",
+      complianceGap: latestSnapshot?.complianceGap ?? null,
+      estimatedPenalty: penaltySummary?.currentEstimatedPenalty ?? null,
+      dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
+      snapshotDate: latestSnapshot?.snapshotDate?.toISOString() ?? null,
+    },
+    governedPenalty: penaltySummary
+      ? {
+          status: penaltySummary.status,
+          currentEstimatedPenalty: penaltySummary.currentEstimatedPenalty,
+          calculatedAt: penaltySummary.calculatedAt,
+          basis: {
+            label: penaltySummary.basis.label,
+            explanation: penaltySummary.basis.explanation,
+          },
+          governingContext: {
+            filingYear: penaltySummary.governingContext.filingYear,
+            complianceCycle: penaltySummary.governingContext.complianceCycle,
+            ruleVersion: penaltySummary.governingContext.ruleVersion,
+            basisPathway: penaltySummary.governingContext.basisPathway,
+          },
+          timestamps: penaltySummary.timestamps,
+          scenarios: penaltySummary.scenarios.map((scenario) => ({
+            code: scenario.code,
+            label: scenario.label,
+            estimatedPenalty: scenario.estimatedPenalty,
+            deltaFromCurrent: scenario.deltaFromCurrent,
+          })),
+        }
+      : null,
+    governedOperationalSummary: governedSummary,
+    sections: {
+      compliance: {
+        readinessState: governedSummary.readinessSummary.state,
+        primaryStatus: governedSummary.complianceSummary.primaryStatus,
+        qaVerdict: governedSummary.complianceSummary.qaVerdict,
+        reasonSummary: governedSummary.complianceSummary.reasonSummary,
+        nextAction: governedSummary.readinessSummary.nextAction,
+        latestSnapshot: {
+          snapshotDate: latestSnapshot?.snapshotDate?.toISOString() ?? null,
+          energyStarScore: latestSnapshot?.energyStarScore ?? null,
+          siteEui: latestSnapshot?.siteEui ?? null,
+          sourceEui: latestSnapshot?.sourceEui ?? null,
+          weatherNormalizedSiteEui:
+            latestSnapshot?.weatherNormalizedSiteEui ?? null,
+          complianceGap: latestSnapshot?.complianceGap ?? null,
+          dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
+        },
+        benchmarkEvaluation:
+          governedSummary.complianceSummary.benchmark ?? null,
+        bepsEvaluation: governedSummary.complianceSummary.beps ?? null,
+      },
+      penalty: {
+        status: penaltySummary?.status ?? "INSUFFICIENT_CONTEXT",
+        currentEstimatedPenalty:
+          penaltySummary?.currentEstimatedPenalty ?? null,
+        calculatedAt: penaltySummary?.calculatedAt ?? null,
+        basisLabel:
+          penaltySummary?.basis.label ?? "No governed penalty run recorded",
+        basisExplanation:
+          penaltySummary?.basis.explanation ??
+          "Penalty exposure has not been derived from a governed penalty run for this building.",
+        filingYear: penaltySummary?.governingContext.filingYear ?? null,
+        complianceCycle:
+          penaltySummary?.governingContext.complianceCycle ?? null,
+        basisPathway: penaltySummary?.governingContext.basisPathway ?? null,
+        scenarios: (penaltySummary?.scenarios ?? []).map((scenario) => ({
+          code: scenario.code,
+          label: scenario.label,
+          estimatedPenalty: scenario.estimatedPenalty,
+          deltaFromCurrent: scenario.deltaFromCurrent,
+        })),
+      },
+      artifacts: {
+        benchmark: {
+          latestArtifactStatus: benchmarkEvidenceSection.artifactStatus,
+          workflowState:
+            benchmarkEvidenceSection.workflow?.state ?? "NOT_STARTED",
+          disposition: benchmarkEvidenceSection.disposition,
+          lastGeneratedAt:
+            benchmarkEvidenceSection.latestArtifact?.generatedAt ?? null,
+          lastFinalizedAt:
+            benchmarkEvidenceSection.latestArtifact?.finalizedAt ?? null,
+          lastExportedAt:
+            benchmarkEvidenceSection.latestExport?.exportedAt ?? null,
+          lastExportFormat:
+            benchmarkEvidenceSection.latestExport?.format ?? null,
+          blockersCount: benchmarkEvidenceSection.blockersCount,
+          warningCount: benchmarkEvidenceSection.warningCount,
+        },
+        beps: {
+          latestArtifactStatus: bepsEvidenceSection.artifactStatus,
+          workflowState: bepsEvidenceSection.workflow?.state ?? "NOT_STARTED",
+          disposition: bepsEvidenceSection.disposition,
+          lastGeneratedAt:
+            bepsEvidenceSection.latestArtifact?.generatedAt ?? null,
+          lastFinalizedAt:
+            bepsEvidenceSection.latestArtifact?.finalizedAt ?? null,
+          lastExportedAt: bepsEvidenceSection.latestExport?.exportedAt ?? null,
+          lastExportFormat: bepsEvidenceSection.latestExport?.format ?? null,
+          blockersCount: bepsEvidenceSection.blockersCount,
+          warningCount: bepsEvidenceSection.warningCount,
+        },
+      },
+      sourceData: {
+        reconciliationStatus:
+          governedSummary.reconciliationSummary.status ?? null,
+        canonicalSource:
+          governedSummary.reconciliationSummary.canonicalSource ?? null,
+        conflictCount: governedSummary.reconciliationSummary.conflictCount,
+        incompleteCount:
+          governedSummary.reconciliationSummary.incompleteCount,
+        lastReconciledAt:
+          governedSummary.reconciliationSummary.lastReconciledAt,
+        runtimeNeedsAttention: governedSummary.runtimeSummary.needsAttention,
+        runtimeAttentionCount: governedSummary.runtimeSummary.attentionCount,
+        runtimeNextActionTitle:
+          governedSummary.runtimeSummary.nextAction?.title ?? null,
+        runtimeNextActionReason:
+          governedSummary.runtimeSummary.nextAction?.reason ?? null,
+        portfolioManagerState:
+          governedSummary.runtimeSummary.portfolioManager.currentState,
+        greenButtonState:
+          governedSummary.runtimeSummary.greenButton.currentState,
+      },
+      anomalyRisk: {
+        activeCount: governedSummary.anomalySummary.activeCount,
+        highSeverityCount: governedSummary.anomalySummary.highSeverityCount,
+        totalEstimatedEnergyImpactKbtu:
+          governedSummary.anomalySummary.totalEstimatedEnergyImpactKbtu,
+        totalEstimatedPenaltyImpactUsd:
+          governedSummary.anomalySummary.totalEstimatedPenaltyImpactUsd,
+        penaltyImpactStatus:
+          governedSummary.anomalySummary.penaltyImpactStatus,
+        highestPriority:
+          governedSummary.anomalySummary.highestPriority ?? null,
+        latestDetectedAt:
+          governedSummary.anomalySummary.latestDetectedAt,
+        topFindings: governedSummary.anomalySummary.topAnomalies.map(
+          (anomaly) => ({
+            id: anomaly.id,
+            title: anomaly.title,
+            severity: anomaly.severity,
+            confidenceBand: anomaly.confidenceBand,
+            explanation: anomaly.explanation,
+            estimatedEnergyImpactKbtu:
+              anomaly.estimatedEnergyImpactKbtu,
+            estimatedPenaltyImpactUsd:
+              anomaly.estimatedPenaltyImpactUsd,
+            penaltyImpactStatus: anomaly.penaltyImpactStatus,
+          }),
+        ),
+      },
+      retrofits: {
+        activeCount: governedSummary.retrofitSummary.activeCount,
+        highestPriorityBand:
+          governedSummary.retrofitSummary.highestPriorityBand,
+        topOpportunity: governedSummary.retrofitSummary.topOpportunity
+          ? {
+              candidateId:
+                governedSummary.retrofitSummary.topOpportunity.candidateId,
+              name: governedSummary.retrofitSummary.topOpportunity.name,
+              priorityBand:
+                governedSummary.retrofitSummary.topOpportunity.priorityBand,
+              priorityScore:
+                governedSummary.retrofitSummary.topOpportunity.priorityScore,
+              estimatedAvoidedPenalty:
+                governedSummary.retrofitSummary.topOpportunity
+                  .estimatedAvoidedPenalty,
+              estimatedAvoidedPenaltyStatus:
+                governedSummary.retrofitSummary.topOpportunity
+                  .estimatedAvoidedPenaltyStatus,
+              estimatedOperationalRiskReductionPenalty:
+                governedSummary.retrofitSummary.topOpportunity
+                  .estimatedOperationalRiskReduction.penaltyImpactUsd,
+              basisSummary:
+                governedSummary.retrofitSummary.topOpportunity.basis.summary,
+            }
+          : null,
+        opportunities: governedSummary.retrofitSummary.opportunities.map(
+          (opportunity) => ({
+            candidateId: opportunity.candidateId,
+            name: opportunity.name,
+            priorityBand: opportunity.priorityBand,
+            priorityScore: opportunity.priorityScore,
+            estimatedAvoidedPenalty: opportunity.estimatedAvoidedPenalty,
+            estimatedAvoidedPenaltyStatus:
+              opportunity.estimatedAvoidedPenaltyStatus,
+            netProjectCost: opportunity.netProjectCost,
+            estimatedOperationalRiskReductionPenalty:
+              opportunity.estimatedOperationalRiskReduction.penaltyImpactUsd,
+            basisSummary: opportunity.basis.summary,
+          }),
+        ),
+      },
+    },
+    evidencePackage: {
+      packageVersion: "governed-report-evidence-v1",
+      generatedAt: new Date().toISOString(),
+      traceability: {
+        readinessState: governedSummary.readinessSummary.state,
+        primaryStatus: governedSummary.complianceSummary.primaryStatus,
+        penaltyRunId: penaltySummary?.id ?? null,
+        penaltyCalculatedAt: penaltySummary?.calculatedAt ?? null,
+        reconciliationStatus:
+          governedSummary.reconciliationSummary.status ?? null,
+        canonicalSource:
+          governedSummary.reconciliationSummary.canonicalSource ?? null,
+        lastReadinessEvaluatedAt:
+          governedSummary.timestamps.lastReadinessEvaluatedAt,
+        lastComplianceEvaluatedAt:
+          governedSummary.timestamps.lastComplianceEvaluatedAt,
+        lastArtifactGeneratedAt:
+          governedSummary.timestamps.lastArtifactGeneratedAt,
+        lastArtifactFinalizedAt:
+          governedSummary.timestamps.lastArtifactFinalizedAt,
+        lastSubmissionTransitionAt:
+          governedSummary.timestamps.lastSubmissionTransitionAt,
+      },
+      artifacts: {
+        benchmark: benchmarkEvidenceSection,
+        beps: bepsEvidenceSection,
+      },
+    },
+    energyHistory: dedupedReadings.map((r: (typeof dedupedReadings)[number]) => ({
+      periodStart: r.periodStart.toISOString(),
+      periodEnd: r.periodEnd.toISOString(),
+      consumptionKbtu: r.consumptionKbtu,
+      meterType: r.meterType,
+      source: r.source,
+    })),
+    pipelineRuns: runs.map((r: (typeof runs)[number]) => ({
+      id: r.id,
+      pipelineType: r.pipelineType,
+      status: r.status,
+      startedAt: r.startedAt?.toISOString() ?? null,
+      completedAt: r.completedAt?.toISOString() ?? null,
+    })),
   };
 }
 
@@ -589,6 +1059,233 @@ const exemptionReportSchema = z.object({
     estimatedProcessingDays: z.number(),
   }),
 });
+
+type ExemptionReportOutput = z.infer<typeof exemptionReportSchema>;
+
+async function buildExemptionReportOutput(params: {
+  tenantDb: {
+    building: any;
+    energyReading: any;
+    complianceSnapshot: any;
+  };
+  organizationId: string;
+  buildingId: string;
+  occupancyPct?: number | null;
+  financialDistress?: FinancialDistressIndicators;
+}): Promise<{
+  report: ExemptionReportOutput;
+  sourceLineage: GovernedReportArtifactLineage;
+}> {
+  const building = await params.tenantDb.building.findUnique({
+    where: { id: params.buildingId },
+  });
+  if (!building) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Building not found",
+    });
+  }
+
+  const latestSnapshot = await getLatestComplianceSnapshot(params.tenantDb, {
+    buildingId: params.buildingId,
+  });
+  const governedSummary = await getBuildingGovernedOperationalSummary({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+  });
+  const penaltySummary = governedSummary.penaltySummary;
+
+  const snapshots = await params.tenantDb.complianceSnapshot.findMany({
+    where: { buildingId: params.buildingId },
+    orderBy: LATEST_SNAPSHOT_ORDER,
+    take: 12,
+    select: {
+      snapshotDate: true,
+      energyStarScore: true,
+      siteEui: true,
+      complianceStatus: true,
+    },
+  });
+
+  const threeYearsAgo = new Date();
+  threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+
+  const readings: Array<{
+    id: string;
+    periodStart: Date;
+    consumptionKbtu: number;
+    meterType: string;
+    meterId: string | null;
+    periodEnd: Date;
+    source: string;
+    ingestedAt: Date;
+  }> = await params.tenantDb.energyReading.findMany({
+    where: {
+      buildingId: params.buildingId,
+      periodStart: { gte: threeYearsAgo },
+    },
+    orderBy: [{ periodStart: "asc" }, { ingestedAt: "desc" }, { id: "desc" }],
+    select: {
+      id: true,
+      periodStart: true,
+      consumptionKbtu: true,
+      meterType: true,
+      meterId: true,
+      periodEnd: true,
+      source: true,
+      ingestedAt: true,
+    },
+  });
+  const dedupedReadings = dedupeEnergyReadings(readings);
+
+  const occupancyPct =
+    params.occupancyPct ??
+    (building.occupancyRate ? building.occupancyRate * 100 : null);
+
+  const financialIndicators: FinancialDistressIndicators =
+    params.financialDistress ?? {
+      inForeclosure: building.hasFinancialDistress,
+      inBankruptcy: false,
+      negativeNetOperatingIncome: false,
+      taxDelinquent: false,
+    };
+
+  const exemptionResult = screenForExemptions({
+    baselineOccupancyPct: occupancyPct,
+    financialDistressIndicators: financialIndicators,
+    grossSquareFeet: building.grossSquareFeet,
+    propertyType: building.propertyType,
+    yearBuilt: building.yearBuilt,
+  });
+
+  const occupancyApplicable =
+    exemptionResult.qualifiedExemptions.includes("LOW_OCCUPANCY");
+  const occupancyEvidence: string[] = [];
+  if (occupancyPct !== null) {
+    occupancyEvidence.push(
+      `Reported baseline occupancy: ${occupancyPct}% (threshold: <50%)`,
+    );
+  }
+  if (occupancyApplicable) {
+    occupancyEvidence.push(
+      "Building qualifies for the Whole-Cycle Low Occupancy Exemption under the 2024 BEPS amendments.",
+    );
+    occupancyEvidence.push(
+      "Owner must submit occupancy records demonstrating <50% occupancy during the baseline period (2019-2021).",
+    );
+  }
+
+  const financialApplicable =
+    exemptionResult.qualifiedExemptions.includes("FINANCIAL_DISTRESS");
+  const financialEvidence: string[] = [];
+  if (financialIndicators.inForeclosure) {
+    financialEvidence.push("Property is in active foreclosure proceedings.");
+  }
+  if (financialIndicators.inBankruptcy) {
+    financialEvidence.push("Owner has filed for bankruptcy protection.");
+  }
+  if (financialIndicators.negativeNetOperatingIncome) {
+    financialEvidence.push(
+      "Property reports negative Net Operating Income (NOI).",
+    );
+  }
+  if (financialIndicators.taxDelinquent) {
+    financialEvidence.push("Property has delinquent property tax payments.");
+  }
+  if (financialApplicable) {
+    financialEvidence.push(
+      "Owner must submit financial documentation (tax returns, court filings, NOI statements) to DOEE.",
+    );
+  }
+
+  const legacyStatutoryMaximum = building.maxPenaltyExposure;
+  const currentPenalty = penaltySummary?.currentEstimatedPenalty ?? null;
+
+  const checklist = buildFilingChecklist({
+    hasOccupancyData: occupancyPct !== null,
+    hasFinancialData: financialApplicable,
+    hasEnergyHistory: dedupedReadings.length >= 12,
+    hasComplianceSnapshot: latestSnapshot !== null,
+    occupancyApplicable,
+    financialApplicable,
+    recentConstructionApplicable:
+      exemptionResult.qualifiedExemptions.includes("RECENT_CONSTRUCTION"),
+  });
+
+  return {
+    report: {
+      buildingId: building.id,
+      buildingName: building.name,
+      address: building.address,
+      grossSquareFeet: building.grossSquareFeet,
+      propertyType: building.propertyType,
+      yearBuilt: building.yearBuilt,
+      generatedAt: new Date().toISOString(),
+      complianceStatus: latestSnapshot?.complianceStatus ?? "PENDING_DATA",
+      exemptionScreening: {
+        eligible: exemptionResult.eligible,
+        qualifiedExemptions: exemptionResult.qualifiedExemptions,
+        details: exemptionResult.details,
+        missingData: exemptionResult.missingData,
+      },
+      occupancyExemption: {
+        applicable: occupancyApplicable,
+        baselineOccupancyPct: occupancyPct,
+        occupancyThreshold: 50,
+        baselineYears: "2019-2021",
+        supportingEvidence: occupancyEvidence,
+      },
+      financialExemption: {
+        applicable: financialApplicable,
+        indicators: financialIndicators,
+        supportingEvidence: financialEvidence,
+      },
+      penaltyContext: {
+        legacyStatutoryMaximum,
+        currentEstimateStatus:
+          penaltySummary?.status ?? "INSUFFICIENT_CONTEXT",
+        currentEstimatedPenalty: currentPenalty,
+        currentEstimateBasis:
+          penaltySummary?.basis.label ?? "No governed penalty run recorded",
+        penaltySavingsIfExempt: currentPenalty,
+      },
+      supportingSnapshots: snapshots.map(
+        (snapshot: {
+          snapshotDate: Date;
+          energyStarScore: number | null;
+          siteEui: number | null;
+          complianceStatus: string;
+        }) => ({
+          snapshotDate: snapshot.snapshotDate.toISOString(),
+          energyStarScore: snapshot.energyStarScore,
+          siteEui: snapshot.siteEui,
+          complianceStatus: snapshot.complianceStatus,
+        }),
+      ),
+      energyHistory: dedupedReadings.map(
+        (reading: (typeof dedupedReadings)[number]) => ({
+          periodStart: reading.periodStart.toISOString(),
+          consumptionKbtu: reading.consumptionKbtu,
+          meterType: reading.meterType,
+        }),
+      ),
+      filingChecklist: checklist,
+      doeeSubmissionGuidance: {
+        deadline: "2026-12-31",
+        submissionUrl:
+          "https://doee.dc.gov/service/beps-exemption-application",
+        requiredDocuments: buildRequiredDocuments(
+          occupancyApplicable,
+          financialApplicable,
+        ),
+        estimatedProcessingDays: 45,
+      },
+    },
+    sourceLineage: buildReportArtifactLineageFromGovernedSummary(
+      governedSummary,
+    ),
+  };
+}
 
 export const reportRouter = router({
   publicationOverview: tenantProcedure.query(async ({ ctx }) => ({
@@ -674,16 +1371,52 @@ export const reportRouter = router({
       }),
     ),
 
-  /**
-   * Generate compliance report data for a building.
-   * Assembles all data needed for the HTML/PDF template.
-   */
-  getComplianceReport: tenantProcedure
+  getComplianceReportArtifacts: tenantProcedure
     .input(z.object({ buildingId: z.string() }))
-    .output(reportOutputSchema)
-    .query(async ({ ctx, input }) => {
+    .output(reportArtifactWorkspaceSchema)
+    .query(async ({ ctx, input }) =>
+      getReportArtifactWorkspace({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportType: "COMPLIANCE_REPORT",
+      }),
+    ),
+
+  generateComplianceReportArtifact: tenantProcedure
+    .input(z.object({ buildingId: z.string() }))
+    .output(reportArtifactSummarySchema)
+    .mutation(async ({ ctx, input }) => {
+      const report = await buildComplianceReportOutput({
+        tenantDb: ctx.tenantDb,
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+      });
+
+      return createReportArtifact({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportType: "COMPLIANCE_REPORT",
+        payload: report,
+        sourceLineage: buildComplianceReportArtifactLineage(report),
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
+    }),
+
+  exportComplianceReportArtifact: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        artifactId: z.string(),
+        format: z.enum(["JSON"]).default("JSON"),
+      }),
+    )
+    .output(reportArtifactExportSchema)
+    .mutation(async ({ ctx, input }) => {
       const building = await ctx.tenantDb.building.findUnique({
         where: { id: input.buildingId },
+        select: { id: true, name: true },
       });
       if (!building) {
         throw new TRPCError({
@@ -692,333 +1425,141 @@ export const reportRouter = router({
         });
       }
 
-      const latestSnapshot = await getLatestComplianceSnapshot(ctx.tenantDb, {
+      const artifact = await getLatestReportArtifact({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportType: "COMPLIANCE_REPORT",
+      });
+      if (!artifact || artifact.id !== input.artifactId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Report artifact not found",
+        });
+      }
+
+      const exportedArtifact = await markReportArtifactExported({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        artifactId: input.artifactId,
+        format: input.format,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
+      });
+
+      return renderReportArtifactExport({
+        buildingName: building.name,
+        artifact: exportedArtifact,
+        format: input.format,
+      });
+    }),
+
+  getExemptionReportArtifacts: tenantProcedure
+    .input(z.object({ buildingId: z.string() }))
+    .output(reportArtifactWorkspaceSchema)
+    .query(async ({ ctx, input }) =>
+      getReportArtifactWorkspace({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportType: "EXEMPTION_REPORT",
+      }),
+    ),
+
+  generateExemptionReportArtifact: tenantProcedure
+    .input(z.object({ buildingId: z.string() }))
+    .output(reportArtifactSummarySchema)
+    .mutation(async ({ ctx, input }) => {
+      const { report, sourceLineage } = await buildExemptionReportOutput({
+        tenantDb: ctx.tenantDb,
+        organizationId: ctx.organizationId,
         buildingId: input.buildingId,
       });
-      const [governedSummary, artifactWorkspace] = await Promise.all([
-        getBuildingGovernedOperationalSummary({
-          organizationId: ctx.organizationId,
-          buildingId: input.buildingId,
-        }),
-        getBuildingArtifactWorkspace({
-          organizationId: ctx.organizationId,
-          buildingId: input.buildingId,
-        }),
-      ]);
-      const penaltySummary = governedSummary.penaltySummary;
 
-      const twoYearsAgo = new Date();
-      twoYearsAgo.setMonth(twoYearsAgo.getMonth() - 24);
-
-      const readings = await ctx.tenantDb.energyReading.findMany({
-        where: {
-          buildingId: input.buildingId,
-          periodStart: { gte: twoYearsAgo },
-        },
-        orderBy: [{ periodStart: "asc" }, { ingestedAt: "desc" }, { id: "desc" }],
-        select: {
-          id: true,
-          periodStart: true,
-          periodEnd: true,
-          consumptionKbtu: true,
-          meterType: true,
-          source: true,
-          meterId: true,
-          ingestedAt: true,
-        },
+      return createReportArtifact({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportType: "EXEMPTION_REPORT",
+        payload: report,
+        sourceLineage,
+        createdByType: "USER",
+        createdById: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
-      const dedupedReadings = dedupeEnergyReadings(readings);
+    }),
 
-      const runs = await ctx.tenantDb.pipelineRun.findMany({
-        where: { buildingId: input.buildingId },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        select: {
-          id: true,
-          pipelineType: true,
-          status: true,
-          startedAt: true,
-          completedAt: true,
-        },
+  exportExemptionReportArtifact: tenantProcedure
+    .input(
+      z.object({
+        buildingId: z.string(),
+        artifactId: z.string(),
+        format: z.enum(["JSON"]).default("JSON"),
+      }),
+    )
+    .output(reportArtifactExportSchema)
+    .mutation(async ({ ctx, input }) => {
+      const building = await ctx.tenantDb.building.findUnique({
+        where: { id: input.buildingId },
+        select: { id: true, name: true },
+      });
+      if (!building) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Building not found",
+        });
+      }
+
+      const artifact = await getLatestReportArtifact({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportType: "EXEMPTION_REPORT",
+      });
+      if (!artifact || artifact.id !== input.artifactId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Report artifact not found",
+        });
+      }
+
+      const exportedArtifact = await markReportArtifactExported({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        artifactId: input.artifactId,
+        format: input.format,
+        actorType: "USER",
+        actorId: ctx.clerkUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
 
-      const benchmarkEvidenceSection = buildArtifactEvidenceSection(
-        artifactWorkspace.benchmarkVerification,
-      );
-      const bepsEvidenceSection = buildArtifactEvidenceSection(
-        artifactWorkspace.bepsFiling,
-      );
-
-      return {
-        buildingId: building.id,
+      return renderReportArtifactExport({
         buildingName: building.name,
-        address: building.address,
-        generatedAt: new Date().toISOString(),
-        complianceData: {
-          energyStarScore: latestSnapshot?.energyStarScore ?? null,
-          siteEui: latestSnapshot?.siteEui ?? null,
-          sourceEui: latestSnapshot?.sourceEui ?? null,
-          weatherNormalizedSiteEui:
-            latestSnapshot?.weatherNormalizedSiteEui ?? null,
-          complianceStatus:
-            latestSnapshot?.complianceStatus ?? "PENDING_DATA",
-          complianceGap: latestSnapshot?.complianceGap ?? null,
-          estimatedPenalty: penaltySummary?.currentEstimatedPenalty ?? null,
-          dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
-          snapshotDate: latestSnapshot?.snapshotDate?.toISOString() ?? null,
-        },
-        governedPenalty: penaltySummary
-          ? {
-              status: penaltySummary.status,
-              currentEstimatedPenalty: penaltySummary.currentEstimatedPenalty,
-              calculatedAt: penaltySummary.calculatedAt,
-              basis: {
-                label: penaltySummary.basis.label,
-                explanation: penaltySummary.basis.explanation,
-              },
-              governingContext: {
-                filingYear: penaltySummary.governingContext.filingYear,
-                complianceCycle: penaltySummary.governingContext.complianceCycle,
-                ruleVersion: penaltySummary.governingContext.ruleVersion,
-                basisPathway: penaltySummary.governingContext.basisPathway,
-              },
-              timestamps: penaltySummary.timestamps,
-              scenarios: penaltySummary.scenarios.map((scenario) => ({
-                code: scenario.code,
-                label: scenario.label,
-                estimatedPenalty: scenario.estimatedPenalty,
-                deltaFromCurrent: scenario.deltaFromCurrent,
-              })),
-            }
-          : null,
-        governedOperationalSummary: governedSummary,
-        sections: {
-          compliance: {
-            readinessState: governedSummary.readinessSummary.state,
-            primaryStatus: governedSummary.complianceSummary.primaryStatus,
-            qaVerdict: governedSummary.complianceSummary.qaVerdict,
-            reasonSummary: governedSummary.complianceSummary.reasonSummary,
-            nextAction: governedSummary.readinessSummary.nextAction,
-            latestSnapshot: {
-              snapshotDate: latestSnapshot?.snapshotDate?.toISOString() ?? null,
-              energyStarScore: latestSnapshot?.energyStarScore ?? null,
-              siteEui: latestSnapshot?.siteEui ?? null,
-              sourceEui: latestSnapshot?.sourceEui ?? null,
-              weatherNormalizedSiteEui:
-                latestSnapshot?.weatherNormalizedSiteEui ?? null,
-              complianceGap: latestSnapshot?.complianceGap ?? null,
-              dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
-            },
-            benchmarkEvaluation:
-              governedSummary.complianceSummary.benchmark ?? null,
-            bepsEvaluation: governedSummary.complianceSummary.beps ?? null,
-          },
-          penalty: {
-            status: penaltySummary?.status ?? "INSUFFICIENT_CONTEXT",
-            currentEstimatedPenalty:
-              penaltySummary?.currentEstimatedPenalty ?? null,
-            calculatedAt: penaltySummary?.calculatedAt ?? null,
-            basisLabel:
-              penaltySummary?.basis.label ?? "No governed penalty run recorded",
-            basisExplanation:
-              penaltySummary?.basis.explanation ??
-              "Penalty exposure has not been derived from a governed penalty run for this building.",
-            filingYear: penaltySummary?.governingContext.filingYear ?? null,
-            complianceCycle:
-              penaltySummary?.governingContext.complianceCycle ?? null,
-            basisPathway: penaltySummary?.governingContext.basisPathway ?? null,
-            scenarios: (penaltySummary?.scenarios ?? []).map((scenario) => ({
-              code: scenario.code,
-              label: scenario.label,
-              estimatedPenalty: scenario.estimatedPenalty,
-              deltaFromCurrent: scenario.deltaFromCurrent,
-            })),
-          },
-          artifacts: {
-            benchmark: {
-              latestArtifactStatus: benchmarkEvidenceSection.artifactStatus,
-              workflowState:
-                benchmarkEvidenceSection.workflow?.state ?? "NOT_STARTED",
-              disposition: benchmarkEvidenceSection.disposition,
-              lastGeneratedAt:
-                benchmarkEvidenceSection.latestArtifact?.generatedAt ?? null,
-              lastFinalizedAt:
-                benchmarkEvidenceSection.latestArtifact?.finalizedAt ?? null,
-              lastExportedAt:
-                benchmarkEvidenceSection.latestExport?.exportedAt ?? null,
-              lastExportFormat:
-                benchmarkEvidenceSection.latestExport?.format ?? null,
-              blockersCount: benchmarkEvidenceSection.blockersCount,
-              warningCount: benchmarkEvidenceSection.warningCount,
-            },
-            beps: {
-              latestArtifactStatus: bepsEvidenceSection.artifactStatus,
-              workflowState: bepsEvidenceSection.workflow?.state ?? "NOT_STARTED",
-              disposition: bepsEvidenceSection.disposition,
-              lastGeneratedAt:
-                bepsEvidenceSection.latestArtifact?.generatedAt ?? null,
-              lastFinalizedAt:
-                bepsEvidenceSection.latestArtifact?.finalizedAt ?? null,
-              lastExportedAt: bepsEvidenceSection.latestExport?.exportedAt ?? null,
-              lastExportFormat: bepsEvidenceSection.latestExport?.format ?? null,
-              blockersCount: bepsEvidenceSection.blockersCount,
-              warningCount: bepsEvidenceSection.warningCount,
-            },
-          },
-          sourceData: {
-            reconciliationStatus:
-              governedSummary.reconciliationSummary.status ?? null,
-            canonicalSource:
-              governedSummary.reconciliationSummary.canonicalSource ?? null,
-            conflictCount: governedSummary.reconciliationSummary.conflictCount,
-            incompleteCount:
-              governedSummary.reconciliationSummary.incompleteCount,
-            lastReconciledAt:
-              governedSummary.reconciliationSummary.lastReconciledAt,
-            runtimeNeedsAttention: governedSummary.runtimeSummary.needsAttention,
-            runtimeAttentionCount: governedSummary.runtimeSummary.attentionCount,
-            runtimeNextActionTitle:
-              governedSummary.runtimeSummary.nextAction?.title ?? null,
-            runtimeNextActionReason:
-              governedSummary.runtimeSummary.nextAction?.reason ?? null,
-            portfolioManagerState:
-              governedSummary.runtimeSummary.portfolioManager.currentState,
-            greenButtonState:
-              governedSummary.runtimeSummary.greenButton.currentState,
-          },
-          anomalyRisk: {
-            activeCount: governedSummary.anomalySummary.activeCount,
-            highSeverityCount: governedSummary.anomalySummary.highSeverityCount,
-            totalEstimatedEnergyImpactKbtu:
-              governedSummary.anomalySummary.totalEstimatedEnergyImpactKbtu,
-            totalEstimatedPenaltyImpactUsd:
-              governedSummary.anomalySummary.totalEstimatedPenaltyImpactUsd,
-            penaltyImpactStatus:
-              governedSummary.anomalySummary.penaltyImpactStatus,
-            highestPriority:
-              governedSummary.anomalySummary.highestPriority ?? null,
-            latestDetectedAt:
-              governedSummary.anomalySummary.latestDetectedAt,
-            topFindings: governedSummary.anomalySummary.topAnomalies.map(
-              (anomaly) => ({
-                id: anomaly.id,
-                title: anomaly.title,
-                severity: anomaly.severity,
-                confidenceBand: anomaly.confidenceBand,
-                explanation: anomaly.explanation,
-                estimatedEnergyImpactKbtu:
-                  anomaly.estimatedEnergyImpactKbtu,
-                estimatedPenaltyImpactUsd:
-                  anomaly.estimatedPenaltyImpactUsd,
-                penaltyImpactStatus: anomaly.penaltyImpactStatus,
-              }),
-            ),
-          },
-          retrofits: {
-            activeCount: governedSummary.retrofitSummary.activeCount,
-            highestPriorityBand:
-              governedSummary.retrofitSummary.highestPriorityBand,
-            topOpportunity: governedSummary.retrofitSummary.topOpportunity
-              ? {
-                  candidateId:
-                    governedSummary.retrofitSummary.topOpportunity.candidateId,
-                  name: governedSummary.retrofitSummary.topOpportunity.name,
-                  priorityBand:
-                    governedSummary.retrofitSummary.topOpportunity.priorityBand,
-                  priorityScore:
-                    governedSummary.retrofitSummary.topOpportunity.priorityScore,
-                  estimatedAvoidedPenalty:
-                    governedSummary.retrofitSummary.topOpportunity
-                      .estimatedAvoidedPenalty,
-                  estimatedAvoidedPenaltyStatus:
-                    governedSummary.retrofitSummary.topOpportunity
-                      .estimatedAvoidedPenaltyStatus,
-                  estimatedOperationalRiskReductionPenalty:
-                    governedSummary.retrofitSummary.topOpportunity
-                      .estimatedOperationalRiskReduction.penaltyImpactUsd,
-                  basisSummary:
-                    governedSummary.retrofitSummary.topOpportunity.basis.summary,
-                }
-              : null,
-            opportunities: governedSummary.retrofitSummary.opportunities.map(
-              (opportunity) => ({
-                candidateId: opportunity.candidateId,
-                name: opportunity.name,
-                priorityBand: opportunity.priorityBand,
-                priorityScore: opportunity.priorityScore,
-                estimatedAvoidedPenalty: opportunity.estimatedAvoidedPenalty,
-                estimatedAvoidedPenaltyStatus:
-                  opportunity.estimatedAvoidedPenaltyStatus,
-                netProjectCost: opportunity.netProjectCost,
-                estimatedOperationalRiskReductionPenalty:
-                  opportunity.estimatedOperationalRiskReduction.penaltyImpactUsd,
-                basisSummary: opportunity.basis.summary,
-              }),
-            ),
-          },
-        },
-        evidencePackage: {
-          packageVersion: "governed-report-evidence-v1",
-          generatedAt: new Date().toISOString(),
-          traceability: {
-            readinessState: governedSummary.readinessSummary.state,
-            primaryStatus: governedSummary.complianceSummary.primaryStatus,
-            penaltyRunId: penaltySummary?.id ?? null,
-            penaltyCalculatedAt: penaltySummary?.calculatedAt ?? null,
-            reconciliationStatus:
-              governedSummary.reconciliationSummary.status ?? null,
-            canonicalSource:
-              governedSummary.reconciliationSummary.canonicalSource ?? null,
-            lastReadinessEvaluatedAt:
-              governedSummary.timestamps.lastReadinessEvaluatedAt,
-            lastComplianceEvaluatedAt:
-              governedSummary.timestamps.lastComplianceEvaluatedAt,
-            lastArtifactGeneratedAt:
-              governedSummary.timestamps.lastArtifactGeneratedAt,
-            lastArtifactFinalizedAt:
-              governedSummary.timestamps.lastArtifactFinalizedAt,
-            lastSubmissionTransitionAt:
-              governedSummary.timestamps.lastSubmissionTransitionAt,
-          },
-          artifacts: {
-            benchmark: benchmarkEvidenceSection,
-            beps: bepsEvidenceSection,
-          },
-        },
-        energyHistory: dedupedReadings.map(
-          (r: {
-            id: string;
-            periodStart: Date;
-            periodEnd: Date;
-            consumptionKbtu: number;
-            meterType: string;
-            source: string;
-            meterId: string | null;
-            ingestedAt: Date;
-          }) => ({
-            periodStart: r.periodStart.toISOString(),
-            periodEnd: r.periodEnd.toISOString(),
-            consumptionKbtu: r.consumptionKbtu,
-            meterType: r.meterType,
-            source: r.source,
-          }),
-        ),
-        pipelineRuns: runs.map(
-          (r: {
-            id: string;
-            pipelineType: string;
-            status: string;
-            startedAt: Date | null;
-            completedAt: Date | null;
-          }) => ({
-            id: r.id,
-            pipelineType: r.pipelineType,
-            status: r.status,
-            startedAt: r.startedAt?.toISOString() ?? null,
-            completedAt: r.completedAt?.toISOString() ?? null,
-          }),
-        ),
-      };
+        artifact: exportedArtifact,
+        format: input.format,
+      });
+    }),
+
+  /**
+   * Generate compliance report data for a building.
+   * Assembles all data needed for the HTML/PDF template.
+   */
+  getComplianceReport: tenantProcedure
+    .input(z.object({ buildingId: z.string() }))
+    .output(reportOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const latestArtifact = await getLatestReportArtifact({
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+        reportType: "COMPLIANCE_REPORT",
+      });
+
+      if (latestArtifact) {
+        return reportOutputSchema.parse(latestArtifact.payload);
+      }
+
+      return buildComplianceReportOutput({
+        tenantDb: ctx.tenantDb,
+        organizationId: ctx.organizationId,
+        buildingId: input.buildingId,
+      });
     }),
 
   /**
@@ -1043,204 +1584,30 @@ export const reportRouter = router({
     )
     .output(exemptionReportSchema)
     .query(async ({ ctx, input }) => {
-      const building = await ctx.tenantDb.building.findUnique({
-        where: { id: input.buildingId },
-      });
-      if (!building) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Building not found",
+      const hasOverrides =
+        input.occupancyPct !== undefined || input.financialDistress !== undefined;
+
+      if (!hasOverrides) {
+        const latestArtifact = await getLatestReportArtifact({
+          organizationId: ctx.organizationId,
+          buildingId: input.buildingId,
+          reportType: "EXEMPTION_REPORT",
         });
+
+        if (latestArtifact) {
+          return exemptionReportSchema.parse(latestArtifact.payload);
+        }
       }
 
-      const latestSnapshot = await getLatestComplianceSnapshot(ctx.tenantDb, {
-        buildingId: input.buildingId,
-      });
-      const governedSummary = await getBuildingGovernedOperationalSummary({
+      const { report } = await buildExemptionReportOutput({
+        tenantDb: ctx.tenantDb,
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
-      });
-      const penaltySummary = governedSummary.penaltySummary;
-
-      const snapshots = await ctx.tenantDb.complianceSnapshot.findMany({
-        where: { buildingId: input.buildingId },
-        orderBy: LATEST_SNAPSHOT_ORDER,
-        take: 12,
-        select: {
-          snapshotDate: true,
-          energyStarScore: true,
-          siteEui: true,
-          complianceStatus: true,
-        },
+        occupancyPct: input.occupancyPct,
+        financialDistress: input.financialDistress,
       });
 
-      // Energy history for baseline period documentation (3 years)
-      const threeYearsAgo = new Date();
-      threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
-
-      const readings = await ctx.tenantDb.energyReading.findMany({
-        where: {
-          buildingId: input.buildingId,
-          periodStart: { gte: threeYearsAgo },
-        },
-        orderBy: [{ periodStart: "asc" }, { ingestedAt: "desc" }, { id: "desc" }],
-        select: {
-          id: true,
-          periodStart: true,
-          consumptionKbtu: true,
-          meterType: true,
-          meterId: true,
-          periodEnd: true,
-          source: true,
-          ingestedAt: true,
-        },
-      });
-      const dedupedReadings = dedupeEnergyReadings(readings);
-
-      // Run exemption screener
-      const occupancyPct = input.occupancyPct ??
-        (building.occupancyRate ? building.occupancyRate * 100 : null);
-
-      const financialIndicators: FinancialDistressIndicators = input.financialDistress ?? {
-        inForeclosure: building.hasFinancialDistress,
-        inBankruptcy: false,
-        negativeNetOperatingIncome: false,
-        taxDelinquent: false,
-      };
-
-      const exemptionResult = screenForExemptions({
-        baselineOccupancyPct: occupancyPct,
-        financialDistressIndicators: financialIndicators,
-        grossSquareFeet: building.grossSquareFeet,
-        propertyType: building.propertyType,
-        yearBuilt: building.yearBuilt,
-      });
-
-      // Build occupancy exemption section
-      const occupancyApplicable = exemptionResult.qualifiedExemptions.includes("LOW_OCCUPANCY");
-      const occupancyEvidence: string[] = [];
-      if (occupancyPct !== null) {
-        occupancyEvidence.push(
-          `Reported baseline occupancy: ${occupancyPct}% (threshold: <50%)`,
-        );
-      }
-      if (occupancyApplicable) {
-        occupancyEvidence.push(
-          "Building qualifies for the Whole-Cycle Low Occupancy Exemption under the 2024 BEPS amendments.",
-        );
-        occupancyEvidence.push(
-          "Owner must submit occupancy records demonstrating <50% occupancy during the baseline period (2019-2021).",
-        );
-      }
-
-      // Build financial exemption section
-      const financialApplicable = exemptionResult.qualifiedExemptions.includes("FINANCIAL_DISTRESS");
-      const financialEvidence: string[] = [];
-      if (financialIndicators.inForeclosure) {
-        financialEvidence.push("Property is in active foreclosure proceedings.");
-      }
-      if (financialIndicators.inBankruptcy) {
-        financialEvidence.push("Owner has filed for bankruptcy protection.");
-      }
-      if (financialIndicators.negativeNetOperatingIncome) {
-        financialEvidence.push("Property reports negative Net Operating Income (NOI).");
-      }
-      if (financialIndicators.taxDelinquent) {
-        financialEvidence.push("Property has delinquent property tax payments.");
-      }
-      if (financialApplicable) {
-        financialEvidence.push(
-          "Owner must submit financial documentation (tax returns, court filings, NOI statements) to DOEE.",
-        );
-      }
-
-      // Penalty context
-      const legacyStatutoryMaximum = building.maxPenaltyExposure;
-      const currentPenalty = penaltySummary?.currentEstimatedPenalty ?? null;
-
-      // Filing checklist
-      const checklist = buildFilingChecklist({
-        hasOccupancyData: occupancyPct !== null,
-        hasFinancialData: financialApplicable,
-        hasEnergyHistory: dedupedReadings.length >= 12,
-        hasComplianceSnapshot: latestSnapshot !== null,
-        occupancyApplicable,
-        financialApplicable,
-        recentConstructionApplicable: exemptionResult.qualifiedExemptions.includes("RECENT_CONSTRUCTION"),
-      });
-
-      return {
-        buildingId: building.id,
-        buildingName: building.name,
-        address: building.address,
-        grossSquareFeet: building.grossSquareFeet,
-        propertyType: building.propertyType,
-        yearBuilt: building.yearBuilt,
-        generatedAt: new Date().toISOString(),
-        complianceStatus: latestSnapshot?.complianceStatus ?? "PENDING_DATA",
-        exemptionScreening: {
-          eligible: exemptionResult.eligible,
-          qualifiedExemptions: exemptionResult.qualifiedExemptions,
-          details: exemptionResult.details,
-          missingData: exemptionResult.missingData,
-        },
-        occupancyExemption: {
-          applicable: occupancyApplicable,
-          baselineOccupancyPct: occupancyPct,
-          occupancyThreshold: 50,
-          baselineYears: "2019-2021",
-          supportingEvidence: occupancyEvidence,
-        },
-        financialExemption: {
-          applicable: financialApplicable,
-          indicators: financialIndicators,
-          supportingEvidence: financialEvidence,
-        },
-        penaltyContext: {
-          legacyStatutoryMaximum,
-          currentEstimateStatus: penaltySummary?.status ?? "INSUFFICIENT_CONTEXT",
-          currentEstimatedPenalty: currentPenalty,
-          currentEstimateBasis:
-            penaltySummary?.basis.label ?? "No governed penalty run recorded",
-          penaltySavingsIfExempt: currentPenalty,
-        },
-        supportingSnapshots: snapshots.map(
-          (s: {
-            snapshotDate: Date;
-            energyStarScore: number | null;
-            siteEui: number | null;
-            complianceStatus: string;
-          }) => ({
-            snapshotDate: s.snapshotDate.toISOString(),
-            energyStarScore: s.energyStarScore,
-            siteEui: s.siteEui,
-            complianceStatus: s.complianceStatus,
-          }),
-        ),
-        energyHistory: dedupedReadings.map(
-          (r: {
-            id: string;
-            periodStart: Date;
-            consumptionKbtu: number;
-            meterType: string;
-            meterId: string | null;
-            periodEnd: Date;
-            source: string;
-            ingestedAt: Date;
-          }) => ({
-            periodStart: r.periodStart.toISOString(),
-            consumptionKbtu: r.consumptionKbtu,
-            meterType: r.meterType,
-          }),
-        ),
-        filingChecklist: checklist,
-        doeeSubmissionGuidance: {
-          deadline: "2026-12-31",
-          submissionUrl: "https://doee.dc.gov/service/beps-exemption-application",
-          requiredDocuments: buildRequiredDocuments(occupancyApplicable, financialApplicable),
-          estimatedProcessingDays: 45,
-        },
-      };
+      return report;
     }),
 });
 

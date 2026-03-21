@@ -10,10 +10,6 @@ import {
   collapseDisplayEnergyReadings,
   dedupeEnergyReadings,
 } from "@/server/lib/energy-readings";
-import {
-  getBuildingWorkflowSummary,
-  listPortfolioWorkflowSummaries,
-} from "@/server/compliance/building-workflow";
 import { getPortfolioWorklist } from "@/server/compliance/portfolio-worklist";
 import {
   listBuildingDataIssues,
@@ -69,11 +65,41 @@ const listBuildingsInput = z.object({
 
 const portfolioWorklistInput = z.object({
   search: z.string().max(200).optional(),
+  cursor: z.string().max(200).optional(),
+  pageSize: z.number().int().min(1).max(100).default(25),
+  triageBucket: z
+    .enum([
+      "COMPLIANCE_BLOCKER",
+      "ARTIFACT_ATTENTION",
+      "REVIEW_QUEUE",
+      "SUBMISSION_QUEUE",
+      "SYNC_ATTENTION",
+      "OPERATIONAL_RISK",
+      "RETROFIT_QUEUE",
+      "MONITORING",
+    ])
+    .optional(),
   readinessState: z
     .enum(["DATA_INCOMPLETE", "READY_FOR_REVIEW", "READY_TO_SUBMIT", "SUBMITTED"])
     .optional(),
   hasBlockingIssues: z.boolean().optional(),
   hasPenaltyExposure: z.boolean().optional(),
+  triageUrgency: z.enum(["NOW", "NEXT", "MONITOR"]).optional(),
+  submissionState: z
+    .enum([
+      "NOT_STARTED",
+      "DRAFT",
+      "READY_FOR_REVIEW",
+      "APPROVED_FOR_SUBMISSION",
+      "SUBMITTED",
+      "COMPLETED",
+      "NEEDS_CORRECTION",
+      "SUPERSEDED",
+    ])
+    .optional(),
+  needsSyncAttention: z.boolean().optional(),
+  needsAnomalyAttention: z.boolean().optional(),
+  hasRetrofitOpportunity: z.boolean().optional(),
   artifactStatus: z
     .enum(["NOT_STARTED", "GENERATED", "STALE", "FINALIZED"])
     .optional(),
@@ -237,32 +263,26 @@ export const buildingRouter = router({
   get: tenantProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const [building, workflowSummary] = await Promise.all([
-        ctx.tenantDb.building.findUnique({
-          where: { id: input.id },
-          include: {
-            complianceSnapshots: {
-              orderBy: LATEST_SNAPSHOT_ORDER,
-              take: 1,
-            },
-            auditLogs: {
-              orderBy: { timestamp: "desc" },
-              take: 8,
-              select: {
-                id: true,
-                timestamp: true,
-                action: true,
-                errorCode: true,
-                requestId: true,
-              },
+      const building = await ctx.tenantDb.building.findUnique({
+        where: { id: input.id },
+        include: {
+          complianceSnapshots: {
+            orderBy: LATEST_SNAPSHOT_ORDER,
+            take: 1,
+          },
+          auditLogs: {
+            orderBy: { timestamp: "desc" },
+            take: 8,
+            select: {
+              id: true,
+              timestamp: true,
+              action: true,
+              errorCode: true,
+              requestId: true,
             },
           },
-        }),
-        getBuildingWorkflowSummary({
-          organizationId: ctx.organizationId,
-          buildingId: input.id,
-        }),
-      ]);
+        },
+      });
 
       if (!building) {
         throw new TRPCError({
@@ -291,7 +311,6 @@ export const buildingRouter = router({
         ...building,
         latestSnapshot: building.complianceSnapshots[0] ?? null,
         recentAuditLogs: building.auditLogs,
-        workflowSummary,
         operatorAccess: buildOperatorAccess(ctx.appRole),
         readinessSummary: governedSummary.readinessSummary,
         issueSummary: governedSummary.issueSummary,
@@ -330,12 +349,20 @@ export const buildingRouter = router({
       const result = await getPortfolioWorklist({
         organizationId: ctx.organizationId,
         search: input.search,
+        triageBucket: input.triageBucket,
         readinessState: input.readinessState,
         hasBlockingIssues: input.hasBlockingIssues,
         hasPenaltyExposure: input.hasPenaltyExposure,
+        triageUrgency: input.triageUrgency,
+        submissionState: input.submissionState,
+        needsSyncAttention: input.needsSyncAttention,
+        needsAnomalyAttention: input.needsAnomalyAttention,
+        hasRetrofitOpportunity: input.hasRetrofitOpportunity,
         artifactStatus: input.artifactStatus,
         nextAction: input.nextAction,
         sortBy: input.sortBy,
+        cursor: input.cursor,
+        pageSize: input.pageSize,
       });
 
       return {
@@ -556,35 +583,6 @@ export const buildingRouter = router({
         createdById: ctx.clerkUserId ?? null,
         requestId: ctx.requestId ?? null,
       });
-    }),
-
-  workflowSummary: tenantProcedure
-    .input(z.object({ buildingId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const building = await ctx.tenantDb.building.findUnique({
-        where: { id: input.buildingId },
-      });
-
-      if (!building) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Building not found",
-        });
-      }
-
-      const summary = await getBuildingWorkflowSummary({
-        organizationId: ctx.organizationId,
-        buildingId: input.buildingId,
-      });
-
-      if (!summary) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow summary not found",
-        });
-      }
-
-      return summary;
     }),
 
   create: tenantProcedure
@@ -886,16 +884,4 @@ export const buildingRouter = router({
     return stats;
   }),
 
-  portfolioWorkflow: tenantProcedure
-    .input(
-      z.object({
-        limit: z.number().int().min(1).max(200).default(25),
-      }),
-    )
-    .query(async ({ ctx, input }) =>
-      listPortfolioWorkflowSummaries({
-        organizationId: ctx.organizationId,
-        limit: input.limit,
-      }),
-    ),
 });

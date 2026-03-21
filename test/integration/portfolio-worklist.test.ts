@@ -15,6 +15,7 @@ describe("portfolio worklist", () => {
   let blockedBuildingId: string;
   let reviewBuildingId: string;
   let submitBuildingId: string;
+  let syncBuildingId: string;
 
   function createCaller() {
     return appRouter.createCaller({
@@ -326,6 +327,23 @@ describe("portfolio worklist", () => {
     });
     submitBuildingId = submitBuilding.id;
 
+    const syncBuilding = await prisma.building.create({
+      data: {
+        organizationId: org.id,
+        name: `Delta Sync ${scope}`,
+        address: "404 Sync Blvd NW, Washington, DC 20001",
+        latitude: 38.93,
+        longitude: -77,
+        grossSquareFeet: 54000,
+        propertyType: "OFFICE",
+        ownershipType: "PRIVATE",
+        bepsTargetScore: 72,
+        espmPropertyId: BigInt(404404),
+      },
+      select: { id: true },
+    });
+    syncBuildingId = syncBuilding.id;
+
     const blockedBenchmarkRun = await prisma.complianceRun.create({
       data: {
         organizationId: org.id,
@@ -375,6 +393,55 @@ describe("portfolio worklist", () => {
         createdByType: "SYSTEM",
         createdById: "test",
       },
+    }).then(async (submission) => {
+      const packet = await prisma.benchmarkPacket.create({
+        data: {
+          organizationId: org.id,
+          buildingId: reviewBuildingId,
+          benchmarkSubmissionId: submission.id,
+          reportingYear: 2025,
+          version: 1,
+          status: "FINALIZED",
+          packetHash: `benchmark-review-packet:${scope}`,
+          packetPayload: toInputJson({ summary: "Ready for review" }),
+          generatedAt: new Date("2026-03-05T11:00:00.000Z"),
+          finalizedAt: new Date("2026-03-05T11:30:00.000Z"),
+          createdByType: "SYSTEM",
+          createdById: "test",
+          finalizedByType: "SYSTEM",
+          finalizedById: "test",
+        },
+        select: { id: true },
+      });
+
+      const workflow = await prisma.submissionWorkflow.create({
+        data: {
+          organizationId: org.id,
+          buildingId: reviewBuildingId,
+          workflowType: "BENCHMARK_VERIFICATION",
+          state: "READY_FOR_REVIEW",
+          benchmarkPacketId: packet.id,
+          createdByType: "SYSTEM",
+          createdById: "test",
+          latestTransitionAt: new Date("2026-03-05T11:30:00.000Z"),
+          readyForReviewAt: new Date("2026-03-05T11:30:00.000Z"),
+        },
+        select: { id: true },
+      });
+
+      await prisma.submissionWorkflowEvent.create({
+        data: {
+          organizationId: org.id,
+          buildingId: reviewBuildingId,
+          workflowId: workflow.id,
+          fromState: "DRAFT",
+          toState: "READY_FOR_REVIEW",
+          notes: "Benchmark packet finalized and queued for review.",
+          createdByType: "SYSTEM",
+          createdById: "test",
+          createdAt: new Date("2026-03-05T11:30:00.000Z"),
+        },
+      });
     });
 
     await prisma.dataIssue.create({
@@ -613,10 +680,131 @@ describe("portfolio worklist", () => {
         scenarioResultsPayload: toInputJson([]),
       },
     });
+
+    await prisma.operationalAnomaly.create({
+      data: {
+        organizationId: org.id,
+        buildingId: submitBuildingId,
+        anomalyType: "ABNORMAL_BASELOAD",
+        severity: "HIGH",
+        status: "ACTIVE",
+        detectionHash: `submit-anomaly:${scope}`,
+        title: "Persistent baseload increase",
+        summary: "Baseload has increased above the prior pattern.",
+        detectionWindowStart: new Date("2026-02-01T00:00:00.000Z"),
+        detectionWindowEnd: new Date("2026-03-01T00:00:00.000Z"),
+        basisJson: {},
+        reasonCodesJson: ["BASELOAD_INCREASE"],
+        estimatedEnergyImpactKbtu: 12000,
+        estimatedPenaltyImpactUsd: 18000,
+        penaltyImpactStatus: "ESTIMATED",
+        attributionJson: {},
+      },
+    });
+
+    await prisma.retrofitCandidate.create({
+      data: {
+        organizationId: org.id,
+        buildingId: submitBuildingId,
+        sourceArtifactId: sourceArtifact.id,
+        projectType: "RETRO_COMMISSIONING",
+        candidateSource: "MANUAL",
+        status: "ACTIVE",
+        name: "Retro-commissioning",
+        complianceCycle: "CYCLE_1",
+        targetFilingYear: 2026,
+        estimatedCapex: 85000,
+        estimatedIncentiveAmount: 5000,
+        estimatedAnnualSavingsKbtu: 240000,
+        estimatedAnnualSavingsUsd: 18000,
+        estimatedSiteEuiReduction: 4.5,
+        estimatedSourceEuiReduction: 6.5,
+        estimatedBepsImprovementPct: 8,
+        estimatedImplementationMonths: 4,
+        confidenceBand: "MEDIUM",
+        sourceMetadata: {},
+      },
+    });
+
+    const syncBenchmarkRun = await prisma.complianceRun.create({
+      data: {
+        organizationId: org.id,
+        buildingId: syncBuildingId,
+        ruleVersionId: benchmarkRuleVersionId,
+        factorSetVersionId: benchmarkFactorSetVersionId,
+        runType: "BENCHMARKING_EVALUATION",
+        status: "SUCCEEDED",
+        inputSnapshotRef: `benchmark-sync:${scope}`,
+        inputSnapshotHash: `hash-benchmark-sync:${scope}`,
+        resultPayload: toInputJson({
+          engineResult: createBenchmarkPayload({
+            reportingYear: 2025,
+            qaVerdict: "PASS",
+            status: "COMPUTED",
+            reasonCodes: ["BENCHMARK_READY"],
+            meetsStandard: true,
+            blocked: false,
+          }).complianceEngine,
+        }),
+        producedByType: "SYSTEM",
+        producedById: "test",
+      },
+      select: { id: true },
+    });
+
+    await prisma.benchmarkSubmission.create({
+      data: {
+        organizationId: org.id,
+        buildingId: syncBuildingId,
+        reportingYear: 2025,
+        ruleVersionId: benchmarkRuleVersionId,
+        factorSetVersionId: benchmarkFactorSetVersionId,
+        status: "READY",
+        complianceRunId: syncBenchmarkRun.id,
+        readinessEvaluatedAt: new Date("2026-03-06T09:00:00.000Z"),
+        submissionPayload: toInputJson(
+          createBenchmarkPayload({
+            reportingYear: 2025,
+            qaVerdict: "PASS",
+            status: "COMPUTED",
+            reasonCodes: ["BENCHMARK_READY"],
+            meetsStandard: true,
+            blocked: false,
+          }),
+        ),
+        createdByType: "SYSTEM",
+        createdById: "test",
+      },
+    });
+
+    await prisma.portfolioManagerSyncState.create({
+      data: {
+        organizationId: org.id,
+        buildingId: syncBuildingId,
+        status: "FAILED",
+        lastAttemptedSyncAt: new Date("2026-03-08T10:00:00.000Z"),
+        lastFailedSyncAt: new Date("2026-03-08T10:00:00.000Z"),
+        attemptCount: 2,
+        retryCount: 1,
+        latestJobId: `job-sync-${scope}`,
+        latestErrorCode: "UPSTREAM_TIMEOUT",
+        latestErrorMessage: "Portfolio Manager did not respond in time.",
+        qaPayload: {},
+      },
+    });
   });
 
   afterAll(async () => {
     await prisma.auditLog.deleteMany({
+      where: { organizationId: org.id },
+    });
+    await prisma.operationalAnomaly.deleteMany({
+      where: { organizationId: org.id },
+    });
+    await prisma.portfolioManagerSyncState.deleteMany({
+      where: { organizationId: org.id },
+    });
+    await prisma.retrofitCandidate.deleteMany({
       where: { organizationId: org.id },
     });
     await prisma.submissionWorkflowEvent.deleteMany({
@@ -672,27 +860,45 @@ describe("portfolio worklist", () => {
 
     const result = await caller.building.portfolioWorklist({});
 
-    expect(result.aggregate.totalBuildings).toBe(3);
+    expect(result.aggregate.totalBuildings).toBe(4);
     expect(result.aggregate.blocked).toBe(1);
     expect(result.aggregate.readyForReview).toBe(1);
-    expect(result.aggregate.readyToSubmit).toBe(1);
+    expect(result.aggregate.readyToSubmit).toBe(2);
     expect(result.aggregate.withPenaltyExposure).toBe(2);
-    expect(result.aggregate.withSyncAttention).toBe(0);
-    expect(result.aggregate.withActionableRetrofits).toBeGreaterThanOrEqual(0);
+    expect(result.aggregate.withSyncAttention).toBe(1);
+    expect(result.aggregate.withOperationalRisk).toBe(1);
+    expect(result.aggregate.withActionableRetrofits).toBe(1);
     expect(result.aggregate.withDraftArtifacts).toBe(0);
-    expect(result.aggregate.finalizedAwaitingNextAction).toBe(1);
+    expect(result.aggregate.finalizedAwaitingNextAction).toBe(2);
+    expect(result.aggregate.needsAttentionNow).toBeGreaterThanOrEqual(3);
+    expect(result.aggregate.reviewQueue).toBe(1);
+    expect(result.aggregate.submissionQueue).toBe(1);
+    expect(result.aggregate.syncQueue).toBe(1);
+    expect(result.aggregate.anomalyQueue).toBe(0);
+    expect(result.aggregate.retrofitQueue).toBe(0);
+    expect(result.pageInfo.returnedCount).toBe(4);
+    expect(result.pageInfo.totalMatchingCount).toBe(4);
+    expect(result.pageInfo.nextCursor).toBeNull();
 
     expect(result.items[0]?.buildingId).toBe(blockedBuildingId);
     expect(result.items[0]?.nextAction.code).toBe("RESOLVE_BLOCKING_ISSUES");
+    expect(result.items[0]?.triage.bucket).toBe("COMPLIANCE_BLOCKER");
+    expect(result.items[0]?.submission.overall.state).toBe("READY_FOR_REVIEW");
 
     const readyToSubmitOnly = await caller.building.portfolioWorklist({
       readinessState: "READY_TO_SUBMIT",
     });
-    expect(readyToSubmitOnly.items).toHaveLength(1);
-    expect(readyToSubmitOnly.items[0]?.buildingId).toBe(submitBuildingId);
-    expect(readyToSubmitOnly.items[0]?.submission.beps.state).toBe("APPROVED_FOR_SUBMISSION");
-    expect(readyToSubmitOnly.items[0]).not.toHaveProperty("submissionPayload");
-    expect(readyToSubmitOnly.items[0]).not.toHaveProperty("filingPayload");
+    expect(readyToSubmitOnly.items).toHaveLength(2);
+    expect(readyToSubmitOnly.items.map((item) => item.buildingId)).toEqual(
+      expect.arrayContaining([submitBuildingId, syncBuildingId]),
+    );
+    const approvedSubmission = readyToSubmitOnly.items.find(
+      (item) => item.buildingId === submitBuildingId,
+    );
+    expect(approvedSubmission?.submission.beps.state).toBe("APPROVED_FOR_SUBMISSION");
+    expect(approvedSubmission?.submission.overall.state).toBe("APPROVED_FOR_SUBMISSION");
+    expect(approvedSubmission).not.toHaveProperty("submissionPayload");
+    expect(approvedSubmission).not.toHaveProperty("filingPayload");
 
     const exposureOnly = await caller.building.portfolioWorklist({
       hasPenaltyExposure: true,
@@ -704,8 +910,74 @@ describe("portfolio worklist", () => {
     const finalizedOnly = await caller.building.portfolioWorklist({
       artifactStatus: "FINALIZED",
     });
-    expect(finalizedOnly.items).toHaveLength(1);
-    expect(finalizedOnly.items[0]?.buildingId).toBe(submitBuildingId);
+    expect(finalizedOnly.items).toHaveLength(2);
+    expect(finalizedOnly.items.map((item) => item.buildingId)).toContain(submitBuildingId);
+
+    const reviewState = await caller.building.portfolioWorklist({
+      submissionState: "READY_FOR_REVIEW",
+    });
+    expect(reviewState.items.length).toBeGreaterThan(0);
+    expect(
+      reviewState.items.every(
+        (item) => item.submission.overall.state === "READY_FOR_REVIEW",
+      ),
+    ).toBe(true);
+
+    const syncAttention = await caller.building.portfolioWorklist({
+      needsSyncAttention: true,
+      triageBucket: "SYNC_ATTENTION",
+    });
+    expect(syncAttention.items).toHaveLength(1);
+    expect(syncAttention.items[0]?.buildingId).toBe(syncBuildingId);
+    expect(syncAttention.items[0]?.nextAction.code).toBe("REFRESH_INTEGRATION");
+
+    const urgentOnly = await caller.building.portfolioWorklist({
+      triageUrgency: "NOW",
+    });
+    expect(urgentOnly.items.map((item) => item.buildingId)).toEqual(
+      expect.arrayContaining([blockedBuildingId, reviewBuildingId, submitBuildingId, syncBuildingId]),
+    );
+
+    const anomalyAttention = await caller.building.portfolioWorklist({
+      needsAnomalyAttention: true,
+    });
+    expect(anomalyAttention.items.map((item) => item.buildingId)).toContain(submitBuildingId);
+
+    const retrofitQueue = await caller.building.portfolioWorklist({
+      hasRetrofitOpportunity: true,
+    });
+    expect(retrofitQueue.items.map((item) => item.buildingId)).toContain(submitBuildingId);
+  });
+
+  it("paginates the governed worklist with a stable server cursor", async () => {
+    const caller = createCaller();
+
+    const firstPage = await caller.building.portfolioWorklist({
+      pageSize: 2,
+    });
+
+    expect(firstPage.items).toHaveLength(2);
+    expect(firstPage.pageInfo.returnedCount).toBe(2);
+    expect(firstPage.pageInfo.totalMatchingCount).toBe(4);
+    expect(firstPage.pageInfo.nextCursor).not.toBeNull();
+
+    const secondPage = await caller.building.portfolioWorklist({
+      pageSize: 2,
+      cursor: firstPage.pageInfo.nextCursor ?? undefined,
+    });
+
+    expect(secondPage.items).toHaveLength(2);
+    expect(secondPage.pageInfo.returnedCount).toBe(2);
+    expect(secondPage.pageInfo.totalMatchingCount).toBe(4);
+    expect(secondPage.pageInfo.nextCursor).toBeNull();
+    expect(secondPage.items[0]?.buildingId).not.toBe(firstPage.items[0]?.buildingId);
+    expect(
+      new Set([
+        ...firstPage.items.map((item) => item.buildingId),
+        ...secondPage.items.map((item) => item.buildingId),
+      ]).size,
+    ).toBe(4);
+    expect(secondPage.aggregate.totalBuildings).toBe(firstPage.aggregate.totalBuildings);
   });
 
   it("keeps portfolio summaries consistent with building-level governed state", async () => {
@@ -742,6 +1014,7 @@ describe("portfolio worklist", () => {
     expect(row?.runtime.greenButton.currentState).toBe(
       buildingDetail.governedSummary.runtimeSummary.greenButton.currentState,
     );
+    expect(buildingDetail).not.toHaveProperty("workflowSummary");
   });
 
   it("keeps report summaries aligned with the shared governed operational projection", async () => {

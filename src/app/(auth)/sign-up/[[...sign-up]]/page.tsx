@@ -6,7 +6,7 @@ export default function SignUpPage() {
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Join Quoin</h1>
-          <p className="mt-2 text-sm text-zinc-600">Start managing your building compliance and financing.</p>
+          <p className="mt-2 text-sm text-zinc-600">Start managing your building compliance operations.</p>
         </div>
         <SignUp 
           appearance={{

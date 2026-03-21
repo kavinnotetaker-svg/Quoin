@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { PageHeader } from "@/components/layout/page-header";
 import {
@@ -18,7 +18,20 @@ import {
   getRuntimeStatusDisplay,
   getSubmissionReadinessDisplay,
   getVerificationStatusDisplay,
+  getWorklistTriageDisplay,
 } from "@/components/internal/status-helpers";
+
+const TRIAGE_FILTERS = [
+  { label: "All triage queues", value: "" },
+  { label: "Compliance blockers", value: "COMPLIANCE_BLOCKER" },
+  { label: "Artifact attention", value: "ARTIFACT_ATTENTION" },
+  { label: "Review queue", value: "REVIEW_QUEUE" },
+  { label: "Submission queue", value: "SUBMISSION_QUEUE" },
+  { label: "Sync attention", value: "SYNC_ATTENTION" },
+  { label: "Operational risk", value: "OPERATIONAL_RISK" },
+  { label: "Retrofit queue", value: "RETROFIT_QUEUE" },
+  { label: "Monitoring", value: "MONITORING" },
+] as const;
 
 const READINESS_FILTERS = [
   { label: "All readiness states", value: "" },
@@ -45,6 +58,17 @@ const NEXT_ACTION_FILTERS = [
   { label: "Review result", value: "REVIEW_COMPLIANCE_RESULT" },
   { label: "Submit artifact", value: "SUBMIT_ARTIFACT" },
   { label: "Monitor submission", value: "MONITOR_SUBMISSION" },
+] as const;
+
+const SUBMISSION_STATE_FILTERS = [
+  { label: "Any workflow state", value: "" },
+  { label: "No workflow", value: "NOT_STARTED" },
+  { label: "Draft", value: "DRAFT" },
+  { label: "Ready for review", value: "READY_FOR_REVIEW" },
+  { label: "Approved for submission", value: "APPROVED_FOR_SUBMISSION" },
+  { label: "Submitted", value: "SUBMITTED" },
+  { label: "Completed", value: "COMPLETED" },
+  { label: "Needs correction", value: "NEEDS_CORRECTION" },
 ] as const;
 
 const SORT_OPTIONS = [
@@ -114,8 +138,12 @@ function getWorkflowStateDisplay(state: string) {
 
 export function ComplianceQueue() {
   const utils = trpc.useUtils();
+  const pageSize = 25;
   const [search, setSearch] = useState("");
+  const [triageUrgencyFilter, setTriageUrgencyFilter] = useState("");
+  const [triageFilter, setTriageFilter] = useState("");
   const [readinessFilter, setReadinessFilter] = useState("");
+  const [submissionStateFilter, setSubmissionStateFilter] = useState("");
   const [artifactFilter, setArtifactFilter] = useState("");
   const [nextActionFilter, setNextActionFilter] = useState("");
   const [sortBy, setSortBy] = useState<
@@ -123,11 +151,50 @@ export function ComplianceQueue() {
   >("PRIORITY");
   const [blockingOnly, setBlockingOnly] = useState(false);
   const [penaltyOnly, setPenaltyOnly] = useState(false);
+  const [syncAttentionOnly, setSyncAttentionOnly] = useState(false);
+  const [anomalyAttentionOnly, setAnomalyAttentionOnly] = useState(false);
+  const [retrofitOnly, setRetrofitOnly] = useState(false);
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<string[]>([]);
   const [bulkResult, setBulkResult] = useState<BulkPortfolioActionResult | null>(null);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    setCursor(undefined);
+    setCursorHistory([]);
+  }, [
+    search,
+    triageUrgencyFilter,
+    triageFilter,
+    readinessFilter,
+    submissionStateFilter,
+    artifactFilter,
+    nextActionFilter,
+    sortBy,
+    blockingOnly,
+    penaltyOnly,
+    syncAttentionOnly,
+    anomalyAttentionOnly,
+    retrofitOnly,
+  ]);
 
   const worklist = trpc.building.portfolioWorklist.useQuery({
+    cursor,
+    pageSize,
     search: search || undefined,
+    triageUrgency:
+      (triageUrgencyFilter as "NOW" | "NEXT" | "MONITOR" | "") || undefined,
+    triageBucket:
+      (triageFilter as
+        | "COMPLIANCE_BLOCKER"
+        | "ARTIFACT_ATTENTION"
+        | "REVIEW_QUEUE"
+        | "SUBMISSION_QUEUE"
+        | "SYNC_ATTENTION"
+        | "OPERATIONAL_RISK"
+        | "RETROFIT_QUEUE"
+        | "MONITORING"
+        | "") || undefined,
     readinessState:
       (readinessFilter as
         | "DATA_INCOMPLETE"
@@ -137,6 +204,20 @@ export function ComplianceQueue() {
         | "") || undefined,
     hasBlockingIssues: blockingOnly ? true : undefined,
     hasPenaltyExposure: penaltyOnly ? true : undefined,
+    submissionState:
+      (submissionStateFilter as
+        | "NOT_STARTED"
+        | "DRAFT"
+        | "READY_FOR_REVIEW"
+        | "APPROVED_FOR_SUBMISSION"
+        | "SUBMITTED"
+        | "COMPLETED"
+        | "NEEDS_CORRECTION"
+        | "SUPERSEDED"
+        | "") || undefined,
+    needsSyncAttention: syncAttentionOnly ? true : undefined,
+    needsAnomalyAttention: anomalyAttentionOnly ? true : undefined,
+    hasRetrofitOpportunity: retrofitOnly ? true : undefined,
     artifactStatus:
       (artifactFilter as "NOT_STARTED" | "GENERATED" | "STALE" | "FINALIZED" | "") ||
       undefined,
@@ -183,6 +264,7 @@ export function ComplianceQueue() {
   }
 
   const canManageOperatorActions = data.operatorAccess.canManage;
+  const pageInfo = data.pageInfo;
   const visibleBuildingIds = data.items.map((item) => item.buildingId);
   const visibleSelectedCount = visibleBuildingIds.filter((buildingId) =>
     selectedBuildingIds.includes(buildingId),
@@ -225,6 +307,67 @@ export function ComplianceQueue() {
     });
   }
 
+  function clearFilters() {
+    setSearch("");
+    setTriageUrgencyFilter("");
+    setTriageFilter("");
+    setReadinessFilter("");
+    setSubmissionStateFilter("");
+    setArtifactFilter("");
+    setNextActionFilter("");
+    setBlockingOnly(false);
+    setPenaltyOnly(false);
+    setSyncAttentionOnly(false);
+    setAnomalyAttentionOnly(false);
+    setRetrofitOnly(false);
+  }
+
+  function moveToNextPage() {
+    if (!pageInfo.nextCursor) {
+      return;
+    }
+
+    setCursorHistory((current) => [...current, cursor ?? ""]);
+    setCursor(pageInfo.nextCursor);
+  }
+
+  function moveToPreviousPage() {
+    if (cursorHistory.length === 0) {
+      setCursor(undefined);
+      return;
+    }
+
+    const previousCursor = cursorHistory[cursorHistory.length - 1];
+    setCursor(previousCursor || undefined);
+    setCursorHistory(cursorHistory.slice(0, -1));
+  }
+
+  const currentPage = cursorHistory.length + 1;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(pageInfo.totalMatchingCount / pageSize),
+  );
+  const pageStart =
+    pageInfo.totalMatchingCount === 0 ? 0 : cursorHistory.length * pageSize + 1;
+  const pageEnd =
+    pageInfo.totalMatchingCount === 0
+      ? 0
+      : cursorHistory.length * pageSize + pageInfo.returnedCount;
+
+  const hasActiveFilters =
+    search.length > 0 ||
+    triageUrgencyFilter.length > 0 ||
+    triageFilter.length > 0 ||
+    readinessFilter.length > 0 ||
+    submissionStateFilter.length > 0 ||
+    artifactFilter.length > 0 ||
+    nextActionFilter.length > 0 ||
+    blockingOnly ||
+    penaltyOnly ||
+    syncAttentionOnly ||
+    anomalyAttentionOnly ||
+    retrofitOnly;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -234,25 +377,18 @@ export function ComplianceQueue() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[
+          { label: "Needs attention now", value: data.aggregate.needsAttentionNow },
           { label: "Blocked", value: data.aggregate.blocked },
           { label: "Ready for review", value: data.aggregate.readyForReview },
           { label: "Ready to submit", value: data.aggregate.readyToSubmit },
+          { label: "Submission queue", value: data.aggregate.submissionQueue },
+          { label: "Review queue", value: data.aggregate.reviewQueue },
           { label: "Needs correction", value: data.aggregate.needsCorrection },
-          {
-            label: "Penalty exposure",
-            value: data.aggregate.withPenaltyExposure,
-          },
+          { label: "Penalty exposure", value: data.aggregate.withPenaltyExposure },
           { label: "Operational risk", value: data.aggregate.withOperationalRisk },
-          {
-            label: "Retrofit opportunities",
-            value: data.aggregate.withActionableRetrofits,
-          },
+          { label: "Retrofit opportunities", value: data.aggregate.withActionableRetrofits },
           { label: "Sync attention", value: data.aggregate.withSyncAttention },
           { label: "Draft artifacts", value: data.aggregate.withDraftArtifacts },
-          {
-            label: "Finalized awaiting action",
-            value: data.aggregate.finalizedAwaitingNextAction,
-          },
         ].map((item) => (
           <div
             key={item.label}
@@ -268,7 +404,65 @@ export function ComplianceQueue() {
         ))}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+        <div>
+          Showing {pageStart}-{pageEnd} of {pageInfo.totalMatchingCount} matching
+          {" "}buildings
+          {" | "}Page {currentPage} of {totalPages}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={moveToPreviousPage}
+            disabled={cursorHistory.length === 0}
+            className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={moveToNextPage}
+            disabled={!pageInfo.nextCursor}
+            className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { label: "Needs attention now", value: "NOW", kind: "urgency" as const },
+          { label: "Submission queue", value: "SUBMISSION_QUEUE" },
+          { label: "Sync attention", value: "SYNC_ATTENTION" },
+          { label: "Operational risk", value: "OPERATIONAL_RISK" },
+          { label: "Retrofit queue", value: "RETROFIT_QUEUE" },
+        ].map((preset) => (
+          <button
+            key={preset.value}
+            type="button"
+            onClick={() => {
+              if ("kind" in preset) {
+                setTriageUrgencyFilter((current) =>
+                  current === preset.value ? "" : preset.value,
+                );
+                return;
+              }
+              setTriageFilter((current) => (current === preset.value ? "" : preset.value));
+            }}
+            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              (("kind" in preset && triageUrgencyFilter === preset.value) ||
+                (!("kind" in preset) && triageFilter === preset.value))
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 hover:text-zinc-900"
+            }`}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]">
         <input
           type="text"
           value={search}
@@ -277,11 +471,33 @@ export function ComplianceQueue() {
           className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition-colors focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
         />
         <select
+          value={triageFilter}
+          onChange={(event) => setTriageFilter(event.target.value)}
+          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
+        >
+          {TRIAGE_FILTERS.map((option) => (
+            <option key={option.label} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
           value={readinessFilter}
           onChange={(event) => setReadinessFilter(event.target.value)}
           className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
         >
           {READINESS_FILTERS.map((option) => (
+            <option key={option.label} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={submissionStateFilter}
+          onChange={(event) => setSubmissionStateFilter(event.target.value)}
+          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
+        >
+          {SUBMISSION_STATE_FILTERS.map((option) => (
             <option key={option.label} value={option.value}>
               {option.label}
             </option>
@@ -328,6 +544,39 @@ export function ComplianceQueue() {
           />
           Governed penalty exposure only
         </label>
+        <label className="inline-flex items-center gap-2 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            checked={syncAttentionOnly}
+            onChange={(event) => setSyncAttentionOnly(event.target.checked)}
+          />
+          Sync attention only
+        </label>
+        <label className="inline-flex items-center gap-2 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            checked={anomalyAttentionOnly}
+            onChange={(event) => setAnomalyAttentionOnly(event.target.checked)}
+          />
+          Anomaly attention only
+        </label>
+        <label className="inline-flex items-center gap-2 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            checked={retrofitOnly}
+            onChange={(event) => setRetrofitOnly(event.target.checked)}
+          />
+          Retrofit queue only
+        </label>
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900"
+          >
+            Clear filters
+          </button>
+        ) : null}
         <div className="ml-auto">
           <select
             value={sortBy}
@@ -360,8 +609,21 @@ export function ComplianceQueue() {
                 Selected {selectedBuildingIds.length} building(s). Each building is still
                 validated individually through the governed server workflow.
               </div>
+              {selectedBuildingIds.length > 0 && visibleSelectedCount !== selectedBuildingIds.length ? (
+                <div className="mt-1 text-xs text-zinc-500">
+                  {visibleSelectedCount} selected in the current filtered view.
+                </div>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedBuildingIds([])}
+                disabled={selectedBuildingIds.length === 0}
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+              >
+                Clear selection
+              </button>
               <button
                 type="button"
                 onClick={() => runBulkAction("RERUN_SOURCE_RECONCILIATION")}
@@ -393,14 +655,25 @@ export function ComplianceQueue() {
 
       {bulkResult ? (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm">
-          <div className="text-sm font-semibold text-zinc-900">
-            Bulk action result: {bulkResult.action.replaceAll("_", " ").toLowerCase()}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-4 text-sm text-zinc-600">
-            <div>Targets {bulkResult.targetCount}</div>
-            <div>Succeeded {bulkResult.succeededCount}</div>
-            <div>Failed {bulkResult.failedCount}</div>
-            <div>Skipped {bulkResult.skippedCount}</div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-zinc-900">
+                Bulk action result: {bulkResult.action.replaceAll("_", " ").toLowerCase()}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-4 text-sm text-zinc-600">
+                <div>Targets {bulkResult.targetCount}</div>
+                <div>Succeeded {bulkResult.succeededCount}</div>
+                <div>Failed {bulkResult.failedCount}</div>
+                <div>Skipped {bulkResult.skippedCount}</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBulkResult(null)}
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900"
+            >
+              Clear result
+            </button>
           </div>
           <div className="mt-3 space-y-2 text-sm text-zinc-600">
             {bulkResult.results.slice(0, 8).map((result) => (
@@ -433,6 +706,7 @@ export function ComplianceQueue() {
                     </th>
                   ) : null}
                   <th className="px-5 py-3 font-semibold">Building</th>
+                  <th className="px-5 py-3 font-semibold">Triage</th>
                   <th className="px-5 py-3 font-semibold">Readiness</th>
                   <th className="px-5 py-3 font-semibold">Compliance</th>
                   <th className="px-5 py-3 font-semibold">Issues</th>
@@ -467,6 +741,7 @@ export function ComplianceQueue() {
                   const greenButtonRuntime = getRuntimeStatusDisplay(
                     item.runtime.greenButton.currentState,
                   );
+                  const triage = getWorklistTriageDisplay(item.triage.bucket);
 
                   return (
                     <tr key={item.buildingId} className="align-top">
@@ -492,6 +767,27 @@ export function ComplianceQueue() {
                         <div className="mt-1 text-[13px] text-zinc-500">
                           {item.address}
                         </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <StatusBadge label={triage.label} tone={triage.tone} />
+                          {item.flags.needsSyncAttention ? (
+                            <StatusBadge label="Sync attention" tone="warning" />
+                          ) : null}
+                          {item.flags.needsAnomalyAttention ? (
+                            <StatusBadge label="Operational risk" tone="warning" />
+                          ) : null}
+                          {item.retrofitSummary.topOpportunity ? (
+                            <StatusBadge label="Retrofit queued" tone="info" />
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <StatusBadge
+                          label={item.triage.urgency === "NOW" ? "Needs attention now" : item.triage.urgency === "NEXT" ? "Next up" : "Monitor"}
+                          tone={item.triage.urgency === "NOW" ? "danger" : item.triage.urgency === "NEXT" ? "info" : "muted"}
+                        />
+                        <div className="mt-2 text-[12px] text-zinc-500">
+                          {item.triage.cue}
+                        </div>
                       </td>
                       <td className="px-5 py-4">
                         <StatusBadge label={readiness.label} tone={readiness.tone} />
@@ -513,6 +809,11 @@ export function ComplianceQueue() {
                         <div className="mt-2 text-[12px] text-zinc-500">
                           {item.complianceSummary.reasonSummary}
                         </div>
+                        <div className="mt-2 text-[12px] text-zinc-500">
+                          Workflow {item.submission.overall.state === "NOT_STARTED"
+                            ? "not started"
+                            : item.submission.overall.state.replaceAll("_", " ").toLowerCase()}
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-zinc-600">
                         <div>{item.blockingIssueCount} blocking</div>
@@ -525,8 +826,8 @@ export function ComplianceQueue() {
                         </div>
                         {item.anomalySummary.activeCount > 0 ? (
                           <div className="mt-2 text-[12px] text-zinc-500">
-                            {item.anomalySummary.activeCount} anomaly
-                            {item.anomalySummary.activeCount === 1 ? "" : "ies"}
+                            {item.anomalySummary.activeCount}{" "}
+                            {item.anomalySummary.activeCount === 1 ? "anomaly" : "anomalies"}
                             {item.anomalySummary.totalEstimatedPenaltyImpactUsd != null
                               ? ` | ${formatMoney(
                                   item.anomalySummary.totalEstimatedPenaltyImpactUsd,
@@ -626,6 +927,23 @@ export function ComplianceQueue() {
                         </div>
                         <div className="mt-1 text-[13px] text-zinc-500">
                           {item.nextAction.reason}
+                        </div>
+                        <div className="mt-2 text-[12px] text-zinc-500">
+                          {item.triage.bucket === "COMPLIANCE_BLOCKER"
+                            ? "Primary queue: compliance blockers"
+                            : item.triage.bucket === "ARTIFACT_ATTENTION"
+                              ? "Primary queue: artifact attention"
+                              : item.triage.bucket === "REVIEW_QUEUE"
+                                ? "Primary queue: review"
+                                : item.triage.bucket === "SUBMISSION_QUEUE"
+                                  ? "Primary queue: submission"
+                                  : item.triage.bucket === "SYNC_ATTENTION"
+                                    ? "Primary queue: integration recovery"
+                                    : item.triage.bucket === "OPERATIONAL_RISK"
+                                      ? "Primary queue: operational risk"
+                                      : item.triage.bucket === "RETROFIT_QUEUE"
+                                        ? "Primary queue: retrofit planning"
+                                        : "Primary queue: monitoring"}
                         </div>
                       </td>
                     </tr>

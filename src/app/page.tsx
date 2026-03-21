@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Zap, Download, CheckCircle2, Banknote } from "lucide-react";
+import { Zap, Download, CheckCircle2, FileText } from "lucide-react";
 
 export default async function HomePage() {
   const { userId } = await auth();
@@ -49,15 +49,15 @@ export default async function HomePage() {
           </h1>
           <p className="mx-auto mt-8 max-w-2xl text-[17px] text-zinc-500 leading-relaxed font-medium">
             Quoin securely ingests your energy data, calculates compliance status, and
-            structures financing — so you hit the December 2026 deadline without
-            hiring an expensive consultant.
+            packages governed evidence so you hit the December 2026 deadline with a
+            real operating workflow instead of spreadsheet drift.
           </p>
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/sign-up"
               className="w-full sm:w-auto rounded-lg bg-zinc-900 px-8 py-4 text-[15px] font-semibold text-white shadow-lg transition-all hover:bg-zinc-800 hover:shadow-xl hover:-tranzinc-y-1 active:scale-[0.98] active:tranzinc-y-0 flex items-center justify-center gap-2"
             >
-              Start free trial
+              Get started
               <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
@@ -95,12 +95,12 @@ export default async function HomePage() {
           </div>
           <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-700 ease-out fill-mode-both rounded-2xl border border-zinc-200/80 bg-white/80 p-8 shadow-sm text-left transition-all hover:shadow-lg hover:-tranzinc-y-1 group">
             <div className="h-12 w-12 rounded-xl bg-zinc-100 flex items-center justify-center mb-6 border border-zinc-200/80 shadow-sm group-hover:scale-105 transition-transform">
-              <Banknote size={22} className="text-zinc-600" />
+              <FileText size={22} className="text-zinc-600" />
             </div>
-            <h3 className="text-xl font-bold tracking-tight text-zinc-900">Finance</h3>
+            <h3 className="text-xl font-bold tracking-tight text-zinc-900">Package</h3>
             <p className="mt-3 text-[15px] text-zinc-500 leading-relaxed font-medium">
-              Leverage CLEER, C-PACE, AHRA, and IRA programs — expertly structured into a capital
-              stack that minimizes out-of-pocket costs.
+              Generate governed packets, reports, and evidence packages that stay traceable to
+              the underlying compliance record.
             </p>
           </div>
         </div>

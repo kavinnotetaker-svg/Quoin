@@ -13,6 +13,12 @@ import {
   rankRetrofitCandidatesForBuilding,
 } from "./retrofit-optimization";
 
+/**
+ * Deprecated legacy financing support.
+ * Retained only for historical packet access and data cleanup paths.
+ * Financing is not part of the active Quoin product surface.
+ */
+
 type FinancingPacketWarningCode =
   | "NO_LINKED_SUPPORT_SOURCE"
   | "MISSING_SAVINGS_ASSUMPTION"

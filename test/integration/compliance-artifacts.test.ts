@@ -396,6 +396,7 @@ describe("governed compliance artifact workflow", () => {
   });
 
   afterAll(async () => {
+    await prisma.reportArtifact.deleteMany({ where: { organizationId: org?.id } });
     await prisma.auditLog.deleteMany({ where: { organizationId: org?.id } });
     await prisma.submissionWorkflowEvent.deleteMany({ where: { organizationId: org?.id } });
     await prisma.submissionWorkflow.deleteMany({ where: { organizationId: org?.id } });
@@ -583,5 +584,138 @@ describe("governed compliance artifact workflow", () => {
     });
     expect((report as unknown as Record<string, unknown>).submissionPayload).toBeUndefined();
     expect((report as unknown as Record<string, unknown>).filingPayload).toBeUndefined();
+  });
+
+  it("persists governed compliance report artifacts with reusable export lineage", async () => {
+    const caller = createCaller(`report-artifact-${scope}`);
+
+    const generated = await caller.report.generateComplianceReportArtifact({
+      buildingId: building.id,
+    });
+
+    expect(generated.reportType).toBe("COMPLIANCE_REPORT");
+    expect(generated.version).toBe(1);
+    expect(generated.latestExportedAt).toBeNull();
+
+    const artifactWorkspace = await caller.report.getComplianceReportArtifacts({
+      buildingId: building.id,
+    });
+
+    expect(artifactWorkspace.latestArtifact?.id).toBe(generated.id);
+    expect(artifactWorkspace.history[0]?.version).toBe(1);
+    expect(artifactWorkspace.latestArtifact?.sourceLineage.bepsSourceRecordId).toBe(
+      bepsFiling.id,
+    );
+
+    const persistedReport = await caller.report.getComplianceReport({
+      buildingId: building.id,
+    });
+
+    expect(persistedReport.sections.artifacts.benchmark.latestArtifactStatus).toBe(
+      "FINALIZED",
+    );
+    expect(persistedReport.evidencePackage.traceability.penaltyRunId).toBeNull();
+    expect(persistedReport.evidencePackage.artifacts.beps.sourceRecordId).toBe(
+      bepsFiling.id,
+    );
+
+    const exported = await caller.report.exportComplianceReportArtifact({
+      buildingId: building.id,
+      artifactId: generated.id,
+      format: "JSON",
+    });
+
+    expect(exported.version).toBe(1);
+    expect(exported.fileName).toContain("compliance_report-v1.json");
+    expect(JSON.parse(exported.content)).toMatchObject({
+      buildingId: building.id,
+    });
+
+    const exportedWorkspace = await caller.report.getComplianceReportArtifacts({
+      buildingId: building.id,
+    });
+    expect(exportedWorkspace.latestArtifact?.latestExportFormat).toBe("JSON");
+    expect(exportedWorkspace.latestArtifact?.latestExportedAt).not.toBeNull();
+
+    const auditActions = await prisma.auditLog.findMany({
+      where: {
+        organizationId: org.id,
+        buildingId: building.id,
+        action: {
+          in: ["REPORT_ARTIFACT_GENERATED", "REPORT_ARTIFACT_EXPORTED"],
+        },
+      },
+      orderBy: { timestamp: "asc" },
+      select: { action: true },
+    });
+
+    expect(auditActions.map((entry) => entry.action)).toEqual(
+      expect.arrayContaining(["REPORT_ARTIFACT_GENERATED", "REPORT_ARTIFACT_EXPORTED"]),
+    );
+  });
+
+  it("persists governed exemption report artifacts with reusable export lineage", async () => {
+    const caller = createCaller(`exemption-report-artifact-${scope}`);
+
+    const generated = await caller.report.generateExemptionReportArtifact({
+      buildingId: building.id,
+    });
+
+    expect(generated.reportType).toBe("EXEMPTION_REPORT");
+    expect(generated.version).toBe(1);
+    expect(generated.latestExportedAt).toBeNull();
+
+    const artifactWorkspace = await caller.report.getExemptionReportArtifacts({
+      buildingId: building.id,
+    });
+
+    expect(artifactWorkspace.latestArtifact?.id).toBe(generated.id);
+    expect(artifactWorkspace.history[0]?.version).toBe(1);
+    expect(artifactWorkspace.latestArtifact?.sourceLineage.bepsSourceRecordId).toBe(
+      bepsFiling.id,
+    );
+
+    const persistedReport = await caller.report.getExemptionReport({
+      buildingId: building.id,
+    });
+
+    expect(persistedReport.buildingId).toBe(building.id);
+    expect(persistedReport.penaltyContext.currentEstimateStatus).toBe(
+      "INSUFFICIENT_CONTEXT",
+    );
+
+    const exported = await caller.report.exportExemptionReportArtifact({
+      buildingId: building.id,
+      artifactId: generated.id,
+      format: "JSON",
+    });
+
+    expect(exported.version).toBe(1);
+    expect(exported.fileName).toContain("exemption_report-v1.json");
+    expect(JSON.parse(exported.content)).toMatchObject({
+      buildingId: building.id,
+    });
+
+    const exportedWorkspace = await caller.report.getExemptionReportArtifacts({
+      buildingId: building.id,
+    });
+    expect(exportedWorkspace.latestArtifact?.latestExportFormat).toBe("JSON");
+    expect(exportedWorkspace.latestArtifact?.latestExportedAt).not.toBeNull();
+
+    const auditActions = await prisma.auditLog.findMany({
+      where: {
+        organizationId: org.id,
+        buildingId: building.id,
+        action: {
+          in: ["REPORT_ARTIFACT_GENERATED", "REPORT_ARTIFACT_EXPORTED"],
+        },
+      },
+      orderBy: { timestamp: "asc" },
+      select: { action: true },
+    });
+
+    expect(auditActions.map((entry) => entry.action)).toEqual(
+      expect.arrayContaining(["REPORT_ARTIFACT_GENERATED", "REPORT_ARTIFACT_EXPORTED"]),
+    );
   });
 });

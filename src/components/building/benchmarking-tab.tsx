@@ -68,7 +68,6 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
       });
       utils.building.get.invalidate({ id: buildingId });
       utils.building.list.invalidate();
-      utils.building.portfolioWorkflow.invalidate({ limit: 25 });
       utils.building.complianceHistory.invalidate({ buildingId, limit: 20 });
       utils.report.getComplianceReport.invalidate({ buildingId });
     },
@@ -92,7 +91,6 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
         });
         utils.building.get.invalidate({ id: buildingId });
         utils.building.list.invalidate();
-        utils.building.portfolioWorkflow.invalidate({ limit: 25 });
         utils.building.energyReadings.invalidate({ buildingId, months: 24 });
         utils.building.complianceHistory.invalidate({ buildingId, limit: 20 });
         utils.report.getComplianceReport.invalidate({ buildingId });
@@ -132,12 +130,6 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
     Array.isArray(qaFindings.data)
       ? null
       : (qaFindings.data as Record<string, unknown>);
-  const readinessPayload =
-    readiness.data?.submissionPayload &&
-    typeof readiness.data.submissionPayload === "object" &&
-    !Array.isArray(readiness.data.submissionPayload)
-      ? (readiness.data.submissionPayload as Record<string, unknown>)
-      : null;
   const findings = Array.isArray(qaPayload?.findings) ? qaPayload.findings : [];
   const syncDiagnostics = syncData?.diagnostics ?? null;
   const syncWarnings = Array.isArray(syncDiagnostics?.warnings)
@@ -388,16 +380,6 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
                   </div>
                 ) : null}
               </div>
-              <details className="group rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-3 shadow-sm transition-all outline-none">
-                <summary className="cursor-pointer font-semibold tracking-tight text-zinc-900 outline-none">
-                  Technical workflow record
-                </summary>
-                <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-zinc-100 bg-white p-3">
-                  <pre className="font-mono text-xs text-zinc-600">
-                    {JSON.stringify(readinessPayload ?? {}, null, 2)}
-                  </pre>
-                </div>
-              </details>
             </div>
           )}
         </Panel>

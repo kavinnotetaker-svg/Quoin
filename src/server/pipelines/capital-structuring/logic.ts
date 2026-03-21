@@ -1,4 +1,7 @@
 /**
+ * Deprecated legacy capital-structuring support.
+ * Retained for historical/internal reference only and not part of the active Quoin product surface.
+ *
  * Capital Structuring Logic
  *
  * Pure functions for assembling a capital stack from eligible funding programs.

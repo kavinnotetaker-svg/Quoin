@@ -79,7 +79,6 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
       }),
       utils.building.get.invalidate({ id: buildingId }),
       utils.building.list.invalidate(),
-      utils.building.portfolioWorkflow.invalidate({ limit: 25 }),
       utils.building.complianceHistory.invalidate({ buildingId, limit: 20 }),
       utils.report.getComplianceReport.invalidate({ buildingId }),
     ]);
@@ -291,14 +290,6 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                   },
                 ]}
               />
-              <details className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-3 shadow-sm transition-all group">
-                <summary className="cursor-pointer font-semibold tracking-tight text-zinc-900 outline-none">Filing payload</summary>
-                <div className="mt-3 bg-white border border-zinc-100 rounded-md p-3 max-h-48 overflow-y-auto">
-                    <pre className="text-xs text-zinc-600 font-mono">
-                    {JSON.stringify(latestFiling.filingPayload, null, 2)}
-                    </pre>
-                </div>
-              </details>
             </div>
           )}
         </Panel>
@@ -432,14 +423,6 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                 <div className="mt-3 text-[13px] font-medium text-zinc-500">
                   <span className="text-zinc-900">{outcome.evidenceArtifacts.length}</span> artifacts • Created {formatDate(outcome.createdAt)}
                 </div>
-                <details className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50/50 px-4 py-3 group outline-none">
-                  <summary className="cursor-pointer text-[13px] font-semibold tracking-tight text-zinc-700 outline-none">Payload Data</summary>
-                  <div className="mt-3 bg-white border border-zinc-100 rounded-md p-3 max-h-48 overflow-y-auto">
-                    <pre className="text-xs text-zinc-600 font-mono">
-                        {JSON.stringify(outcome.filingPayload, null, 2)}
-                    </pre>
-                  </div>
-                </details>
               </div>
             ))}
           </div>

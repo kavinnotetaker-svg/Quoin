@@ -64,17 +64,7 @@ function getReadinessStatus(data: unknown) {
     return "NOT_STARTED";
   }
 
-  const payload = (data as { submissionPayload?: unknown }).submissionPayload;
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return "NOT_STARTED";
-  }
-
-  const readiness = (payload as Record<string, unknown>)["readiness"];
-  if (!readiness || typeof readiness !== "object" || Array.isArray(readiness)) {
-    return "NOT_STARTED";
-  }
-
-  const status = (readiness as Record<string, unknown>)["status"];
+  const status = (data as { status?: unknown }).status;
   return typeof status === "string" ? status : "NOT_STARTED";
 }
 

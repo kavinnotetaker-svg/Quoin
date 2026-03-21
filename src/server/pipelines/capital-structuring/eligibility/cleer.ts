@@ -1,5 +1,6 @@
 /**
- * CLEER (Commercial Loan for Energy Efficiency & Renewables) Eligibility Screener
+ * Deprecated legacy capital-structuring eligibility support.
+ * CLEER screener is retained for historical/internal reference only and not part of the active Quoin product surface.
  *
  * DC Green Bank program providing below-market unsecured loans.
  * Rules from BEPSGuard Doc4: min $10K, max $250K, 2-12yr term,

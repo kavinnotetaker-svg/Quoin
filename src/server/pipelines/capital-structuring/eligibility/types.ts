@@ -1,5 +1,6 @@
 /**
- * Shared types for capital program eligibility screeners.
+ * Deprecated legacy capital-structuring eligibility support.
+ * Shared types retained for historical/internal reference only.
  */
 
 export interface BuildingCapitalProfile {

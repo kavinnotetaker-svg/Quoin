@@ -12,12 +12,21 @@ Quoin currently supports:
 - ENERGY STAR Portfolio Manager sync and Green Button ingestion
 - deterministic benchmarking readiness and verification
 - deterministic BEPS evaluation with governed rule and factor versioning
+- source reconciliation and provenance for canonical building and meter state
+- governed penalty visibility and simple deterministic scenario deltas
+- immutable artifact, evidence, and submission workflow operations
+- anomaly-to-risk decision-support and retrofit prioritization
+- portfolio worklists, operator controls, and governed reporting
 - persisted compliance runs, evidence, audit logs, and jobs
 - benchmarking and BEPS request/checklist workflows
 - packet generation and PDF export for verification and filing workpapers
 - compliance-first building and portfolio UI
 
+Quoin is not a financing platform. Financing and capital-structuring code may remain in the repo as deprecated legacy support for historical records and cleanup safety, but they are not active product capabilities.
+
 Quoin does not currently implement direct DOEE submission transport or a generic reporting platform.
+
+For the current v1 checkpoint boundary and post-v1 backlog seed, see [docs/v1-release-checkpoint.md](docs/v1-release-checkpoint.md).
 
 ## Core workflows
 
@@ -143,6 +152,8 @@ docs/                 Technical documentation
 ## Additional documentation
 
 - [Architecture](docs/architecture.md)
+- [Capability Map](docs/capability-map.md)
+- [V1 Release Checkpoint](docs/v1-release-checkpoint.md)
 - [Development](docs/development.md)
 - [Compliance Engine](docs/compliance-engine.md)
 - [DB Operations](docs/foundation-db-operations.md)

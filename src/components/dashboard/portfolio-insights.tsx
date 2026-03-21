@@ -10,6 +10,10 @@ import {
   Panel,
   formatMoney,
 } from "@/components/internal/admin-primitives";
+import {
+  getWorklistTriageDisplay,
+  humanizeToken,
+} from "@/components/internal/status-helpers";
 
 interface BuildingRef {
   id: string;
@@ -17,6 +21,8 @@ interface BuildingRef {
 }
 
 function urgencyClasses(level: string) {
+  if (level === "NOW") return "bg-red-50 text-red-700 ring-1 ring-red-600/20";
+  if (level === "NEXT") return "bg-orange-50 text-orange-700 ring-1 ring-orange-600/20";
   if (level === "CRITICAL") return "bg-red-50 text-red-700 ring-1 ring-red-600/20";
   if (level === "HIGH") return "bg-orange-50 text-orange-700 ring-1 ring-orange-600/20";
   if (level === "MEDIUM") return "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20";
@@ -29,29 +35,16 @@ export function PortfolioInsights({
   buildings: BuildingRef[];
 }) {
   const buildingNameById = new Map(buildings.map((building) => [building.id, building.name]));
-  const workflow = trpc.building.portfolioWorkflow.useQuery({ limit: 25 });
-  const risk = trpc.portfolioRisk.list.useQuery({ limit: 25 });
-  const actions = trpc.portfolioRisk.priorityActions.useQuery({ limit: 8 });
+  const worklist = trpc.building.portfolioWorklist.useQuery({});
   const anomalies = trpc.operations.listPortfolioAnomalies.useQuery({ limit: 8 });
   const retrofit = trpc.retrofit.rankPortfolio.useQuery({ limit: 8 });
 
-  if (
-    workflow.isLoading ||
-    risk.isLoading ||
-    actions.isLoading ||
-    anomalies.isLoading ||
-    retrofit.isLoading
-  ) {
+  if (worklist.isLoading || anomalies.isLoading || retrofit.isLoading) {
     return <LoadingState />;
   }
 
-  if (workflow.error || risk.error || actions.error || anomalies.error || retrofit.error) {
-    const error =
-      workflow.error ??
-      risk.error ??
-      actions.error ??
-      anomalies.error ??
-      retrofit.error;
+  if (worklist.error || anomalies.error || retrofit.error) {
+    const error = worklist.error ?? anomalies.error ?? retrofit.error;
     return (
       <ErrorState
         message="Portfolio insights are unavailable right now."
@@ -60,58 +53,63 @@ export function PortfolioInsights({
     );
   }
 
-  const aggregate = risk.data?.aggregate;
-  const workflowAggregate = workflow.data?.aggregate;
+  const aggregate = worklist.data?.aggregate;
+  const priorityItems = worklist.data?.items.slice(0, 8) ?? [];
+  const backlogItems = worklist.data?.items
+    .filter((item) => item.triage.bucket !== "MONITORING")
+    .slice(0, 8) ?? [];
 
   return (
     <div className="space-y-6">
       {aggregate ? (
         <MetricGrid
           items={[
-            { label: "Buildings ready to work", value: aggregate.totals.buildingsReady, tone: "success" },
-            { label: "Buildings blocked", value: aggregate.totals.buildingsBlocked, tone: "danger" },
-            { label: "High-risk buildings", value: aggregate.totals.buildingsAtHighRisk, tone: "warning" },
             {
-              label: "Estimated exposure",
-              value: formatMoney(aggregate.totals.totalEstimatedExposure),
-              tone: "danger",
+              label: "Needs attention now",
+              value: aggregate.needsAttentionNow,
+              tone: aggregate.needsAttentionNow > 0 ? "danger" : "default",
+            },
+            {
+              label: "Compliance blockers",
+              value: aggregate.blocked,
+              tone: aggregate.blocked > 0 ? "danger" : "default",
+            },
+            {
+              label: "Submission queue",
+              value: aggregate.submissionQueue,
+              tone: aggregate.submissionQueue > 0 ? "warning" : "default",
+            },
+            {
+              label: "Penalty exposure",
+              value: aggregate.withPenaltyExposure,
+              tone: aggregate.withPenaltyExposure > 0 ? "warning" : "default",
             },
           ]}
         />
       ) : null}
 
-      {workflowAggregate ? (
+      {aggregate ? (
         <MetricGrid
           items={[
             {
-              label: "Benchmarking blocked",
-              value: workflowAggregate.benchmarkingBlocked,
-              tone: workflowAggregate.benchmarkingBlocked > 0 ? "danger" : "default",
+              label: "Review queue",
+              value: aggregate.reviewQueue,
+              tone: aggregate.reviewQueue > 0 ? "warning" : "default",
             },
             {
-              label: "BEPS needs review",
-              value: workflowAggregate.needsBepsEvaluation,
-              tone: workflowAggregate.needsBepsEvaluation > 0 ? "warning" : "default",
+              label: "Sync attention",
+              value: aggregate.syncQueue,
+              tone: aggregate.syncQueue > 0 ? "warning" : "default",
             },
             {
-              label: "Filing follow-up",
-              value: workflowAggregate.filingAttention,
-              tone: workflowAggregate.filingAttention > 0 ? "warning" : "default",
+              label: "Operational risk",
+              value: aggregate.anomalyQueue,
+              tone: aggregate.anomalyQueue > 0 ? "warning" : "default",
             },
             {
-              label: "Operational review",
-              value: workflowAggregate.operationalAttention,
-              tone: workflowAggregate.operationalAttention > 0 ? "warning" : "default",
-            },
-            {
-              label: "Retrofit planned",
-              value: workflowAggregate.retrofitReady,
-              tone: workflowAggregate.retrofitReady > 0 ? "success" : "default",
-            },
-            {
-              label: "Financing ready",
-              value: workflowAggregate.financingReady,
-              tone: workflowAggregate.financingReady > 0 ? "success" : "default",
+              label: "Retrofit queue",
+              value: aggregate.retrofitQueue,
+              tone: aggregate.retrofitQueue > 0 ? "warning" : "default",
             },
           ]}
         />
@@ -120,59 +118,75 @@ export function PortfolioInsights({
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel
           title="Priority Actions"
-          subtitle="Plain-language workflow actions derived from governed records and current building state."
+          subtitle="Governed next actions pulled directly from the current portfolio worklist."
         >
-          {!actions.data || actions.data.length === 0 ? (
+          {priorityItems.length === 0 ? (
             <EmptyState message="No portfolio actions need immediate attention." />
           ) : (
             <div className="space-y-3">
-              {actions.data.map((item) => (
-                <div key={`${item.buildingId}-${item.reasonCode}`} className="card-machined p-4 transition-all hover:shadow-md hover:border-zinc-300">
-                  <div className="flex items-center justify-between gap-3">
-                    <Link href={`/buildings/${item.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors">
-                      {buildingNameById.get(item.buildingId) ?? item.buildingId}
-                    </Link>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-mono font-medium tracking-tight uppercase ${urgencyClasses(item.urgencyLevel)}`}>
-                      {item.urgencyLevel}
-                    </span>
+              {priorityItems.map((item) => {
+                const triageDisplay = getWorklistTriageDisplay(item.triage.bucket);
+
+                return (
+                  <div
+                    key={`${item.buildingId}-${item.nextAction.code}`}
+                    className="card-machined p-4 transition-all hover:shadow-md hover:border-zinc-300"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <Link
+                        href={`/buildings/${item.buildingId}`}
+                        className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors"
+                      >
+                        {item.buildingName}
+                      </Link>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-mono font-medium tracking-tight uppercase ${urgencyClasses(item.triage.urgency)}`}
+                      >
+                        {item.triage.urgency}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 ring-1 ring-zinc-200">
+                        {triageDisplay.label}
+                      </span>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 ring-1 ring-zinc-200">
+                        {humanizeToken(item.readinessState)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-zinc-700 font-medium">
+                      {item.nextAction.title}
+                    </p>
+                    <p className="mt-1.5 text-xs text-zinc-500">{item.triage.cue}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{item.nextAction.reason}</p>
                   </div>
-                  <p className="mt-2 text-sm text-zinc-700 font-medium">{item.message}</p>
-                  <p className="mt-1.5 text-xs text-zinc-500">{item.recommendedNextAction}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Panel>
 
         <Panel
-          title="Workflow Backlog"
-          subtitle="Buildings blocked in the current workflow, with the next concrete step called out."
+          title="Governed Queue"
+          subtitle="Buildings currently surfacing in the governed portfolio queue, grouped by server-authored triage state."
         >
-          {!workflow.data || workflow.data.items.length === 0 ? (
-            <EmptyState message="No workflow summaries are available yet." />
+          {backlogItems.length === 0 ? (
+            <EmptyState message="No governed queue items are available yet." />
           ) : (
             <div className="space-y-3">
-              {workflow.data.items
-                .filter((entry) =>
-                  entry.stages.some((stage) => stage.status === "BLOCKED" || stage.status === "NEEDS_ATTENTION"),
-                )
-                .slice(0, 8)
-                .map((entry) => {
-                  const blockedStage = entry.stages.find(
-                    (stage) => stage.status === "BLOCKED" || stage.status === "NEEDS_ATTENTION",
-                  );
-
+              {backlogItems.map((entry) => {
+                const triageDisplay = getWorklistTriageDisplay(entry.triage.bucket);
                 return (
                   <div key={entry.buildingId} className="card-machined p-4 transition-all hover:shadow-md hover:border-zinc-300">
                     <div className="flex items-center justify-between gap-3">
                       <Link href={`/buildings/${entry.buildingId}`} className="font-semibold text-zinc-900 hover:text-amber-600 transition-colors">
                         {entry.buildingName}
                       </Link>
-                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${blockedStage?.status === "BLOCKED" ? "bg-red-50 text-red-700 ring-1 ring-red-600/20" : "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"}`}>
-                        {blockedStage?.status?.replace("_", " ") ?? "NEEDS ATTENTION"}
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${urgencyClasses(entry.triage.urgency)}`}>
+                        {triageDisplay.label}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-zinc-700 font-medium">{blockedStage?.label ?? entry.nextAction.title}</p>
+                    <p className="mt-2 text-sm text-zinc-700 font-medium">{entry.triage.cue}</p>
+                    <p className="mt-1 text-[13px] text-zinc-500">{entry.nextAction.title}</p>
                     <p className="mt-1 text-[13px] text-zinc-500">{entry.nextAction.reason}</p>
                   </div>
                 );

@@ -24,6 +24,14 @@ export function ReportsPage() {
   const [reportingYear, setReportingYear] = useState(currentReportingYear());
   const buildings = trpc.building.list.useQuery({ pageSize: 100 });
   const publicationOverview = trpc.report.publicationOverview.useQuery();
+  const reportArtifacts = trpc.report.getComplianceReportArtifacts.useQuery(
+    { buildingId },
+    { enabled: !!buildingId },
+  );
+  const exemptionReportArtifacts = trpc.report.getExemptionReportArtifacts.useQuery(
+    { buildingId },
+    { enabled: !!buildingId },
+  );
   const promoteRuleCandidate = trpc.report.promoteRuleCandidate.useMutation({
     onSuccess: async () => {
       await utils.report.publicationOverview.invalidate();
@@ -49,6 +57,36 @@ export function ReportsPage() {
       await utils.report.publicationOverview.invalidate();
     },
   });
+  const generateComplianceReportArtifact =
+    trpc.report.generateComplianceReportArtifact.useMutation({
+      onSuccess: async () => {
+        await Promise.all([
+          utils.report.getComplianceReport.invalidate({ buildingId }),
+          utils.report.getComplianceReportArtifacts.invalidate({ buildingId }),
+        ]);
+      },
+    });
+  const exportComplianceReportArtifact =
+    trpc.report.exportComplianceReportArtifact.useMutation({
+      onSuccess: async () => {
+        await utils.report.getComplianceReportArtifacts.invalidate({ buildingId });
+      },
+    });
+  const generateExemptionReportArtifact =
+    trpc.report.generateExemptionReportArtifact.useMutation({
+      onSuccess: async () => {
+        await Promise.all([
+          utils.report.getExemptionReport.invalidate({ buildingId }),
+          utils.report.getExemptionReportArtifacts.invalidate({ buildingId }),
+        ]);
+      },
+    });
+  const exportExemptionReportArtifact =
+    trpc.report.exportExemptionReportArtifact.useMutation({
+      onSuccess: async () => {
+        await utils.report.getExemptionReportArtifacts.invalidate({ buildingId });
+      },
+    });
   const complianceReport = trpc.report.getComplianceReport.useQuery(
     { buildingId },
     { enabled: !!buildingId },
@@ -91,7 +129,7 @@ export function ReportsPage() {
 
       <Panel
         title="Report Scope"
-        subtitle="Choose a building to inspect the generated compliance and exemption report data."
+        subtitle="Choose a building to inspect governed compliance and exemption report artifacts."
       >
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm text-zinc-700">
@@ -306,24 +344,51 @@ export function ReportsPage() {
               title="Compliance Report"
               subtitle="Governed compliance, penalty, evidence, and operational risk packaged for operator and customer-facing review."
               actions={
-                <button
-                  onClick={() =>
-                    downloadTextFile({
-                      fileName: `${selectedBuilding.name.replace(/\s+/g, "-").toLowerCase()}-compliance-report.json`,
-                      content: JSON.stringify(complianceReport.data, null, 2),
-                      contentType: "application/json",
-                    })
-                  }
-                  className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-                >
-                  Download JSON
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() =>
+                      generateComplianceReportArtifact.mutate({
+                        buildingId,
+                      })
+                    }
+                    disabled={generateComplianceReportArtifact.isPending}
+                    className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                  >
+                    {reportArtifacts.data?.latestArtifact
+                      ? "Generate new governed artifact"
+                      : "Generate governed artifact"}
+                  </button>
+                  {reportArtifacts.data?.latestArtifact ? (
+                    <button
+                      onClick={async () => {
+                        const exported =
+                          await exportComplianceReportArtifact.mutateAsync({
+                            buildingId,
+                            artifactId: reportArtifacts.data.latestArtifact!.id,
+                            format: "JSON",
+                          });
+
+                        downloadTextFile({
+                          fileName: exported.fileName,
+                          content: exported.content,
+                          contentType: exported.contentType,
+                        });
+                      }}
+                      disabled={exportComplianceReportArtifact.isPending}
+                      className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                    >
+                      Download governed JSON
+                    </button>
+                  ) : null}
+                </div>
               }
             >
               {(() => {
                 const report = complianceReport.data;
                 const sections = report.sections;
                 const evidencePackage = report.evidencePackage;
+                const artifactWorkspace = reportArtifacts.data;
+                const latestArtifact = artifactWorkspace?.latestArtifact ?? null;
 
                 return (
                   <>
@@ -346,6 +411,15 @@ export function ReportsPage() {
                   )}
                   {" | "}Last compliance evaluation{" "}
                   {formatDate(evidencePackage.traceability.lastComplianceEvaluatedAt)}
+                </div>
+                <div className="mt-2 text-xs text-zinc-500">
+                  {latestArtifact
+                    ? `Persisted artifact v${latestArtifact.version} generated ${formatDate(
+                        latestArtifact.generatedAt,
+                      )} | Last exported ${formatDate(
+                        latestArtifact.latestExportedAt,
+                      )}`
+                    : "No persisted compliance report artifact has been generated for this building yet."}
                 </div>
               </div>
 
@@ -547,10 +621,36 @@ export function ReportsPage() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-zinc-900">Evidence appendices</h4>
+                  <h4 className="text-sm font-medium text-zinc-900">Report artifact history</h4>
                   <div className="mt-2 space-y-2 text-sm text-zinc-700">
                     <div className="rounded border border-zinc-200 px-3 py-2">
-                      <div className="font-medium text-zinc-900">Recent energy history</div>
+                      <div className="font-medium text-zinc-900">Persisted governed reports</div>
+                      <div className="mt-2 space-y-2">
+                        {artifactWorkspace?.history.length ? (
+                          artifactWorkspace.history.map((artifact) => (
+                            <div
+                              key={artifact.id}
+                              className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2"
+                            >
+                              <div className="font-medium text-zinc-900">
+                                Report v{artifact.version}
+                              </div>
+                              <div className="text-xs text-zinc-500">
+                                Generated {formatDate(artifact.generatedAt)}
+                                {" | "}Last export {formatDate(artifact.latestExportedAt)}
+                              </div>
+                              <div className="mt-1 text-xs text-zinc-600">
+                                Source summary hash {artifact.sourceSummaryHash}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <EmptyState message="No persisted compliance report artifacts have been generated yet." />
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded border border-zinc-200 px-3 py-2">
+                      <div className="font-medium text-zinc-900">Evidence appendices</div>
                       <div className="mt-2 space-y-2">
                         {report.energyHistory.slice(0, 6).map((reading) => (
                           <div
@@ -567,21 +667,14 @@ export function ReportsPage() {
                             </div>
                           </div>
                         ))}
-                      </div>
-                    </div>
-                    <div className="rounded border border-zinc-200 px-3 py-2">
-                      <div className="font-medium text-zinc-900">Recent pipeline runs</div>
-                      <div className="mt-2 space-y-2">
                         {report.pipelineRuns.length === 0 ? (
                           <EmptyState message="No pipeline runs were included in the report payload." />
-                        ) : (
-                          report.pipelineRuns.map((run) => (
-                            <div key={run.id} className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-                              <div className="font-medium">{run.pipelineType}</div>
-                              <div className="text-xs text-zinc-500">{run.status}</div>
-                            </div>
-                          ))
-                        )}
+                        ) : report.pipelineRuns.map((run) => (
+                          <div key={run.id} className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                            <div className="font-medium">{run.pipelineType}</div>
+                            <div className="text-xs text-zinc-500">{run.status}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -596,22 +689,67 @@ export function ReportsPage() {
           {selectedBuilding && exemptionReport.data ? (
             <Panel
               title="Exemption Report"
-              subtitle="Current exemption filing package payload generated from the deterministic screener."
+              subtitle="Persisted exemption filing packages generated from the governed screener and current compliance context."
               actions={
-                <button
-                  onClick={() =>
-                    downloadTextFile({
-                      fileName: `${selectedBuilding.name.replace(/\s+/g, "-").toLowerCase()}-exemption-report.json`,
-                      content: JSON.stringify(exemptionReport.data, null, 2),
-                      contentType: "application/json",
-                    })
-                  }
-                  className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-                >
-                  Download JSON
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() =>
+                      generateExemptionReportArtifact.mutate({
+                        buildingId,
+                      })
+                    }
+                    disabled={generateExemptionReportArtifact.isPending}
+                    className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                  >
+                    {exemptionReportArtifacts.data?.latestArtifact
+                      ? "Generate new governed artifact"
+                      : "Generate governed artifact"}
+                  </button>
+                  {exemptionReportArtifacts.data?.latestArtifact ? (
+                    <button
+                      onClick={async () => {
+                        const exported =
+                          await exportExemptionReportArtifact.mutateAsync({
+                            buildingId,
+                            artifactId: exemptionReportArtifacts.data.latestArtifact!.id,
+                            format: "JSON",
+                          });
+
+                        downloadTextFile({
+                          fileName: exported.fileName,
+                          content: exported.content,
+                          contentType: exported.contentType,
+                        });
+                      }}
+                      disabled={exportExemptionReportArtifact.isPending}
+                      className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                    >
+                      Download governed JSON
+                    </button>
+                  ) : null}
+                </div>
               }
             >
+              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
+                <div className="font-medium text-zinc-900">Governed exemption summary</div>
+                <div className="mt-1 text-zinc-600">
+                  Compliance{" "}
+                  {exemptionReport.data.complianceStatus
+                    .toLowerCase()
+                    .replaceAll("_", " ")}
+                  {" | "}Eligible{" "}
+                  {exemptionReport.data.exemptionScreening.eligible ? "yes" : "no"}
+                </div>
+                <div className="mt-2 text-xs text-zinc-500">
+                  {exemptionReportArtifacts.data?.latestArtifact
+                    ? `Persisted artifact v${exemptionReportArtifacts.data.latestArtifact.version} generated ${formatDate(
+                        exemptionReportArtifacts.data.latestArtifact.generatedAt,
+                      )} | Last exported ${formatDate(
+                        exemptionReportArtifacts.data.latestArtifact.latestExportedAt,
+                      )}`
+                    : "No persisted exemption report artifact has been generated for this building yet."}
+                </div>
+              </div>
               <MetricGrid
                 items={[
                   {
@@ -670,25 +808,58 @@ export function ReportsPage() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-zinc-900">Benchmark Submissions</h4>
+                  <h4 className="text-sm font-medium text-zinc-900">Report artifact history</h4>
                   <div className="mt-2 space-y-2">
-                    {submissions.data && submissions.data.length > 0 ? (
-                      submissions.data
-                        .filter((submission) => submission.reportingYear === reportingYear)
-                        .map((submission) => (
-                          <div
-                            key={submission.id}
-                            className="rounded border border-zinc-200 px-3 py-2 text-sm"
-                          >
-                            <div className="font-medium text-zinc-900">
-                              Reporting year {submission.reportingYear}
+                    <div className="rounded border border-zinc-200 px-3 py-2">
+                      <div className="font-medium text-zinc-900">
+                        Persisted exemption reports
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        {exemptionReportArtifacts.data?.history.length ? (
+                          exemptionReportArtifacts.data.history.map((artifact) => (
+                            <div
+                              key={artifact.id}
+                              className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2"
+                            >
+                              <div className="font-medium text-zinc-900">
+                                Report v{artifact.version}
+                              </div>
+                              <div className="text-xs text-zinc-500">
+                                Generated {formatDate(artifact.generatedAt)}
+                                {" | "}Last export {formatDate(artifact.latestExportedAt)}
+                              </div>
+                              <div className="mt-1 text-xs text-zinc-600">
+                                Source summary hash {artifact.sourceSummaryHash}
+                              </div>
                             </div>
-                            <div className="text-xs text-zinc-500">{submission.status}</div>
-                          </div>
-                        ))
-                    ) : (
-                      <EmptyState message="No benchmark submissions are available for this building yet." />
-                    )}
+                          ))
+                        ) : (
+                          <EmptyState message="No persisted exemption report artifacts have been generated yet." />
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded border border-zinc-200 px-3 py-2">
+                      <div className="font-medium text-zinc-900">Benchmark submissions</div>
+                      <div className="mt-2 space-y-2">
+                        {submissions.data && submissions.data.length > 0 ? (
+                          submissions.data
+                            .filter((submission) => submission.reportingYear === reportingYear)
+                            .map((submission) => (
+                              <div
+                                key={submission.id}
+                                className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                              >
+                                <div className="font-medium text-zinc-900">
+                                  Reporting year {submission.reportingYear}
+                                </div>
+                                <div className="text-xs text-zinc-500">{submission.status}</div>
+                              </div>
+                            ))
+                        ) : (
+                          <EmptyState message="No benchmark submissions are available for this building yet." />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

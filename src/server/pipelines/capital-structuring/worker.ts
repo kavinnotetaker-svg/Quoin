@@ -1,3 +1,7 @@
+/**
+ * Deprecated legacy capital-structuring support.
+ * Retained for historical/internal reference only and not part of the active Quoin product surface.
+ */
 import { createWorker } from "@/server/lib/queue";
 import { getTenantClient } from "@/server/lib/db";
 import { getLatestComplianceSnapshot } from "@/server/lib/compliance-snapshots";
