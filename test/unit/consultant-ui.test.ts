@@ -107,6 +107,14 @@ vi.mock("@/lib/trpc", () => ({
           isPending: false,
         }),
       },
+      create: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          error: null,
+        }),
+      },
       transitionSubmissionWorkflow: {
         useMutation: () => ({
           mutate: vi.fn(),
@@ -592,6 +600,7 @@ describe("consultant-facing screens", () => {
     const markup = renderToStaticMarkup(createElement(ComplianceQueue));
 
     expect(markup).toContain("Portfolio worklist");
+    expect(markup).toContain("Add building");
     expect(markup).toContain("Needs attention now");
     expect(markup).toContain("Submission queue");
     expect(markup).toContain("Resolve missing utility months");

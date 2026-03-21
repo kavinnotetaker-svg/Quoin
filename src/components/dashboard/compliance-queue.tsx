@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Building2, Plus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { PageHeader } from "@/components/layout/page-header";
 import {
@@ -10,6 +11,14 @@ import {
   ErrorState,
   LoadingState,
 } from "@/components/internal/admin-primitives";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { BuildingForm, type BuildingFormData } from "@/components/onboarding/building-form";
 import {
   StatusBadge,
   getPacketStatusDisplay,
@@ -139,6 +148,7 @@ function getWorkflowStateDisplay(state: string) {
 export function ComplianceQueue() {
   const utils = trpc.useUtils();
   const pageSize = 25;
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [triageUrgencyFilter, setTriageUrgencyFilter] = useState("");
   const [triageFilter, setTriageFilter] = useState("");
@@ -242,6 +252,19 @@ export function ComplianceQueue() {
         utils.building.portfolioWorklist.invalidate(),
         utils.building.list.invalidate(),
       ]);
+    },
+  });
+  const createBuilding = trpc.building.create.useMutation({
+    onSuccess: async (createdBuilding) => {
+      await Promise.all([
+        utils.building.list.invalidate(),
+        utils.building.portfolioWorklist.invalidate(),
+      ]);
+      setIsCreateDialogOpen(false);
+
+      if (typeof window !== "undefined") {
+        window.location.assign(`/buildings/${createdBuilding.id}`);
+      }
     },
   });
 
@@ -368,12 +391,106 @@ export function ComplianceQueue() {
     anomalyAttentionOnly ||
     retrofitOnly;
 
+  function handleCreateBuilding(input: BuildingFormData) {
+    createBuilding.mutate({
+      name: input.name,
+      address: input.address,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      grossSquareFeet: input.grossSquareFeet,
+      propertyType: input.propertyType as "OFFICE" | "MULTIFAMILY" | "MIXED_USE" | "OTHER",
+      yearBuilt: input.yearBuilt ?? undefined,
+      bepsTargetScore: input.bepsTargetScore,
+      espmPropertyId: input.espmPropertyId,
+    });
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Portfolio worklist"
         subtitle="Use the governed worklist to see which buildings are blocked, which are ready for review, and which artifacts are ready to finalize or submit."
-      />
+      >
+        <div className="w-full rounded-2xl border border-zinc-200/80 bg-white px-4 py-4 shadow-sm sm:min-w-[340px] sm:max-w-[380px]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                Portfolio setup
+              </div>
+              <div className="mt-1 text-sm font-semibold text-zinc-900">
+                Add a building into the governed workflow
+              </div>
+              <div className="mt-1 text-xs leading-relaxed text-zinc-500">
+                Create the record first, then connect data sources, review compliance,
+                and package artifacts from the same building workspace.
+              </div>
+            </div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-600">
+              <Building2 size={18} />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="btn-primary mt-4 w-full justify-center text-sm"
+          >
+            <Plus size={16} />
+            Add building
+          </button>
+        </div>
+      </PageHeader>
+
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent
+          className="border border-zinc-200/80 bg-white p-0 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)]"
+          style={{ width: "min(calc(100vw - 2rem), 48rem)", maxWidth: "48rem" }}
+        >
+          <DialogHeader className="border-b border-zinc-200 px-6 py-5">
+            <DialogTitle>Add building</DialogTitle>
+            <DialogDescription>
+              Create a building record so it can enter the governed compliance workflow.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-6">
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-5 shadow-sm">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                  Manual scope
+                </div>
+                <div className="mt-2 text-lg font-semibold tracking-tight text-zinc-900">
+                  Start with the building record
+                </div>
+                <div className="mt-2 text-sm leading-relaxed text-zinc-600">
+                  Quoin uses the building as the governed anchor for source reconciliation,
+                  compliance evaluation, artifacts, and reports.
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3 text-sm text-zinc-600">
+                  <div className="rounded-xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+                    Link Portfolio Manager later if needed.
+                  </div>
+                  <div className="rounded-xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+                    Upload utility data after creation.
+                  </div>
+                  <div className="rounded-xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+                    Governed readiness, penalty, and artifact history attach to this record.
+                  </div>
+                </div>
+              </div>
+              <div className="min-w-0">
+                <BuildingForm
+                  onSubmit={handleCreateBuilding}
+                  loading={createBuilding.isPending}
+                />
+                {createBuilding.error ? (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                    {createBuilding.error.message}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[
