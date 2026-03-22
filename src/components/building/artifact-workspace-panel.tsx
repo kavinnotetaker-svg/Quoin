@@ -13,6 +13,7 @@ import {
 import {
   StatusBadge,
   getPacketStatusDisplay,
+  getSubmissionWorkflowStateDisplay,
 } from "@/components/internal/status-helpers";
 
 function getDispositionDisplay(disposition: string | null) {
@@ -25,27 +26,6 @@ function getDispositionDisplay(disposition: string | null) {
       return { label: "Blocked", tone: "danger" as const };
     default:
       return { label: "Not generated", tone: "muted" as const };
-  }
-}
-
-function getWorkflowStateDisplay(state: string) {
-  switch (state) {
-    case "DRAFT":
-      return { label: "Draft workflow", tone: "muted" as const };
-    case "READY_FOR_REVIEW":
-      return { label: "Ready for review", tone: "info" as const };
-    case "APPROVED_FOR_SUBMISSION":
-      return { label: "Approved for submission", tone: "success" as const };
-    case "SUBMITTED":
-      return { label: "Submitted", tone: "warning" as const };
-    case "COMPLETED":
-      return { label: "Completed", tone: "success" as const };
-    case "NEEDS_CORRECTION":
-      return { label: "Needs correction", tone: "danger" as const };
-    case "SUPERSEDED":
-      return { label: "Superseded", tone: "muted" as const };
-    default:
-      return { label: "No workflow", tone: "muted" as const };
   }
 }
 
@@ -220,9 +200,24 @@ function ArtifactCard({
 }) {
   const statusDisplay = getPacketStatusDisplay(workflow.status);
   const dispositionDisplay = getDispositionDisplay(workflow.disposition);
-  const workflowDisplay = getWorkflowStateDisplay(
+  const workflowDisplay = getSubmissionWorkflowStateDisplay(
     workflow.submissionWorkflow?.state ?? "NOT_STARTED",
   );
+  const transitionActions = canManageSubmissionWorkflows
+    ? workflow.submissionWorkflow?.allowedTransitions ?? []
+    : [];
+  const primaryTransition =
+    !workflow.canGenerate && !workflow.canFinalize
+      ? transitionActions[0] ?? null
+      : null;
+  const secondaryTransitions = primaryTransition
+    ? transitionActions.filter(
+        (transition) => transition.nextState !== primaryTransition.nextState,
+      )
+    : transitionActions;
+  const primaryButtonClass = "btn-primary inline-flex items-center justify-center";
+  const quietButtonClass =
+    "rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50";
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-5">
@@ -265,7 +260,7 @@ function ArtifactCard({
               ? `v${workflow.latestArtifact.version} generated ${formatDate(
                   workflow.latestArtifact.generatedAt,
                 )}`
-              : "No artifact has been generated yet."}
+              : "This package has not been generated yet."}
           </div>
           <div className="mt-1 text-zinc-500">
             {workflow.latestArtifact?.finalizedAt
@@ -280,12 +275,12 @@ function ArtifactCard({
           <div className="mt-1">
             {workflow.submissionWorkflow
               ? workflow.submissionWorkflow.nextAction.title
-              : "No submission workflow has started."}
+              : "Submission workflow has not started for this package."}
           </div>
           <div className="mt-1 text-zinc-500">
             {workflow.submissionWorkflow?.latestTransitionAt
               ? `Last transition ${formatDate(workflow.submissionWorkflow.latestTransitionAt)}`
-              : "Workflow starts after artifact generation."}
+              : "Workflow history begins after the first governed package is generated."}
           </div>
         </div>
         <div>
@@ -303,71 +298,106 @@ function ArtifactCard({
           <div className="mt-1">
             {workflow.sourceContext.currentEstimatedPenalty != null
               ? formatMoney(workflow.sourceContext.currentEstimatedPenalty)
-              : "No current estimate"}
+              : "No governed estimate"}
           </div>
           <div className="mt-1 text-zinc-500">
             {workflow.sourceContext.penaltyEstimatedAt
               ? `Calculated ${formatDate(workflow.sourceContext.penaltyEstimatedAt)}`
-              : "No governed penalty run linked"}
+              : "No governed penalty run is linked to this package context."}
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={!workflow.canGenerate || isGenerating}
-          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
-        >
-          {isGenerating
-            ? "Generating..."
-            : workflow.latestArtifact
-              ? "Regenerate artifact"
-              : "Generate artifact"}
-        </button>
-        <button
-          type="button"
-          onClick={onFinalize}
-          disabled={!workflow.canFinalize || isFinalizing}
-          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
-        >
-          {isFinalizing ? "Finalizing..." : "Finalize artifact"}
-        </button>
-        <button
-          type="button"
-          onClick={() => onExport("PDF")}
-          disabled={!workflow.latestArtifact}
-          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
-        >
-          Export PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => onExport("JSON")}
-          disabled={!workflow.latestArtifact}
-          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
-        >
-          Export JSON
-        </button>
-        {canManageSubmissionWorkflows
-          ? workflow.submissionWorkflow?.allowedTransitions.map((transition) => (
+      <div className="mt-4 space-y-3">
+        <div className="flex flex-wrap gap-3">
+          {workflow.canGenerate ? (
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={!workflow.canGenerate || isGenerating}
+              className={primaryButtonClass}
+            >
+              {isGenerating
+                ? "Generating package..."
+                : workflow.latestArtifact
+                  ? "Refresh package"
+                  : "Generate package"}
+            </button>
+          ) : null}
+          {!workflow.canGenerate && workflow.canFinalize ? (
+            <button
+              type="button"
+              onClick={onFinalize}
+              disabled={!workflow.canFinalize || isFinalizing}
+              className={primaryButtonClass}
+            >
+              {isFinalizing ? "Finalizing package..." : "Finalize package"}
+            </button>
+          ) : null}
+          {!workflow.canGenerate && !workflow.canFinalize && primaryTransition ? (
+            <button
+              type="button"
+              onClick={() =>
+                onWorkflowTransition(
+                  primaryTransition.nextState,
+                  transitionNotes.trim().length > 0 ? transitionNotes.trim() : null,
+                )
+              }
+              disabled={isTransitioning}
+              className={primaryButtonClass}
+            >
+              {primaryTransition.label}
+            </button>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {workflow.canGenerate && workflow.canFinalize ? (
+            <button
+              type="button"
+              onClick={onFinalize}
+              disabled={!workflow.canFinalize || isFinalizing}
+              className={quietButtonClass}
+            >
+              {isFinalizing ? "Finalizing package..." : "Finalize package"}
+            </button>
+          ) : null}
+          {secondaryTransitions.map((transition) => (
+            <button
+              key={transition.nextState}
+              type="button"
+              onClick={() =>
+                onWorkflowTransition(
+                  transition.nextState,
+                  transitionNotes.trim().length > 0 ? transitionNotes.trim() : null,
+                )
+              }
+              disabled={isTransitioning}
+              className={quietButtonClass}
+            >
+              {transition.label}
+            </button>
+          ))}
+          {workflow.latestArtifact ? (
+            <>
               <button
-                key={transition.nextState}
                 type="button"
-                onClick={() =>
-                  onWorkflowTransition(
-                    transition.nextState,
-                    transitionNotes.trim().length > 0 ? transitionNotes.trim() : null,
-                  )
-                }
-                disabled={isTransitioning}
-                className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
+                onClick={() => onExport("PDF")}
+                disabled={!workflow.latestArtifact}
+                className={quietButtonClass}
               >
-                {transition.label}
+                Download PDF
               </button>
-            ))
-          : null}
+              <button
+                type="button"
+                onClick={() => onExport("JSON")}
+                disabled={!workflow.latestArtifact}
+                className={quietButtonClass}
+              >
+                Download JSON
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-3 space-y-2 text-xs text-zinc-500">
@@ -398,7 +428,7 @@ function ArtifactCard({
         </div>
         {workflow.history.length === 0 ? (
           <div className="mt-2 text-sm text-zinc-500">
-            No governed artifact versions exist yet.
+            No governed package versions exist yet. Generate the package to start version history.
           </div>
         ) : (
           <div className="mt-3 space-y-2">
@@ -437,7 +467,7 @@ function ArtifactCard({
           </div>
           {workflow.submissionWorkflow.history.length === 0 ? (
             <div className="mt-2 text-sm text-zinc-500">
-              No workflow transitions have been recorded yet.
+              No review or submission transitions are recorded yet. History begins after the first workflow move.
             </div>
           ) : (
             <div className="mt-3 space-y-2">
@@ -554,7 +584,7 @@ export function ArtifactWorkspacePanel({
         title="Governed artifacts"
         subtitle="Immutable filing and submission artifacts generated from the current governed compliance context."
       >
-        <div className="text-sm text-zinc-500">Loading artifact workspace...</div>
+        <div className="text-sm text-zinc-500">Preparing the governed artifact workspace...</div>
       </Panel>
     );
   }

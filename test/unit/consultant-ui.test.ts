@@ -619,9 +619,6 @@ describe("consultant-facing screens", () => {
     expect(markup).toContain("Approved");
     expect(markup).toContain("Needs attention now");
     expect(markup).toContain("Primary queue: submission");
-    expect(markup).toContain("Bulk operator actions");
-    expect(markup).toContain("Clear selection");
-    expect(markup).toContain("Bulk retry PM sync");
     expect(markup).toContain("Top retrofit: Retro-commissioning");
   });
 
@@ -1043,28 +1040,18 @@ describe("consultant-facing screens", () => {
     expect(markup).toContain(
       "No blocking issues remain. Review the latest governed result before submission.",
     );
+    expect(markup).toContain("Deterministic compliance and evidence record");
+    expect(markup).toContain("Basis, provenance, and runtime context");
     expect(markup).toContain("Open data issues");
     expect(markup).toContain("engine-test-v1");
-    expect(markup).toContain("ENERGY STAR SCORE");
-    expect(markup).toContain("Governed artifacts");
-    expect(markup).toContain("Benchmark verification artifact");
-    expect(markup).toContain("BEPS filing artifact");
-    expect(markup).toContain("Approve for submission");
-    expect(markup).toContain("Workflow history");
+    expect(markup).toContain("Energy Star Score");
     expect(markup).toContain("Penalty estimate");
     expect(markup).toContain("$300,000");
     expect(markup).toContain("Meet target");
-    expect(markup).toContain("Retrofit priorities");
-    expect(markup).toContain("Retro-commissioning");
-    expect(markup).toContain("Top risk reduction");
-    expect(markup).toContain("Risk reduction");
-    expect(markup).toContain("Operational anomalies");
-    expect(markup).toContain("Persistent baseload increased above prior operating pattern");
     expect(markup).toContain("Integration runtime health");
-    expect(markup).toContain("Operator controls");
+    expect(markup).toContain("Technical recovery tools");
     expect(markup).toContain("Retry Portfolio Manager sync");
     expect(markup).toContain("Re-enqueue Green Button ingestion");
-    expect(markup).toContain("Transition note (optional)");
     expect(markup).toContain(
       "Portfolio Manager data is stale and should be refreshed.",
     );
@@ -1080,6 +1067,20 @@ describe("consultant-facing screens", () => {
 
   it("hides non-essential routes from the primary navigation", () => {
     expect(NAV_ITEMS.map((item) => item.label)).toEqual(["Buildings", "Reports"]);
+  });
+
+  it("keeps the building workbench organized around overview, compliance, submission, and planning tabs", () => {
+    const detailSource = readFileSync(
+      "C:\\Quoin\\src\\components\\building\\building-detail.tsx",
+      "utf8",
+    );
+
+    expect(detailSource).toContain('{ key: "overview", label: "Overview" }');
+    expect(detailSource).toContain('{ key: "benchmarking", label: "Benchmarking" }');
+    expect(detailSource).toContain('{ key: "beps", label: "BEPS" }');
+    expect(detailSource).toContain('{ key: "submission", label: "Submission" }');
+    expect(detailSource).toContain('{ key: "planning", label: "Planning" }');
+    expect(detailSource).not.toContain('{ key: "retrofit", label: "Retrofit" }');
   });
 
   it("keeps compliance authority out of the client compliance tab", () => {
@@ -1170,6 +1171,8 @@ describe("consultant-facing screens", () => {
     expect(reportSource).toContain("report.generateExemptionReportArtifact.useMutation");
     expect(reportSource).toContain("report.exportComplianceReportArtifact.useMutation");
     expect(reportSource).toContain("report.exportExemptionReportArtifact.useMutation");
+    expect(reportSource).toContain("Submission Packages");
+    expect(reportSource).toContain("Publication Controls");
     expect(reportSource).toContain("Governed report summary");
     expect(reportSource).toContain("Evidence package");
     expect(reportSource).toContain("Persisted governed reports");
@@ -1202,15 +1205,15 @@ describe("consultant-facing screens", () => {
       "C:\\Quoin\\src\\components\\building\\retrofit-tab.tsx",
       "utf8",
     );
-    const overviewSource = readFileSync(
-      "C:\\Quoin\\src\\components\\building\\compliance-overview-tab.tsx",
+    const detailSource = readFileSync(
+      "C:\\Quoin\\src\\components\\building\\building-detail.tsx",
       "utf8",
     );
 
     expect(retrofitSource).not.toContain("@/server/");
     expect(retrofitSource).toContain("trpc.retrofit.rankBuilding.useQuery");
-    expect(overviewSource).not.toContain("@/server/");
-    expect(overviewSource).toContain("building.governedSummary.retrofitSummary");
+    expect(detailSource).not.toContain("@/server/");
+    expect(detailSource).toContain("<RetrofitTab buildingId={buildingId} />");
   });
 
   it("keeps active building workflow surfaces off raw payload debug output", () => {

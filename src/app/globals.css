@@ -46,7 +46,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans tracking-tight antialiased;
+    @apply bg-background text-foreground font-sans antialiased;
     font-variant-numeric: tabular-nums;
   }
 }
@@ -79,6 +79,65 @@
 }
 
 @layer components {
+  .font-display {
+    font-family: var(--font-display), var(--font-sans), sans-serif;
+  }
+
+  .quoin-shell {
+    @apply bg-zinc-50;
+  }
+
+  .quoin-kicker {
+    @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500;
+  }
+
+  .quoin-rule {
+    @apply h-px w-full bg-zinc-200/70;
+  }
+
+  .quoin-section {
+    @apply space-y-5 border-t border-zinc-200/80 pt-6;
+  }
+
+  .quoin-panel {
+    @apply space-y-5 border-t border-zinc-200/80 pt-6;
+  }
+
+  .quoin-panel-header {
+    @apply flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between;
+  }
+
+  .quoin-note {
+    @apply border-l border-zinc-300 pl-4 text-sm leading-6 text-zinc-600;
+  }
+
+  .quoin-note-governed {
+    @apply border-zinc-400 text-zinc-700;
+  }
+
+  .quoin-note-advisory {
+    @apply border-zinc-200 text-zinc-500;
+  }
+
+  .quoin-metric-strip {
+    @apply grid gap-0 border-y border-zinc-200/80 bg-white;
+  }
+
+  .quoin-metric {
+    @apply border-b border-zinc-200/70 px-5 py-5 last:border-b-0 lg:border-b-0 lg:border-r lg:last:border-r-0;
+  }
+
+  .quoin-metric-label {
+    @apply text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500;
+  }
+
+  .quoin-metric-value {
+    @apply mt-3 font-display text-3xl font-medium tracking-tight text-zinc-900;
+  }
+
+  .quoin-metric-copy {
+    @apply mt-3 text-sm leading-6 text-zinc-500;
+  }
   /* ── Machined Card ── */
   .card-machined {
     @apply bg-white rounded-2xl border border-zinc-200/60 transition-all duration-300;
@@ -118,12 +177,12 @@
 
   /* ── Status Pill Badges ── */
   .badge-status {
-    @apply rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest border transition-all duration-200;
+    @apply inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors duration-200;
   }
-  .badge-status-success { @apply badge-status bg-emerald-50 text-emerald-700 border-emerald-200/50; }
-  .badge-status-info { @apply badge-status bg-sky-50 text-sky-700 border-sky-200/50; }
-  .badge-status-warning { @apply badge-status bg-amber-50 text-amber-700 border-amber-200/50; }
-  .badge-status-danger { @apply badge-status bg-red-50 text-red-700 border-red-200/50; }
+  .badge-status-success { @apply badge-status bg-transparent text-emerald-800 border-emerald-200; }
+  .badge-status-info { @apply badge-status bg-transparent text-slate-700 border-slate-200; }
+  .badge-status-warning { @apply badge-status bg-transparent text-amber-800 border-amber-200; }
+  .badge-status-danger { @apply badge-status bg-transparent text-red-800 border-red-200; }
 
   /* ── Data Value (monospace hero numbers) ── */
   .data-value {

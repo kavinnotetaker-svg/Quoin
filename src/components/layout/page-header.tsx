@@ -10,14 +10,13 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-900">{title}</h1>
-        {subtitle ? (
-          <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>
-        ) : null}
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <div className="space-y-3">
+        <div className="quoin-kicker">Compliance workbench</div>
+        <h1 className="font-display text-4xl font-medium tracking-tight text-zinc-900">{title}</h1>
+        {subtitle ? <p className="max-w-3xl text-[15px] leading-7 text-zinc-500">{subtitle}</p> : null}
       </div>
-      {children && <div className="flex items-center gap-2">{children}</div>}
+      {children && <div className="flex items-center gap-2 lg:justify-end">{children}</div>}
     </div>
   );
 }

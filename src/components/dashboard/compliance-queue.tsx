@@ -25,9 +25,11 @@ import {
   getPenaltySummaryStatusDisplay,
   getPrimaryComplianceStatusDisplay,
   getRuntimeStatusDisplay,
+  getSubmissionWorkflowStateDisplay,
   getSubmissionReadinessDisplay,
   getVerificationStatusDisplay,
   getWorklistTriageDisplay,
+  humanizeToken,
 } from "@/components/internal/status-helpers";
 
 const TRIAGE_FILTERS = [
@@ -124,25 +126,6 @@ function formatMoney(value: number | null | undefined) {
   }
 
   return `$${value.toLocaleString()}`;
-}
-
-function getWorkflowStateDisplay(state: string) {
-  switch (state) {
-    case "READY_FOR_REVIEW":
-      return { label: "Ready for review", tone: "info" as const };
-    case "APPROVED_FOR_SUBMISSION":
-      return { label: "Approved", tone: "success" as const };
-    case "SUBMITTED":
-      return { label: "Submitted", tone: "warning" as const };
-    case "COMPLETED":
-      return { label: "Completed", tone: "success" as const };
-    case "NEEDS_CORRECTION":
-      return { label: "Correction needed", tone: "danger" as const };
-    case "DRAFT":
-      return { label: "Draft workflow", tone: "muted" as const };
-    default:
-      return { label: "No workflow", tone: "muted" as const };
-  }
 }
 
 export function ComplianceQueue() {
@@ -283,7 +266,11 @@ export function ComplianceQueue() {
 
   const data = worklist.data;
   if (!data) {
-    return <EmptyState message="No worklist data is available." />;
+    return (
+      <EmptyState
+        message="The governed worklist is not ready to display yet. Refresh the page once the portfolio view is available."
+      />
+    );
   }
 
   const canManageOperatorActions = data.operatorAccess.canManage;
@@ -411,29 +398,25 @@ export function ComplianceQueue() {
         title="Portfolio worklist"
         subtitle="Use the governed worklist to see which buildings are blocked, which are ready for review, and which artifacts are ready to finalize or submit."
       >
-        <div className="w-full rounded-2xl border border-zinc-200/80 bg-white px-4 py-4 shadow-sm sm:min-w-[340px] sm:max-w-[380px]">
+        <div className="w-full border border-zinc-200/80 bg-white px-5 py-5 sm:min-w-[340px] sm:max-w-[420px]">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              <div className="quoin-kicker">
                 Portfolio setup
               </div>
-              <div className="mt-1 text-sm font-semibold text-zinc-900">
+              <div className="mt-2 font-display text-2xl font-medium tracking-tight text-zinc-900">
                 Add a building into the governed workflow
               </div>
-              <div className="mt-1 text-xs leading-relaxed text-zinc-500">
+              <div className="mt-2 text-sm leading-7 text-zinc-500">
                 Create the record first, then connect data sources, review compliance,
                 and package artifacts from the same building workspace.
               </div>
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-600">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-zinc-200 bg-zinc-50 text-zinc-600">
               <Building2 size={18} />
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="btn-primary mt-4 w-full justify-center text-sm"
-          >
+          <button type="button" onClick={() => setIsCreateDialogOpen(true)} className="btn-primary mt-5 w-full justify-center text-sm">
             <Plus size={16} />
             Add building
           </button>
@@ -492,36 +475,58 @@ export function ComplianceQueue() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {[
-          { label: "Needs attention now", value: data.aggregate.needsAttentionNow },
-          { label: "Blocked", value: data.aggregate.blocked },
-          { label: "Ready for review", value: data.aggregate.readyForReview },
-          { label: "Ready to submit", value: data.aggregate.readyToSubmit },
-          { label: "Submission queue", value: data.aggregate.submissionQueue },
-          { label: "Review queue", value: data.aggregate.reviewQueue },
-          { label: "Needs correction", value: data.aggregate.needsCorrection },
-          { label: "Penalty exposure", value: data.aggregate.withPenaltyExposure },
-          { label: "Operational risk", value: data.aggregate.withOperationalRisk },
-          { label: "Retrofit opportunities", value: data.aggregate.withActionableRetrofits },
-          { label: "Sync attention", value: data.aggregate.withSyncAttention },
-          { label: "Draft artifacts", value: data.aggregate.withDraftArtifacts },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"
-          >
-            <div className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
-              {item.label}
+      <div className="space-y-6">
+        <div className="quoin-metric-strip lg:grid-cols-4">
+          {[
+            {
+              label: "Needs attention now",
+              value: data.aggregate.needsAttentionNow.toString().padStart(2, "0"),
+              copy: "Buildings with immediate governed blockers, workflow stalls, or urgent operational follow-up.",
+            },
+            {
+              label: "Ready for review",
+              value: data.aggregate.readyForReview.toString().padStart(2, "0"),
+              copy: "Governed building records prepared for consultant review.",
+            },
+            {
+              label: "Ready to submit",
+              value: data.aggregate.readyToSubmit.toString().padStart(2, "0"),
+              copy: "Artifacts and workflow state aligned for submission handling.",
+            },
+            {
+              label: "Penalty exposure",
+              value: data.aggregate.withPenaltyExposure.toString().padStart(2, "0"),
+              copy: "Buildings with an active governed penalty estimate on record.",
+            },
+          ].map((item) => (
+            <div key={item.label} className="quoin-metric">
+              <div className="quoin-metric-label">{item.label}</div>
+              <div className="quoin-metric-value">{item.value}</div>
+              <div className="quoin-metric-copy">{item.copy}</div>
             </div>
-            <div className="mt-2 font-mono text-3xl font-semibold text-zinc-900">
-              {item.value}
+          ))}
+        </div>
+
+        <div className="grid gap-x-8 gap-y-3 border-t border-zinc-200 pt-5 text-sm text-zinc-600 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["Blocked", data.aggregate.blocked],
+            ["Submission queue", data.aggregate.submissionQueue],
+            ["Review queue", data.aggregate.reviewQueue],
+            ["Needs correction", data.aggregate.needsCorrection],
+            ["Operational risk", data.aggregate.withOperationalRisk],
+            ["Retrofit opportunities", data.aggregate.withActionableRetrofits],
+            ["Sync attention", data.aggregate.withSyncAttention],
+            ["Draft artifacts", data.aggregate.withDraftArtifacts],
+          ].map(([label, value]) => (
+            <div key={label as string} className="flex items-center justify-between gap-4 border-b border-zinc-100 py-2">
+              <span className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">{label}</span>
+              <span className="font-display text-xl font-medium text-zinc-900">{String(value)}</span>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600">
         <div>
           Showing {pageStart}-{pageEnd} of {pageInfo.totalMatchingCount} matching
           {" "}buildings
@@ -717,14 +722,15 @@ export function ComplianceQueue() {
         </div>
       </div>
 
-      {canManageOperatorActions ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+      {canManageOperatorActions && selectedBuildingIds.length > 0 ? (
+        <div className="border-y border-zinc-200 bg-white px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-zinc-900">Bulk operator actions</div>
+              <div className="text-sm font-semibold text-zinc-900">Selected buildings</div>
               <div className="mt-1 text-sm text-zinc-500">
-                Selected {selectedBuildingIds.length} building(s). Each building is still
-                validated individually through the governed server workflow.
+                {selectedBuildingIds.length} building(s) selected. Bulk actions stay
+                contextual and each building is still validated individually through the
+                governed workflow.
               </div>
               {selectedBuildingIds.length > 0 && visibleSelectedCount !== selectedBuildingIds.length ? (
                 <div className="mt-1 text-xs text-zinc-500">
@@ -736,34 +742,33 @@ export function ComplianceQueue() {
               <button
                 type="button"
                 onClick={() => setSelectedBuildingIds([])}
-                disabled={selectedBuildingIds.length === 0}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900"
               >
                 Clear selection
               </button>
               <button
                 type="button"
                 onClick={() => runBulkAction("RERUN_SOURCE_RECONCILIATION")}
-                disabled={selectedBuildingIds.length === 0 || bulkOperatePortfolio.isPending}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+                disabled={bulkOperatePortfolio.isPending}
+                className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50"
               >
-                Bulk rerun source reconciliation
+                Refresh source reconciliation
               </button>
               <button
                 type="button"
                 onClick={() => runBulkAction("REFRESH_PENALTY_SUMMARY")}
-                disabled={selectedBuildingIds.length === 0 || bulkOperatePortfolio.isPending}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+                disabled={bulkOperatePortfolio.isPending}
+                className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50"
               >
-                Bulk refresh penalty summary
+                Refresh penalty summary
               </button>
               <button
                 type="button"
                 onClick={() => runBulkAction("RETRY_PORTFOLIO_MANAGER_SYNC")}
-                disabled={selectedBuildingIds.length === 0 || bulkOperatePortfolio.isPending}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+                disabled={bulkOperatePortfolio.isPending}
+                className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 disabled:opacity-50"
               >
-                Bulk retry PM sync
+                Retry PM sync
               </button>
             </div>
           </div>
@@ -771,11 +776,11 @@ export function ComplianceQueue() {
       ) : null}
 
       {bulkResult ? (
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm">
+        <div className="border-l border-zinc-300 bg-zinc-50 px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-zinc-900">
-                Bulk action result: {bulkResult.action.replaceAll("_", " ").toLowerCase()}
+                Bulk action result: {humanizeToken(bulkResult.action)}
               </div>
               <div className="mt-2 flex flex-wrap gap-4 text-sm text-zinc-600">
                 <div>Targets {bulkResult.targetCount}</div>
@@ -797,7 +802,7 @@ export function ComplianceQueue() {
               <div key={`${result.buildingId}-${result.status}`} className="rounded-md border border-zinc-200 bg-white px-3 py-2">
                 <span className="font-medium text-zinc-900">{result.buildingName}</span>
                 {": "}
-                {result.status.toLowerCase()} - {result.message}
+                {humanizeToken(result.status)} - {result.message}
               </div>
             ))}
           </div>
@@ -805,13 +810,38 @@ export function ComplianceQueue() {
       ) : null}
 
       {data.items.length === 0 ? (
-        <EmptyState message="No buildings match the current worklist filters." />
+        <EmptyState
+          message={
+            hasActiveFilters
+              ? "No buildings match the current worklist filters. Clear the filters to return to the broader governed queue."
+              : "No buildings are in the governed worklist yet. Add a building to start source review, compliance evaluation, and package preparation."
+          }
+          action={
+            hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900"
+              >
+                Clear filters
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900"
+              >
+                Add building
+              </button>
+            )
+          }
+        />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+        <div className="overflow-hidden border-y border-zinc-200 bg-white">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-zinc-50">
-                <tr className="border-b border-zinc-200 text-xs uppercase tracking-wider text-zinc-500">
+              <thead className="bg-zinc-50/70">
+                <tr className="border-b border-zinc-200 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
                   {canManageOperatorActions ? (
                     <th className="px-5 py-3 font-semibold">
                       <input
@@ -848,10 +878,10 @@ export function ComplianceQueue() {
                     item.artifacts.benchmark.status,
                   );
                   const bepsArtifact = getPacketStatusDisplay(item.artifacts.beps.status);
-                  const benchmarkWorkflow = getWorkflowStateDisplay(
+                  const benchmarkWorkflow = getSubmissionWorkflowStateDisplay(
                     item.submission.benchmark.state,
                   );
-                  const bepsWorkflow = getWorkflowStateDisplay(item.submission.beps.state);
+                  const bepsWorkflow = getSubmissionWorkflowStateDisplay(item.submission.beps.state);
                   const portfolioManagerRuntime = getRuntimeStatusDisplay(
                     item.runtime.portfolioManager.currentState,
                   );
@@ -861,7 +891,7 @@ export function ComplianceQueue() {
                   const triage = getWorklistTriageDisplay(item.triage.bucket);
 
                   return (
-                    <tr key={item.buildingId} className="align-top">
+                    <tr key={item.buildingId} className="align-top transition-colors hover:bg-zinc-50/60">
                       {canManageOperatorActions ? (
                         <td className="px-5 py-4">
                           <input
@@ -881,19 +911,23 @@ export function ComplianceQueue() {
                         >
                           {item.buildingName}
                         </Link>
+                        <div className="mt-2 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+                          {triage.label}
+                        </div>
                         <div className="mt-1 text-[13px] text-zinc-500">
                           {item.address}
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <StatusBadge label={triage.label} tone={triage.tone} />
+                        <div className="mt-2 space-y-1 text-[12px] text-zinc-500">
                           {item.flags.needsSyncAttention ? (
-                            <StatusBadge label="Sync attention" tone="warning" />
+                            <div>Integration recovery is flagged.</div>
                           ) : null}
                           {item.flags.needsAnomalyAttention ? (
-                            <StatusBadge label="Operational risk" tone="warning" />
+                            <div>Operational risk needs review.</div>
                           ) : null}
                           {item.retrofitSummary.topOpportunity ? (
-                            <StatusBadge label="Retrofit queued" tone="info" />
+                            <div>
+                              Advisory retrofit: {item.retrofitSummary.topOpportunity.name}
+                            </div>
                           ) : null}
                         </div>
                       </td>
@@ -919,17 +953,15 @@ export function ComplianceQueue() {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <StatusBadge label={compliance.label} tone={compliance.tone} />
-                          <StatusBadge label={qa.label} tone={qa.tone} />
+                        <div className="font-medium text-zinc-900">{compliance.label}</div>
+                        <div className="mt-1 text-[12px] uppercase tracking-[0.16em] text-zinc-500">
+                          QA {qa.label}
                         </div>
                         <div className="mt-2 text-[12px] text-zinc-500">
                           {item.complianceSummary.reasonSummary}
                         </div>
                         <div className="mt-2 text-[12px] text-zinc-500">
-                          Workflow {item.submission.overall.state === "NOT_STARTED"
-                            ? "not started"
-                            : item.submission.overall.state.replaceAll("_", " ").toLowerCase()}
+                          Workflow {getSubmissionWorkflowStateDisplay(item.submission.overall.state).label}
                         </div>
                       </td>
                       <td className="px-5 py-4 text-zinc-600">
@@ -937,9 +969,11 @@ export function ComplianceQueue() {
                         <div className="mt-1">{item.warningIssueCount} warning</div>
                       </td>
                       <td className="px-5 py-4">
-                        <StatusBadge label={penalty.label} tone={penalty.tone} />
-                        <div className="mt-2 font-mono text-sm text-zinc-900">
+                        <div className="font-mono text-sm text-zinc-900">
                           {formatMoney(item.penaltySummary?.currentEstimatedPenalty)}
+                        </div>
+                        <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+                          {penalty.label}
                         </div>
                         {item.anomalySummary.activeCount > 0 ? (
                           <div className="mt-2 text-[12px] text-zinc-500">
@@ -965,62 +999,38 @@ export function ComplianceQueue() {
                         ) : null}
                       </td>
                       <td className="px-5 py-4">
-                        <div className="space-y-2">
+                        <div className="space-y-3 text-[12px] text-zinc-600">
                           <div>
                             <div className="text-[11px] uppercase tracking-wider text-zinc-500">
                               PM
                             </div>
-                            <div className="mt-1">
-                              <StatusBadge
-                                label={portfolioManagerRuntime.label}
-                                tone={portfolioManagerRuntime.tone}
-                              />
-                            </div>
+                            <div className="mt-1 text-zinc-900">{portfolioManagerRuntime.label}</div>
                           </div>
                           <div>
                             <div className="text-[11px] uppercase tracking-wider text-zinc-500">
                               Green Button
                             </div>
-                            <div className="mt-1">
-                              <StatusBadge
-                                label={greenButtonRuntime.label}
-                                tone={greenButtonRuntime.tone}
-                              />
-                            </div>
+                            <div className="mt-1 text-zinc-900">{greenButtonRuntime.label}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="space-y-2">
+                        <div className="space-y-3 text-[12px] text-zinc-600">
                           <div>
                             <div className="text-[11px] uppercase tracking-wider text-zinc-500">
                               Benchmark
                             </div>
-                            <div className="mt-1 flex flex-wrap gap-2">
-                              <StatusBadge
-                                label={benchmarkArtifact.label}
-                                tone={benchmarkArtifact.tone}
-                              />
-                              <StatusBadge
-                                label={benchmarkWorkflow.label}
-                                tone={benchmarkWorkflow.tone}
-                              />
+                            <div className="mt-1 text-zinc-900">
+                              {benchmarkArtifact.label}
                             </div>
+                            <div className="mt-1 text-zinc-500">{benchmarkWorkflow.label}</div>
                           </div>
                           <div>
                             <div className="text-[11px] uppercase tracking-wider text-zinc-500">
                               BEPS
                             </div>
-                            <div className="mt-1 flex flex-wrap gap-2">
-                              <StatusBadge
-                                label={bepsArtifact.label}
-                                tone={bepsArtifact.tone}
-                              />
-                              <StatusBadge
-                                label={bepsWorkflow.label}
-                                tone={bepsWorkflow.tone}
-                              />
-                            </div>
+                            <div className="mt-1 text-zinc-900">{bepsArtifact.label}</div>
+                            <div className="mt-1 text-zinc-500">{bepsWorkflow.label}</div>
                           </div>
                         </div>
                       </td>
@@ -1039,11 +1049,13 @@ export function ComplianceQueue() {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="font-medium text-zinc-900">
-                          {item.nextAction.title}
-                        </div>
-                        <div className="mt-1 text-[13px] text-zinc-500">
-                          {item.nextAction.reason}
+                        <div className="border-l-2 border-zinc-900 pl-3">
+                          <div className="font-medium text-zinc-900">
+                            {item.nextAction.title}
+                          </div>
+                          <div className="mt-1 text-[13px] text-zinc-500">
+                            {item.nextAction.reason}
+                          </div>
                         </div>
                         <div className="mt-2 text-[12px] text-zinc-500">
                           {item.triage.bucket === "COMPLIANCE_BLOCKER"

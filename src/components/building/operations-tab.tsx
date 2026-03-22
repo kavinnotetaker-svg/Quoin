@@ -9,6 +9,7 @@ import {
   formatDate,
   formatNumber,
 } from "@/components/internal/admin-primitives";
+import { humanizeToken } from "@/components/internal/status-helpers";
 
 function severityClasses(severity: string) {
   if (severity === "CRITICAL") return "bg-red-100 text-red-800";
@@ -52,15 +53,15 @@ export function OperationsTab({ buildingId }: { buildingId: string }) {
 
   return (
     <Panel
-      title="Operational Review"
-      subtitle="Review deterministic operating issues that may be increasing energy use or worsening compliance outcomes."
+      title="Operational signals"
+      subtitle="Review explainable operating issues that may be increasing energy use or worsening compliance outcomes."
       actions={
         <button
           onClick={() => refresh.mutate({ buildingId })}
           disabled={refresh.isPending}
           className={btnClass}
         >
-          {refresh.isPending ? "Refreshing..." : "Refresh Operational Review"}
+          {refresh.isPending ? "Refreshing..." : "Refresh operational signals"}
         </button>
       }
     >
@@ -77,12 +78,12 @@ export function OperationsTab({ buildingId }: { buildingId: string }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ring-1 ring-inset ring-current/20 shadow-sm ${severityClasses(anomaly.severity)}`}>
-                        {anomaly.severity}
+                        {humanizeToken(anomaly.severity)}
                       </span>
                       <span className="text-zinc-300">—</span>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{anomaly.status}</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md shadow-sm">{humanizeToken(anomaly.status)}</span>
                       <span className="text-zinc-300">—</span>
-                      <span className="text-xs font-semibold text-zinc-600">{anomaly.anomalyType}</span>
+                      <span className="text-xs font-semibold text-zinc-600">{humanizeToken(anomaly.anomalyType)}</span>
                     </div>
                     <h4 className="mt-3 text-[15px] font-semibold tracking-tight text-zinc-900">{anomaly.title}</h4>
                     <p className="mt-1.5 text-sm text-zinc-700 leading-relaxed">{anomaly.summary}</p>

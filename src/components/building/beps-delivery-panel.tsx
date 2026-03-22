@@ -211,7 +211,7 @@ export function BepsDeliveryPanel({
   }
 
   if (requestItems.isLoading || packets.isLoading) {
-    return <div className="text-sm text-zinc-500">Loading BEPS delivery workspace...</div>;
+    return <div className="text-sm text-zinc-500">Preparing the BEPS delivery workspace...</div>;
   }
 
   if (requestItems.error || packets.error) {
@@ -226,8 +226,11 @@ export function BepsDeliveryPanel({
 
   const btnClass =
     "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50";
+  const primaryBtnClass = "btn-primary inline-flex items-center justify-center";
   const inputClass =
     "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm";
+  const canFinalizePacket =
+    !!latestPacket && latestPacket.status !== "FINALIZED";
 
   return (
     <div className="space-y-6">
@@ -249,40 +252,45 @@ export function BepsDeliveryPanel({
                 </option>
               ))}
             </select>
-            <button
-              className={btnClass}
-              onClick={() => generateMutation.mutate({ buildingId, filingRecordId, packetType })}
-              disabled={generateMutation.isPending}
-            >
-              {generateMutation.isPending
-                ? "Generating..."
-                : latestPacket
-                  ? "Regenerate packet"
-                  : "Generate packet"}
-            </button>
-            <button
-              className={btnClass}
-              onClick={() => finalizeMutation.mutate({ buildingId, filingRecordId, packetType })}
-              disabled={
-                finalizeMutation.isPending ||
-                !latestPacket ||
-                latestPacket.status === "FINALIZED"
-              }
-            >
-              {finalizeMutation.isPending ? "Finalizing..." : "Finalize packet"}
+            {!latestPacket ? (
+              <button
+                className={primaryBtnClass}
+                onClick={() => generateMutation.mutate({ buildingId, filingRecordId, packetType })}
+                disabled={generateMutation.isPending}
+              >
+                {generateMutation.isPending ? "Generating package..." : "Generate package"}
+              </button>
+            ) : null}
+            {canFinalizePacket ? (
+              <button
+                className={primaryBtnClass}
+                onClick={() => finalizeMutation.mutate({ buildingId, filingRecordId, packetType })}
+                disabled={finalizeMutation.isPending || !canFinalizePacket}
+              >
+                {finalizeMutation.isPending ? "Finalizing package..." : "Finalize package"}
+              </button>
+            ) : null}
+            {latestPacket ? (
+              <button
+                className={btnClass}
+                onClick={() => generateMutation.mutate({ buildingId, filingRecordId, packetType })}
+                disabled={generateMutation.isPending}
+              >
+                {generateMutation.isPending ? "Refreshing package..." : "Refresh package"}
+              </button>
+            ) : null}
+            <button className={btnClass} onClick={() => handleExport("PDF")} disabled={!latestPacket}>
+              Download PDF
             </button>
             <button className={btnClass} onClick={() => handleExport("JSON")} disabled={!latestPacket}>
-              Export JSON
+              Download JSON
             </button>
             <button
               className={btnClass}
               onClick={() => handleExport("MARKDOWN")}
               disabled={!latestPacket}
             >
-              Export Markdown
-            </button>
-            <button className={btnClass} onClick={() => handleExport("PDF")} disabled={!latestPacket}>
-              Export PDF
+              Download Markdown
             </button>
           </div>
         }
@@ -329,7 +337,7 @@ export function BepsDeliveryPanel({
             <p className="mt-2 text-[13px] text-zinc-600">
               {latestPacket
                 ? `${getPacketTypeLabel(packetType)} was last generated ${formatDate(latestPacket.generatedAt)}. Finalize only when required support is verified and blockers are cleared.`
-                : `No ${getPacketTypeLabel(packetType).toLowerCase()} packet exists yet for this filing.`}
+                : `This ${getPacketTypeLabel(packetType).toLowerCase()} package has not been generated yet. Generate it once the required support is assembled for review.`}
             </p>
           </div>
 
@@ -337,7 +345,7 @@ export function BepsDeliveryPanel({
             <div className="font-semibold text-zinc-900">What still needs attention</div>
             {blockers.length === 0 && warnings.length === 0 ? (
               <p className="mt-2 text-[13px] text-zinc-600">
-                No current blockers or warnings are recorded for this deliverable.
+                No blockers or warnings are recorded for this deliverable. It can move forward once the required support items are verified.
               </p>
             ) : (
               <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-zinc-700">
@@ -384,7 +392,7 @@ export function BepsDeliveryPanel({
                         <div className="mt-1 text-[13px] text-zinc-500">
                           {REQUEST_CATEGORIES.find((entry) => entry.value === item.category)?.label ??
                             item.category}
-                          {item.isRequired ? " • Required" : " • Optional"}
+                          {item.isRequired ? " | Required" : " | Optional"}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -416,7 +424,7 @@ export function BepsDeliveryPanel({
               })}
             </div>
           ) : (
-            <EmptyState message="No BEPS request items exist yet. Add the support documents and checklist items the consultant still needs for this deliverable." />
+            <EmptyState message="No support checklist is recorded for this deliverable yet. Add the missing evidence or reviewer requests that still need tracking." />
           )}
         </Panel>
 
@@ -594,7 +602,7 @@ export function BepsDeliveryPanel({
                         {getPacketTypeLabel(packet.packetType)}
                       </div>
                       <div className="mt-1 text-[13px] text-zinc-500">
-                        {`Version ${packet.version} • Generated ${formatDate(packet.generatedAt)}`}
+                        {`Version ${packet.version} | Generated ${formatDate(packet.generatedAt)}`}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -607,7 +615,7 @@ export function BepsDeliveryPanel({
             })}
           </div>
         ) : (
-          <EmptyState message="No packets have been generated yet for this deliverable type." />
+          <EmptyState message="No versions have been generated for this deliverable yet. Version history begins after the first package is created." />
         )}
       </Panel>
     </div>

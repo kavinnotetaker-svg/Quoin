@@ -9,11 +9,11 @@ import {
   LoadingState,
   MetricGrid,
   Panel,
-  downloadFile,
   formatDate,
   formatMoney,
   formatNumber,
 } from "@/components/internal/admin-primitives";
+import { formatCycleLabel } from "@/components/internal/status-helpers";
 
 const CYCLES = ["CYCLE_1", "CYCLE_2", "CYCLE_3"] as const;
 
@@ -25,7 +25,13 @@ function todayIso() {
   return new Date().toISOString();
 }
 
-export function BepsTab({ buildingId }: { buildingId: string }) {
+export function BepsTab({
+  buildingId,
+  includeDeliveryWorkspace = true,
+}: {
+  buildingId: string;
+  includeDeliveryWorkspace?: boolean;
+}) {
   const [cycle, setCycle] = useState<(typeof CYCLES)[number]>("CYCLE_1");
   const [baselineAdjustedSiteEui, setBaselineAdjustedSiteEui] = useState("");
   const [evaluationAdjustedSiteEui, setEvaluationAdjustedSiteEui] = useState("");
@@ -114,17 +120,6 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
       invalidateCycle();
     },
   });
-  const generatePacket = trpc.beps.generatePacket.useMutation({
-    onSuccess: async () => {
-      await invalidateCycle();
-    },
-  });
-  const finalizePacket = trpc.beps.finalizePacket.useMutation({
-    onSuccess: async () => {
-      await invalidateCycle();
-    },
-  });
-
   if (inputState.isLoading || outcomes.isLoading || packets.isLoading) {
     return <LoadingState />;
   }
@@ -139,6 +134,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
   const latestFiling = latestRun.error?.data?.code === "NOT_FOUND" ? null : latestRun.data;
 
   const btnClass = "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors disabled:opacity-50";
+  const primaryBtnClass = "btn-primary inline-flex items-center justify-center";
   const inputClass = "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors";
   const labelSpanClass = "mb-1.5 block text-[11px] font-semibold tracking-wider text-zinc-500 uppercase";
 
@@ -146,7 +142,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
     <div className="space-y-6">
       <Panel
         title="BEPS review and filing"
-        subtitle="Refresh governed inputs, run the active cycle evaluation, and prepare the filing packet when the result is ready."
+        subtitle="Refresh governed inputs and run the active cycle evaluation here. Package generation and final submission actions stay in Submission."
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <select
@@ -155,65 +151,29 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
               className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] font-medium text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors"
             >
               {CYCLES.map((value) => (
-                <option key={value} value={value}>{value.replace("_", " ")}</option>
+                <option key={value} value={value}>{formatCycleLabel(value)}</option>
               ))}
             </select>
+            <button
+              onClick={() => evaluate.mutate({ buildingId, cycle })}
+              disabled={evaluate.isPending}
+              className={primaryBtnClass}
+            >
+              {evaluate.isPending ? "Running evaluation..." : "Run evaluation"}
+            </button>
             <button
               onClick={() => refreshMetrics.mutate({ buildingId, cycle })}
               disabled={refreshMetrics.isPending}
               className={btnClass}
             >
-              Refresh BEPS Inputs
+              {refreshMetrics.isPending ? "Refreshing inputs..." : "Refresh inputs"}
             </button>
-            <button
-              onClick={() => evaluate.mutate({ buildingId, cycle })}
-              disabled={evaluate.isPending}
-              className={btnClass}
-            >
-              Run BEPS Evaluation
-            </button>
-            {latestFiling ? (
-              <>
-                <button
-                  onClick={() => generatePacket.mutate({ buildingId, filingRecordId: latestFiling.id })}
-                  disabled={generatePacket.isPending}
-                  className={btnClass}
-                >
-                  Generate Filing Packet
-                </button>
-                <button
-                  onClick={() => finalizePacket.mutate({ buildingId, filingRecordId: latestFiling.id })}
-                  disabled={finalizePacket.isPending}
-                  className={btnClass}
-                >
-                  Finalize Filing Packet
-                </button>
-                <button
-                  onClick={async () => {
-                    const exportResult = await utils.beps.exportPacket.fetch({
-                      buildingId,
-                      filingRecordId: latestFiling.id,
-                      format: "PDF",
-                    });
-                    downloadFile({
-                      fileName: exportResult.fileName,
-                      content: exportResult.content,
-                      contentType: exportResult.contentType,
-                      encoding: exportResult.encoding,
-                    });
-                  }}
-                  className={btnClass}
-                >
-                  Export Filing PDF
-                </button>
-              </>
-            ) : null}
           </div>
         }
       >
         <MetricGrid
           items={[
-            { label: "Cycle", value: cycle.replace("_", " ") },
+            { label: "Cycle", value: formatCycleLabel(cycle) },
             { label: "Filing Year", value: inputState.data?.filingYear ?? "—" },
             { label: "Ownership", value: inputState.data?.building?.ownershipType ?? "—" },
             { label: "Score Eligible", value: inputState.data?.building?.isEnergyStarScoreEligible == null ? "—" : inputState.data?.building?.isEnergyStarScoreEligible ? "Yes" : "No" },
@@ -273,7 +233,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
 
         <Panel title="Latest BEPS Filing" subtitle="Current governed BEPS run, filing status, and deterministic packet state.">
           {!latestFiling ? (
-            <EmptyState message="No governed BEPS filing exists for this cycle yet." />
+            <EmptyState message="No governed BEPS filing record exists for this cycle yet. Run evaluation to establish the current filing position." />
           ) : (
             <div className="space-y-4 text-sm text-zinc-700">
               <MetricGrid
@@ -336,7 +296,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
                 <div className="font-semibold text-zinc-900 tracking-tight">{item.name}</div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{item.status}</div>
               </div>
-            )) : <EmptyState message="No canonical prescriptive items exist yet." />}
+            )) : <EmptyState message="No canonical prescriptive items are recorded for this cycle. Add them only if this building is using a prescriptive pathway." />}
           </div>
         </Panel>
 
@@ -390,13 +350,13 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
             </div>
           ) : (
             <div className="mt-5">
-              <EmptyState message="No canonical alternative compliance agreement exists yet." />
+              <EmptyState message="No alternative compliance agreement is recorded for this cycle. Leave this empty unless an ACP governs the current filing path." />
             </div>
           )}
         </Panel>
       </div>
 
-      {latestFiling ? (
+      {includeDeliveryWorkspace && latestFiling ? (
         <BepsDeliveryPanel
           buildingId={buildingId}
           filingRecordId={latestFiling.id}
@@ -407,7 +367,7 @@ export function BepsTab({ buildingId }: { buildingId: string }) {
 
       <Panel title="Recent Outcomes" subtitle="Recent governed BEPS filing outcomes for this building.">
         {!outcomes.data || outcomes.data.length === 0 ? (
-          <EmptyState message="No BEPS filing outcomes are available yet." />
+          <EmptyState message="No governed BEPS outcomes are recorded for this building yet. Run evaluation to establish the current cycle history." />
         ) : (
           <div className="space-y-4">
             {outcomes.data.map((outcome) => (

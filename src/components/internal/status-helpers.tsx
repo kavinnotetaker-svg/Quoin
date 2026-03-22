@@ -36,16 +36,59 @@ export function toneClasses(tone: StatusTone) {
   }
 }
 
+export function toneDotClasses(tone: StatusTone) {
+  switch (tone) {
+    case "success":
+      return "bg-emerald-700";
+    case "warning":
+      return "bg-amber-700";
+    case "danger":
+      return "bg-red-700";
+    case "info":
+      return "bg-slate-700";
+    default:
+      return "bg-zinc-400";
+  }
+}
+
 export function humanizeToken(value: string | null | undefined) {
   if (!value) {
     return "Not available";
   }
 
+  const cycleMatch = value.match(/^CYCLE_(\d+)$/);
+  if (cycleMatch) {
+    return `BEPS Cycle ${cycleMatch[1]}`;
+  }
+
   return value
     .toLowerCase()
     .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => {
+      switch (part) {
+        case "qa":
+          return "QA";
+        case "beps":
+          return "BEPS";
+        case "doee":
+          return "DOEE";
+        case "espm":
+          return "ESPM";
+        case "pm":
+          return "PM";
+        case "acp":
+          return "ACP";
+        case "kbtu":
+          return "kBtu";
+        default:
+          return part.charAt(0).toUpperCase() + part.slice(1);
+      }
+    })
     .join(" ");
+}
+
+export function formatCycleLabel(value: string | null | undefined) {
+  return humanizeToken(value);
 }
 
 export function getComplianceStatusDisplay(status: string | null | undefined) {
@@ -75,6 +118,44 @@ export function getWorkflowStageStatusDisplay(status: string | null | undefined)
       return { label: "Blocked", tone: "danger" as const };
     case "NOT_STARTED":
       return { label: "Not started", tone: "muted" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
+export function getSubmissionWorkflowStateDisplay(status: string | null | undefined) {
+  switch (status) {
+    case "READY_FOR_REVIEW":
+      return { label: "Ready for review", tone: "info" as const };
+    case "APPROVED_FOR_SUBMISSION":
+      return { label: "Approved for submission", tone: "success" as const };
+    case "SUBMITTED":
+      return { label: "Submitted", tone: "warning" as const };
+    case "COMPLETED":
+      return { label: "Completed", tone: "success" as const };
+    case "NEEDS_CORRECTION":
+      return { label: "Needs correction", tone: "danger" as const };
+    case "DRAFT":
+      return { label: "Draft", tone: "muted" as const };
+    case "NOT_STARTED":
+      return { label: "Not started", tone: "muted" as const };
+    case "SUPERSEDED":
+      return { label: "Superseded", tone: "muted" as const };
+    default:
+      return { label: humanizeToken(status), tone: "muted" as const };
+  }
+}
+
+export function getGovernedVersionStatusDisplay(status: string | null | undefined) {
+  switch (status) {
+    case "ACTIVE":
+      return { label: "Active", tone: "success" as const };
+    case "CANDIDATE":
+      return { label: "Candidate", tone: "info" as const };
+    case "DRAFT":
+      return { label: "Draft", tone: "muted" as const };
+    case "SUPERSEDED":
+      return { label: "Superseded", tone: "muted" as const };
     default:
       return { label: humanizeToken(status), tone: "muted" as const };
   }
@@ -335,9 +416,8 @@ export function StatusBadge({
   icon?: ReactNode;
 }) {
   return (
-    <span
-      className={`items-center gap-1.5 ${toneClasses(tone)}`}
-    >
+    <span className={`${toneClasses(tone)}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${toneDotClasses(tone)}`} />
       {icon}
       {label}
     </span>

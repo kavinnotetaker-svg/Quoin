@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { PageHeader } from "@/components/layout/page-header";
@@ -7,21 +8,30 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
-  MetricGrid,
   Panel,
   downloadTextFile,
   formatDate,
   formatMoney,
 } from "@/components/internal/admin-primitives";
+import {
+  formatCycleLabel,
+  getGovernedVersionStatusDisplay,
+  getPacketStatusDisplay,
+  getSubmissionWorkflowStateDisplay,
+  humanizeToken,
+} from "@/components/internal/status-helpers";
 
 function currentReportingYear() {
   return new Date().getUTCFullYear() - 1;
 }
 
+type ReportMode = "submission-packages" | "publication-controls";
+
 export function ReportsPage() {
   const utils = trpc.useUtils();
   const [buildingId, setBuildingId] = useState("");
   const [reportingYear, setReportingYear] = useState(currentReportingYear());
+  const [mode, setMode] = useState<ReportMode>("submission-packages");
   const buildings = trpc.building.list.useQuery({ pageSize: 100 });
   const publicationOverview = trpc.report.publicationOverview.useQuery();
   const reportArtifacts = trpc.report.getComplianceReportArtifacts.useQuery(
@@ -122,48 +132,76 @@ export function ReportsPage() {
   const selectedBuilding = buildings.data?.buildings.find((building) => building.id === buildingId);
   const canManagePublication =
     publicationOverview.data?.operatorAccess.canManage ?? false;
+  const primaryButtonClass = "btn-primary inline-flex items-center justify-center";
+  const quietButtonClass =
+    "rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60";
+  const governanceButtonClass =
+    "rounded border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 disabled:opacity-60";
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" />
+      <PageHeader
+        title="Submission compilation"
+        subtitle="Work in two explicit modes: building-level submission packages and governed publication controls."
+      />
 
-      <Panel
-        title="Report Scope"
-        subtitle="Choose a building to inspect governed compliance and exemption report artifacts."
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm text-zinc-700">
-            <span className="mb-1 block text-xs text-zinc-500">Building</span>
-            <select
-              value={buildingId}
-              onChange={(event) => setBuildingId(event.target.value)}
-              className="w-full rounded border border-zinc-300 px-3 py-2"
-            >
-              <option value="">Select a building</option>
-              {buildings.data?.buildings.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="text-sm text-zinc-700">
-            <span className="mb-1 block text-xs text-zinc-500">Reporting year</span>
-            <input
-              type="number"
-              value={reportingYear}
-              onChange={(event) => setReportingYear(Number(event.target.value))}
-              className="w-full rounded border border-zinc-300 px-3 py-2"
-            />
-          </label>
+      <div className="border-b border-zinc-200 pb-4">
+        <div className="flex flex-wrap gap-2">
+          <ModeButton
+            active={mode === "submission-packages"}
+            label="Submission Packages"
+            description="Building-level evidence, readiness, and persisted package artifacts."
+            onClick={() => setMode("submission-packages")}
+          />
+          <ModeButton
+            active={mode === "publication-controls"}
+            label="Publication Controls"
+            description="Governed rule and factor publication, validation, and activation."
+            onClick={() => setMode("publication-controls")}
+          />
         </div>
-      </Panel>
+      </div>
 
-      <Panel
-        title="Governed publication"
-        subtitle="Inspect live vs candidate governed versions and run deterministic publication checks before activation."
-      >
+      {mode === "submission-packages" ? (
+        <Panel
+          title="Submission package scope"
+          subtitle="Choose a building to inspect governed compliance and exemption report artifacts."
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm text-zinc-700">
+              <span className="mb-1 block text-xs text-zinc-500">Building</span>
+              <select
+                value={buildingId}
+                onChange={(event) => setBuildingId(event.target.value)}
+                className="w-full rounded border border-zinc-300 px-3 py-2"
+              >
+                <option value="">Select a building</option>
+                {buildings.data?.buildings.map((building) => (
+                  <option key={building.id} value={building.id}>
+                    {building.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm text-zinc-700">
+              <span className="mb-1 block text-xs text-zinc-500">Reporting year</span>
+              <input
+                type="number"
+                value={reportingYear}
+                onChange={(event) => setReportingYear(Number(event.target.value))}
+                className="w-full rounded border border-zinc-300 px-3 py-2"
+              />
+            </label>
+          </div>
+        </Panel>
+      ) : null}
+
+      {mode === "publication-controls" ? (
+        <Panel
+          title="Publication controls"
+          subtitle="Inspect live vs candidate governed versions and run deterministic publication checks before activation."
+        >
         {publicationOverview.isLoading ? <LoadingState /> : null}
         {publicationOverview.error ? (
           <ErrorState
@@ -173,6 +211,9 @@ export function ReportsPage() {
         ) : null}
         {publicationOverview.data ? (
           <div className="space-y-3">
+            <div className="border-b border-zinc-200 pb-3 text-sm text-zinc-600">
+              Publication administration remains separate from the submission package surfaces below. It governs what rules and factors become active, not what evidence is packaged for a building.
+            </div>
             {publicationOverview.data.targets.map((target) => (
               <div
                 key={`${target.publicationKind}-${target.targetKey}`}
@@ -181,7 +222,7 @@ export function ReportsPage() {
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                   <div className="space-y-1">
                     <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                      {target.scopeKey.replaceAll("_", " ")}
+                      {humanizeToken(target.scopeKey)}
                     </div>
                     <div className="font-medium text-zinc-900">{target.label}</div>
                     <div className="text-xs text-zinc-500">{target.targetKey}</div>
@@ -192,8 +233,8 @@ export function ReportsPage() {
                         </div>
                         <div className="mt-1 font-medium text-zinc-900">
                           {target.activeVersion
-                            ? `${target.activeVersion.version} (${target.activeVersion.status.toLowerCase()})`
-                            : "Not configured"}
+                            ? `${target.activeVersion.version} (${getGovernedVersionStatusDisplay(target.activeVersion.status).label})`
+                            : "No active version is published"}
                         </div>
                       </div>
                       <div>
@@ -202,8 +243,8 @@ export function ReportsPage() {
                         </div>
                         <div className="mt-1 font-medium text-zinc-900">
                           {target.candidateVersion
-                            ? `${target.candidateVersion.version} (${target.candidateVersion.status.toLowerCase()})`
-                            : "None"}
+                            ? `${target.candidateVersion.version} (${getGovernedVersionStatusDisplay(target.candidateVersion.status).label})`
+                            : "No candidate is staged"}
                         </div>
                       </div>
                       <div>
@@ -212,15 +253,15 @@ export function ReportsPage() {
                         </div>
                         <div className="mt-1 font-medium text-zinc-900">
                           {target.latestDraftVersion
-                            ? `${target.latestDraftVersion.version} (${target.latestDraftVersion.status.toLowerCase()})`
-                            : "None"}
+                            ? `${target.latestDraftVersion.version} (${getGovernedVersionStatusDisplay(target.latestDraftVersion.status).label})`
+                            : "No draft is queued"}
                         </div>
                       </div>
                     </div>
                     {target.latestValidation ? (
                       <div className="mt-3 rounded border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
                         <div className="font-medium text-zinc-900">
-                          Latest validation: {target.latestValidation.status.toLowerCase()}
+                          Latest validation: {humanizeToken(target.latestValidation.status)}
                         </div>
                         <div className="mt-1">
                           {target.latestValidation.passedCases} passed /{" "}
@@ -234,7 +275,11 @@ export function ReportsPage() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                      Governance actions
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                     {canManagePublication &&
                     target.publicationKind === "RULE_VERSION" &&
                     target.latestDraftVersion ? (
@@ -245,7 +290,7 @@ export function ReportsPage() {
                           })
                         }
                         disabled={promoteRuleCandidate.isPending}
-                        className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                        className={governanceButtonClass}
                       >
                         Promote draft
                       </button>
@@ -260,7 +305,7 @@ export function ReportsPage() {
                           })
                         }
                         disabled={promoteFactorCandidate.isPending}
-                        className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                        className={governanceButtonClass}
                       >
                         Promote draft
                       </button>
@@ -275,7 +320,7 @@ export function ReportsPage() {
                           })
                         }
                         disabled={validateRuleCandidate.isPending}
-                        className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                        className={governanceButtonClass}
                       >
                         Run regressions
                       </button>
@@ -290,7 +335,7 @@ export function ReportsPage() {
                           })
                         }
                         disabled={validateFactorCandidate.isPending}
-                        className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                        className={governanceButtonClass}
                       >
                         Run regressions
                       </button>
@@ -303,11 +348,12 @@ export function ReportsPage() {
                           })
                         }
                         disabled={publishGovernedCandidate.isPending}
-                        className="rounded border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800 disabled:opacity-60"
+                        className={governanceButtonClass}
                       >
                         Publish active version
                       </button>
                     ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -320,11 +366,34 @@ export function ReportsPage() {
           </div>
         ) : null}
       </Panel>
+      ) : null}
 
-      {!buildingId ? (
-        <EmptyState message="Select a building to load report surfaces." />
+      {mode === "submission-packages" ? (buildings.data?.buildings.length === 0 ? (
+        <EmptyState
+          message="No buildings are available for governed report packaging yet. Add a building in Buildings to start the submission workspace."
+          action={
+            <Link
+              href="/buildings"
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900"
+            >
+              Go to Buildings
+            </Link>
+          }
+        />
+      ) : !buildingId ? (
+        <EmptyState message="Select a building to open its submission package workspace." />
       ) : (
         <>
+          <div className="border-t border-zinc-200 pt-6">
+            <div className="quoin-kicker">Submission package workbench</div>
+            <div className="mt-2 font-display text-2xl font-medium tracking-tight text-zinc-950">
+              Building-specific governed report artifacts
+            </div>
+            <div className="mt-2 max-w-3xl text-sm leading-7 text-zinc-600">
+              Generate, review, and export the persisted package record for the selected building. Publication administration remains separate above.
+            </div>
+          </div>
+
           {complianceReport.isLoading || exemptionReport.isLoading ? <LoadingState /> : null}
           {complianceReport.error ? (
             <ErrorState
@@ -337,6 +406,18 @@ export function ReportsPage() {
               message="Exemption report failed to load."
               detail={exemptionReport.error.message}
             />
+          ) : null}
+          {selectedBuilding &&
+          !complianceReport.isLoading &&
+          !complianceReport.error &&
+          !complianceReport.data ? (
+            <EmptyState message="The governed compliance package is not ready for this building yet. Generate the current package once the building has an evaluated compliance record." />
+          ) : null}
+          {selectedBuilding &&
+          !exemptionReport.isLoading &&
+          !exemptionReport.error &&
+          !exemptionReport.data ? (
+            <EmptyState message="The governed exemption package is not available for this building yet. It will appear once the exemption screen has current governed context." />
           ) : null}
 
           {selectedBuilding && complianceReport.data ? (
@@ -352,11 +433,11 @@ export function ReportsPage() {
                       })
                     }
                     disabled={generateComplianceReportArtifact.isPending}
-                    className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                    className={primaryButtonClass}
                   >
                     {reportArtifacts.data?.latestArtifact
-                      ? "Generate new governed artifact"
-                      : "Generate governed artifact"}
+                      ? "Generate new package"
+                      : "Generate package"}
                   </button>
                   {reportArtifacts.data?.latestArtifact ? (
                     <button
@@ -375,9 +456,9 @@ export function ReportsPage() {
                         });
                       }}
                       disabled={exportComplianceReportArtifact.isPending}
-                      className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                      className={quietButtonClass}
                     >
-                      Download governed JSON
+                      Download JSON
                     </button>
                   ) : null}
                 </div>
@@ -392,72 +473,84 @@ export function ReportsPage() {
 
                 return (
                   <>
-              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-                <div className="font-medium text-zinc-900">Governed report summary</div>
-                <div className="mt-1 text-zinc-600">
-                  Readiness{" "}
-                  {sections.compliance.readinessState
-                    .toLowerCase()
-                    .replaceAll("_", " ")}
-                  {" | "}Compliance{" "}
-                  {sections.compliance.primaryStatus
-                    .toLowerCase()
-                    .replaceAll("_", " ")}
-                </div>
-                <div className="mt-1 text-zinc-500">
-                  Last readiness evaluation{" "}
-                  {formatDate(
-                    evidencePackage.traceability.lastReadinessEvaluatedAt,
-                  )}
-                  {" | "}Last compliance evaluation{" "}
-                  {formatDate(evidencePackage.traceability.lastComplianceEvaluatedAt)}
-                </div>
-                <div className="mt-2 text-xs text-zinc-500">
-                  {latestArtifact
-                    ? `Persisted artifact v${latestArtifact.version} generated ${formatDate(
-                        latestArtifact.generatedAt,
-                      )} | Last exported ${formatDate(
-                        latestArtifact.latestExportedAt,
-                      )}`
-                    : "No persisted compliance report artifact has been generated for this building yet."}
+              <div className="border-y border-zinc-200 bg-zinc-50/60 px-5 py-5 text-sm text-zinc-700">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="space-y-2">
+                    <div className="quoin-kicker">Governed report summary</div>
+                    <div className="font-display text-2xl font-medium tracking-tight text-zinc-950">
+                      {sections.compliance.reasonSummary}
+                    </div>
+                    <div className="text-sm leading-7 text-zinc-600">
+                      Next step: {sections.compliance.nextAction.title}.{" "}
+                      {sections.compliance.nextAction.reason}
+                    </div>
+                  </div>
+                  <div className="space-y-3 border-t border-zinc-200 pt-4 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                    <SummaryLine
+                      label="Package readiness"
+                      value={humanizeToken(sections.compliance.readinessState)}
+                    />
+                    <SummaryLine
+                      label="Compliance state"
+                      value={humanizeToken(sections.compliance.primaryStatus)}
+                    />
+                    <SummaryLine
+                      label="Current penalty estimate"
+                      value={formatMoney(sections.penalty.currentEstimatedPenalty)}
+                    />
+                  </div>
+                  <div className="space-y-3 border-t border-zinc-200 pt-4 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                    <SummaryLine
+                      label="Latest readiness evaluation"
+                      value={formatDate(
+                        evidencePackage.traceability.lastReadinessEvaluatedAt,
+                      )}
+                    />
+                    <SummaryLine
+                      label="Latest compliance evaluation"
+                      value={formatDate(
+                        evidencePackage.traceability.lastComplianceEvaluatedAt,
+                      )}
+                    />
+                    <SummaryLine
+                      label="Persisted artifact"
+                      value={
+                        latestArtifact
+                          ? `v${latestArtifact.version} generated ${formatDate(
+                              latestArtifact.generatedAt,
+                            )}`
+                          : "Package not generated"
+                      }
+                    />
+                  </div>
                 </div>
               </div>
 
-              <MetricGrid
-                items={[
-                  {
-                    label: "Readiness",
-                    value: sections.compliance.readinessState,
-                  },
-                  {
-                    label: "Compliance Status",
-                    value: sections.compliance.primaryStatus,
-                  },
-                  {
-                    label: "Current Penalty Estimate",
-                    value: formatMoney(sections.penalty.currentEstimatedPenalty),
-                    tone:
-                      sections.penalty.status === "ESTIMATED"
-                        ? "danger"
-                        : "default",
-                  },
-                  {
-                    label: "Top Retrofit",
-                    value: sections.retrofits.topOpportunity?.name ?? "None",
-                    tone:
-                      sections.retrofits.topOpportunity?.priorityBand === "CRITICAL"
-                        ? "warning"
-                        : "default",
-                  },
-                ]}
-              />
+              <div className="grid gap-3 border-b border-zinc-200 pb-4 text-sm text-zinc-600 sm:grid-cols-2 xl:grid-cols-4">
+                <SummaryLine
+                  label="Readiness"
+                  value={humanizeToken(sections.compliance.readinessState)}
+                />
+                <SummaryLine
+                  label="Compliance status"
+                  value={humanizeToken(sections.compliance.primaryStatus)}
+                />
+                <SummaryLine
+                  label="Penalty estimate"
+                  value={formatMoney(sections.penalty.currentEstimatedPenalty)}
+                />
+                <SummaryLine
+                  label="Top retrofit"
+                  value={sections.retrofits.topOpportunity?.name ?? "No prioritized retrofit"}
+                />
+              </div>
 
-              <div className="mt-4 grid gap-4 xl:grid-cols-2">
+              <div className="mt-4 grid gap-6 xl:grid-cols-2">
                 <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  <div className="quoin-kicker">
                     Compliance position
                   </div>
-                  <div className="mt-2 font-medium text-zinc-900">
+                  <div className="mt-3 font-medium text-zinc-900">
                     {sections.compliance.reasonSummary}
                   </div>
                   <div className="mt-2 text-zinc-600">
@@ -492,17 +585,17 @@ export function ReportsPage() {
                   </div>
                 </div>
                 <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  <div className="quoin-kicker">
                     Penalty exposure
                   </div>
-                  <div className="mt-2 font-medium text-zinc-900">
+                  <div className="mt-3 font-medium text-zinc-900">
                     {sections.penalty.basisLabel}
                   </div>
                   <div className="mt-1 text-zinc-600">
                     {sections.penalty.basisExplanation}
                   </div>
                   <div className="mt-2 text-xs text-zinc-500">
-                    Status {sections.penalty.status.toLowerCase().replaceAll("_", " ")}
+                    Status {humanizeToken(sections.penalty.status)}
                     {" | "}Calculated {formatDate(sections.penalty.calculatedAt)}
                   </div>
                   <div className="mt-3 space-y-2">
@@ -518,19 +611,17 @@ export function ReportsPage() {
                       ))
                     ) : (
                       <div className="rounded border border-zinc-200 bg-zinc-50 p-3 text-zinc-500">
-                        No governed penalty scenarios are available for this building yet.
+                        No governed penalty scenarios are linked to this building yet. The package currently reflects only the base governed penalty context.
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  <div className="quoin-kicker">
                     Source integrity
                   </div>
-                  <div className="mt-2 font-medium text-zinc-900">
-                    {(sections.sourceData.reconciliationStatus ?? "UNKNOWN")
-                      .toLowerCase()
-                      .replaceAll("_", " ")}
+                  <div className="mt-3 font-medium text-zinc-900">
+                    {humanizeToken(sections.sourceData.reconciliationStatus ?? "UNKNOWN")}
                     {" | "}Canonical source {sections.sourceData.canonicalSource ?? "Unresolved"}
                   </div>
                   <div className="mt-1 text-zinc-600">
@@ -539,8 +630,8 @@ export function ReportsPage() {
                     {" | "}Last reconciled {formatDate(sections.sourceData.lastReconciledAt)}
                   </div>
                   <div className="mt-2 text-xs text-zinc-500">
-                    Portfolio Manager {sections.sourceData.portfolioManagerState.toLowerCase().replaceAll("_", " ")}
-                    {" | "}Green Button {sections.sourceData.greenButtonState.toLowerCase().replaceAll("_", " ")}
+                    Portfolio Manager {humanizeToken(sections.sourceData.portfolioManagerState)}
+                    {" | "}Green Button {humanizeToken(sections.sourceData.greenButtonState)}
                   </div>
                   <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
                     {sections.sourceData.runtimeNextActionTitle
@@ -549,10 +640,10 @@ export function ReportsPage() {
                   </div>
                 </div>
                 <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  <div className="quoin-kicker">
                     Operational risk and retrofit priorities
                   </div>
-                  <div className="mt-2 font-medium text-zinc-900">
+                  <div className="mt-3 font-medium text-zinc-900">
                     Active anomalies {sections.anomalyRisk.activeCount}
                     {" | "}Retrofit opportunities {sections.retrofits.activeCount}
                   </div>
@@ -580,10 +671,13 @@ export function ReportsPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                <div>
-                  <h4 className="text-sm font-medium text-zinc-900">Evidence package</h4>
-                  <div className="mt-2 space-y-2 text-sm text-zinc-700">
+              <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                <div className="space-y-3">
+                  <div className="quoin-kicker">Evidence package</div>
+                  <div className="text-sm leading-7 text-zinc-600">
+                    Included governed artifacts, workflow lineage, source record references, and compliance-run traceability for this report package.
+                  </div>
+                  <div className="space-y-2 text-sm text-zinc-700">
                     {[
                       {
                         label: "Benchmark artifact",
@@ -600,8 +694,8 @@ export function ReportsPage() {
                       >
                         <div className="font-medium text-zinc-900">{label}</div>
                         <div className="text-xs text-zinc-500">
-                          Status {artifact.artifactStatus.toLowerCase().replaceAll("_", " ")}
-                          {" | "}Workflow {(artifact.workflow?.state ?? "NOT_STARTED").toLowerCase().replaceAll("_", " ")}
+                          Status {getPacketStatusDisplay(artifact.artifactStatus).label}
+                          {" | "}Workflow {getSubmissionWorkflowStateDisplay(artifact.workflow?.state ?? "NOT_STARTED").label}
                         </div>
                         <div className="mt-1 text-xs text-zinc-600">
                           Latest artifact v{artifact.latestArtifact?.version ?? "-"}
@@ -609,20 +703,23 @@ export function ReportsPage() {
                           {" | "}Finalized {formatDate(artifact.latestArtifact?.finalizedAt ?? null)}
                         </div>
                         <div className="mt-1 text-xs text-zinc-600">
-                          Latest export {artifact.latestExport?.format ?? "none"}
+                          Latest export {artifact.latestExport?.format ?? "No export yet"}
                           {" | "}Exported {formatDate(artifact.latestExport?.exportedAt ?? null)}
                         </div>
                         <div className="mt-1 text-xs text-zinc-500">
-                          Source record {artifact.sourceRecordId ?? "none"}
-                          {" | "}Compliance run {artifact.sourceContext.complianceRunId ?? "none"}
+                          Source record {artifact.sourceRecordId ?? "No source record linked"}
+                          {" | "}Compliance run {artifact.sourceContext.complianceRunId ?? "No compliance run linked"}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <h4 className="text-sm font-medium text-zinc-900">Report artifact history</h4>
-                  <div className="mt-2 space-y-2 text-sm text-zinc-700">
+                <div className="space-y-3">
+                  <div className="quoin-kicker">Versioning and appendices</div>
+                  <div className="text-sm leading-7 text-zinc-600">
+                    Persisted governed reports remain the authority record. Supporting readings and pipeline traces appear below as appendices only.
+                  </div>
+                  <div className="space-y-2 text-sm text-zinc-700">
                     <div className="rounded border border-zinc-200 px-3 py-2">
                       <div className="font-medium text-zinc-900">Persisted governed reports</div>
                       <div className="mt-2 space-y-2">
@@ -645,7 +742,7 @@ export function ReportsPage() {
                             </div>
                           ))
                         ) : (
-                          <EmptyState message="No persisted compliance report artifacts have been generated yet." />
+                          <EmptyState message="No persisted compliance package has been generated for this building yet. Generate the package to start report history." />
                         )}
                       </div>
                     </div>
@@ -668,7 +765,7 @@ export function ReportsPage() {
                           </div>
                         ))}
                         {report.pipelineRuns.length === 0 ? (
-                          <EmptyState message="No pipeline runs were included in the report payload." />
+                          <EmptyState message="No supporting pipeline traces were captured in this report snapshot. The governed report artifact remains the record." />
                         ) : report.pipelineRuns.map((run) => (
                           <div key={run.id} className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
                             <div className="font-medium">{run.pipelineType}</div>
@@ -699,11 +796,11 @@ export function ReportsPage() {
                       })
                     }
                     disabled={generateExemptionReportArtifact.isPending}
-                    className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                    className={primaryButtonClass}
                   >
                     {exemptionReportArtifacts.data?.latestArtifact
-                      ? "Generate new governed artifact"
-                      : "Generate governed artifact"}
+                      ? "Generate new package"
+                      : "Generate package"}
                   </button>
                   {exemptionReportArtifacts.data?.latestArtifact ? (
                     <button
@@ -722,65 +819,100 @@ export function ReportsPage() {
                         });
                       }}
                       disabled={exportExemptionReportArtifact.isPending}
-                      className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                      className={quietButtonClass}
                     >
-                      Download governed JSON
+                      Download JSON
                     </button>
                   ) : null}
                 </div>
               }
             >
-              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-                <div className="font-medium text-zinc-900">Governed exemption summary</div>
-                <div className="mt-1 text-zinc-600">
-                  Compliance{" "}
-                  {exemptionReport.data.complianceStatus
-                    .toLowerCase()
-                    .replaceAll("_", " ")}
-                  {" | "}Eligible{" "}
-                  {exemptionReport.data.exemptionScreening.eligible ? "yes" : "no"}
-                </div>
-                <div className="mt-2 text-xs text-zinc-500">
-                  {exemptionReportArtifacts.data?.latestArtifact
-                    ? `Persisted artifact v${exemptionReportArtifacts.data.latestArtifact.version} generated ${formatDate(
-                        exemptionReportArtifacts.data.latestArtifact.generatedAt,
-                      )} | Last exported ${formatDate(
-                        exemptionReportArtifacts.data.latestArtifact.latestExportedAt,
-                      )}`
-                    : "No persisted exemption report artifact has been generated for this building yet."}
+              <div className="border-y border-zinc-200 bg-zinc-50/60 px-5 py-5 text-sm text-zinc-700">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="space-y-2">
+                    <div className="quoin-kicker">Governed exemption summary</div>
+                    <div className="font-display text-2xl font-medium tracking-tight text-zinc-950">
+                      {exemptionReport.data.exemptionScreening.eligible
+                        ? "Exemption path available"
+                        : "Exemption path not established"}
+                    </div>
+                    <div className="text-sm leading-7 text-zinc-600">
+                      Compliance{" "}
+                      {humanizeToken(exemptionReport.data.complianceStatus)}
+                      {" | "}Qualified exemptions{" "}
+                      {exemptionReport.data.exemptionScreening.qualifiedExemptions.length}
+                    </div>
+                  </div>
+                  <div className="space-y-3 border-t border-zinc-200 pt-4 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                    <SummaryLine
+                      label="Eligible"
+                      value={exemptionReport.data.exemptionScreening.eligible ? "Yes" : "No"}
+                    />
+                    <SummaryLine
+                      label="Penalty savings if exempt"
+                      value={formatMoney(
+                        exemptionReport.data.penaltyContext.penaltySavingsIfExempt,
+                      )}
+                    />
+                    <SummaryLine
+                      label="Current penalty estimate"
+                      value={formatMoney(
+                        exemptionReport.data.penaltyContext.currentEstimatedPenalty,
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-3 border-t border-zinc-200 pt-4 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                    <SummaryLine
+                      label="Persisted artifact"
+                      value={
+                        exemptionReportArtifacts.data?.latestArtifact
+                          ? `v${exemptionReportArtifacts.data.latestArtifact.version} generated ${formatDate(
+                              exemptionReportArtifacts.data.latestArtifact.generatedAt,
+                            )}`
+                          : "Package not generated"
+                      }
+                    />
+                    <SummaryLine
+                      label="Last exported"
+                      value={formatDate(
+                        exemptionReportArtifacts.data?.latestArtifact?.latestExportedAt ??
+                          null,
+                      )}
+                    />
+                    <SummaryLine
+                      label="DOEE deadline"
+                      value={exemptionReport.data.doeeSubmissionGuidance.deadline}
+                    />
+                  </div>
                 </div>
               </div>
-              <MetricGrid
-                items={[
-                  {
-                    label: "Eligible",
-                    value: exemptionReport.data.exemptionScreening.eligible ? "Yes" : "No",
-                  },
-                  {
-                    label: "Qualified Exemptions",
-                    value:
-                      exemptionReport.data.exemptionScreening.qualifiedExemptions.length || 0,
-                  },
-                  {
-                    label: "Penalty Savings If Exempt",
-                    value: formatMoney(exemptionReport.data.penaltyContext.penaltySavingsIfExempt),
-                    tone: "success",
-                  },
-                  {
-                    label: "Current Penalty Estimate",
-                    value: formatMoney(exemptionReport.data.penaltyContext.currentEstimatedPenalty),
-                  },
-                ]}
-              />
+              <div className="grid gap-3 border-b border-zinc-200 pb-4 text-sm text-zinc-600 sm:grid-cols-2 xl:grid-cols-4">
+                <SummaryLine
+                  label="Eligible"
+                  value={exemptionReport.data.exemptionScreening.eligible ? "Yes" : "No"}
+                />
+                <SummaryLine
+                  label="Qualified exemptions"
+                  value={String(
+                    exemptionReport.data.exemptionScreening.qualifiedExemptions.length || 0,
+                  )}
+                />
+                <SummaryLine
+                  label="Penalty savings if exempt"
+                  value={formatMoney(exemptionReport.data.penaltyContext.penaltySavingsIfExempt)}
+                />
+                <SummaryLine
+                  label="Current penalty estimate"
+                  value={formatMoney(exemptionReport.data.penaltyContext.currentEstimatedPenalty)}
+                />
+              </div>
               <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
                 <div className="font-medium text-zinc-900">
                   {exemptionReport.data.penaltyContext.currentEstimateBasis}
                 </div>
                 <div className="mt-1 text-zinc-600">
                   Current estimate status:{" "}
-                  {exemptionReport.data.penaltyContext.currentEstimateStatus
-                    .toLowerCase()
-                    .replaceAll("_", " ")}
+                  {humanizeToken(exemptionReport.data.penaltyContext.currentEstimateStatus)}
                   .
                 </div>
                 <div className="mt-1 text-zinc-500">
@@ -791,25 +923,31 @@ export function ReportsPage() {
                   DOEE deadline: {exemptionReport.data.doeeSubmissionGuidance.deadline}
                 </div>
               </div>
-              <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                <div>
-                  <h4 className="text-sm font-medium text-zinc-900">Checklist</h4>
-                  <div className="mt-2 space-y-2">
+              <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+                <div className="space-y-3">
+                  <div className="quoin-kicker">Required items</div>
+                  <div className="text-sm leading-7 text-zinc-600">
+                    Missing items and filing notes stay explicit here so exemption packaging remains reviewable rather than assumed.
+                  </div>
+                  <div className="space-y-2">
                     {exemptionReport.data.filingChecklist.map((item) => (
                       <div
                         key={item.item}
                         className="rounded border border-zinc-200 px-3 py-2 text-sm"
                       >
                         <div className="font-medium text-zinc-900">{item.item}</div>
-                        <div className="text-xs text-zinc-500">{item.status}</div>
+                        <div className="text-xs text-zinc-500">{humanizeToken(item.status)}</div>
                         <div className="mt-1 text-xs text-zinc-600">{item.notes}</div>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <h4 className="text-sm font-medium text-zinc-900">Report artifact history</h4>
-                  <div className="mt-2 space-y-2">
+                <div className="space-y-3">
+                  <div className="quoin-kicker">Versioning and record support</div>
+                  <div className="text-sm leading-7 text-zinc-600">
+                    Persisted exemption reports provide the governed history. Benchmark submission references remain supporting record context.
+                  </div>
+                  <div className="space-y-2">
                     <div className="rounded border border-zinc-200 px-3 py-2">
                       <div className="font-medium text-zinc-900">
                         Persisted exemption reports
@@ -834,7 +972,7 @@ export function ReportsPage() {
                             </div>
                           ))
                         ) : (
-                          <EmptyState message="No persisted exemption report artifacts have been generated yet." />
+                          <EmptyState message="No persisted exemption package has been generated for this building yet. Generate the package to start exemption report history." />
                         )}
                       </div>
                     </div>
@@ -852,11 +990,11 @@ export function ReportsPage() {
                                 <div className="font-medium text-zinc-900">
                                   Reporting year {submission.reportingYear}
                                 </div>
-                                <div className="text-xs text-zinc-500">{submission.status}</div>
+                                <div className="text-xs text-zinc-500">{humanizeToken(submission.status)}</div>
                               </div>
                             ))
                         ) : (
-                          <EmptyState message="No benchmark submissions are available for this building yet." />
+                          <EmptyState message="No benchmark submission record is linked to this building and reporting year yet." />
                         )}
                       </div>
                     </div>
@@ -866,7 +1004,48 @@ export function ReportsPage() {
             </Panel>
           ) : null}
         </>
-      )}
+      )) : null}
+    </div>
+  );
+}
+
+function ModeButton({
+  active,
+  label,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-w-[16rem] rounded-2xl border px-4 py-3 text-left transition-colors ${
+        active
+          ? "border-zinc-900 bg-zinc-900 text-white"
+          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:text-zinc-950"
+      }`}
+    >
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+        Reports mode
+      </div>
+      <div className="mt-2 text-sm font-medium">{label}</div>
+      <div className={`mt-1 text-xs leading-6 ${active ? "text-zinc-200" : "text-zinc-500"}`}>
+        {description}
+      </div>
+    </button>
+  );
+}
+
+function SummaryLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">{label}</div>
+      <div className="mt-1 text-sm text-zinc-900">{value}</div>
     </div>
   );
 }

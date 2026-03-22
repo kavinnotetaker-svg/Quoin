@@ -2,7 +2,6 @@
 
 import React from "react";
 import { trpc } from "@/lib/trpc";
-import { ArtifactWorkspacePanel } from "./artifact-workspace-panel";
 import {
   Panel,
   formatDate,
@@ -10,6 +9,7 @@ import {
 } from "@/components/internal/admin-primitives";
 import {
   StatusBadge,
+  formatCycleLabel,
   getDataIssueSeverityDisplay,
   getDataIssueStatusDisplay,
   getOperationalAnomalyConfidenceDisplay,
@@ -19,10 +19,11 @@ import {
   getSourceReconciliationStatusDisplay,
   getSubmissionReadinessDisplay,
   getVerificationStatusDisplay,
+  humanizeToken,
 } from "@/components/internal/status-helpers";
 
 function metricLabel(metric: string | null) {
-  return metric ? metric.replaceAll("_", " ") : "Not recorded";
+  return metric ? humanizeToken(metric) : "Not recorded";
 }
 
 function decisionLabel(input: {
@@ -57,7 +58,7 @@ function getPenaltyStatusDisplay(status: string) {
 }
 
 function sourceLabel(value: string | null) {
-  return value ? value.replaceAll("_", " ") : "Not selected";
+  return value ? humanizeToken(value) : "Not selected";
 }
 
 function sourceRecordStateLabel(value: string) {
@@ -72,7 +73,7 @@ function sourceRecordStateLabel(value: string) {
 }
 
 function anomalyTypeLabel(value: string) {
-  return value.toLowerCase().replaceAll("_", " ");
+  return humanizeToken(value);
 }
 
 type PenaltySummaryShape = {
@@ -431,10 +432,7 @@ export function ComplianceOverviewTab({
   const [operatorFeedback, setOperatorFeedback] = React.useState<string | null>(null);
   const readiness = building.readinessSummary;
   const penaltySummary = building.governedSummary.penaltySummary;
-  const anomalySummary = building.governedSummary.anomalySummary;
-  const retrofitSummary = building.governedSummary.retrofitSummary;
   const runtimeSummary = building.governedSummary.runtimeSummary;
-  const operationalAnomalies = building.operationalAnomalies;
   const benchmarkReportingYear = readiness.evaluations.benchmark?.reportingYear ?? null;
   const canManageOperatorControls = building.operatorAccess.canManage;
 
@@ -478,6 +476,28 @@ export function ComplianceOverviewTab({
   const reconciliationDisplay = getSourceReconciliationStatusDisplay(
     reconciliation?.status,
   );
+  const primaryOverviewAction =
+    readiness.blockingIssueCount > 0
+      ? {
+          label: "Resolve blocking issues",
+          detail:
+            "Open the active issue list and clear the remaining blockers before moving this building forward.",
+          targetId: "building-open-issues",
+        }
+      : runtimeSummary.needsAttention
+        ? {
+            label: "Review source and runtime context",
+            detail:
+              runtimeSummary.nextAction?.reason ??
+              "Check the latest integration and source state before advancing compliance work.",
+            targetId: "building-runtime-context",
+          }
+        : {
+            label: "Review latest compliance result",
+            detail:
+              "Use the current governed result and evidence record as the basis for the next submission step.",
+            targetId: "building-compliance-decision",
+          };
 
   async function runOperatorAction(
     action: () => Promise<{ message?: string | null }>,
@@ -494,60 +514,143 @@ export function ComplianceOverviewTab({
     }
   }
 
+  function scrollToSection(sectionId: string) {
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
   return (
     <div className="space-y-6">
-      <Panel
+      <div className="border-y border-zinc-200 bg-white">
+        <div className="grid gap-6 px-5 py-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="space-y-3">
+            <div className="quoin-kicker">Current operating position</div>
+            <div className="font-display text-3xl font-medium tracking-tight text-zinc-950">
+              {primaryDisplay.label}
+            </div>
+            <div className="max-w-2xl text-sm leading-7 text-zinc-600">
+              {readiness.reasonSummary}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge label={readinessDisplay.label} tone={readinessDisplay.tone} />
+              <StatusBadge label={qaDisplay.label} tone={qaDisplay.tone} />
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => scrollToSection(primaryOverviewAction.targetId)}
+                className="btn-primary"
+              >
+                {primaryOverviewAction.label}
+              </button>
+              <div className="mt-3 max-w-xl text-sm leading-7 text-zinc-500">
+                {primaryOverviewAction.detail}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4 border-t border-zinc-200 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+            <SummaryItem label="Next action" value={readiness.nextAction.title} />
+            <div className="text-sm leading-7 text-zinc-600">{readiness.nextAction.reason}</div>
+            <div className="grid gap-3 text-sm text-zinc-600 sm:grid-cols-2 lg:grid-cols-1">
+              <SummaryItem
+                label="Blocking issues"
+                value={String(readiness.blockingIssueCount)}
+              />
+              <SummaryItem
+                label="Warnings"
+                value={String(readiness.warningIssueCount)}
+              />
+            </div>
+          </div>
+          <div className="space-y-4 border-t border-zinc-200 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+            <SummaryItem label="Compliance cycle" value={building.complianceCycle} />
+            <SummaryItem
+              label="Latest submission transition"
+              value={formatDate(
+                building.governedSummary.timestamps.lastSubmissionTransitionAt,
+              )}
+            />
+            <SummaryItem
+              label="Last packet finalized"
+              value={formatDate(readiness.lastPacketFinalizedAt)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <SectionHeading
+        kicker="Authoritative truth"
+        title="Deterministic compliance and evidence record"
+        description="These sections come from persisted compliance evaluations, governed penalty runs, active issues, and immutable artifact workflow state."
+      />
+
+      <div id="building-compliance-decision">
+        <Panel
         title="Compliance decision"
         subtitle="This summary is taken from the latest persisted compliance-engine results for benchmarking and BEPS."
       >
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Submission readiness
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+          <div className="space-y-4 border-l-2 border-zinc-900 pl-4">
+            <div className="quoin-kicker">Current recorded result</div>
+            <div className="font-display text-3xl font-medium tracking-tight text-zinc-950">
+              {primaryDisplay.label}
             </div>
-            <div className="mt-2">
-              <StatusBadge label={readinessDisplay.label} tone={readinessDisplay.tone} />
-            </div>
-            <div className="mt-2 text-sm text-zinc-600">
-              {readiness.nextAction.reason}
-            </div>
-          </div>
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              QA verdict
-            </div>
-            <div className="mt-2">
-              <StatusBadge label={qaDisplay.label} tone={qaDisplay.tone} />
-            </div>
-            <div className="mt-2 text-sm text-zinc-600">
-              {verificationChecklist
-                ? `${verificationChecklist.summary.failedCount} failed, ${verificationChecklist.summary.needsReviewCount} needs review`
-                : "No verification checklist has been recorded yet."}
-            </div>
-          </div>
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Compliance result
-            </div>
-            <div className="mt-2">
-              <StatusBadge label={primaryDisplay.label} tone={primaryDisplay.tone} />
-            </div>
-            <div className="mt-2 text-sm text-zinc-600">
+            <div className="text-sm leading-7 text-zinc-600">
               {readiness.blockingIssueCount > 0
                 ? `${readiness.blockingIssueCount} blocking issue(s) must be resolved before the compliance result is submission-ready.`
-                : "The latest governed compliance result is available below."}
+                : "No blocking issues remain. Review the latest governed result before submission."}
+            </div>
+            <div className="grid gap-4 border-t border-zinc-200 pt-4 sm:grid-cols-2">
+              <SummaryItem label="Submission readiness" value={readinessDisplay.label} />
+              <SummaryItem label="QA verdict" value={qaDisplay.label} />
+              <SummaryItem
+                label="Last readiness evaluation"
+                value={formatDate(readiness.lastReadinessEvaluatedAt)}
+              />
+              <SummaryItem
+                label="Last compliance evaluation"
+                value={formatDate(readiness.lastComplianceEvaluatedAt)}
+              />
+            </div>
+          </div>
+          <div className="space-y-3 border-t border-zinc-200 pt-4 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+            <div className="quoin-kicker">Why it is surfacing now</div>
+            <div className="text-sm leading-7 text-zinc-700">{readiness.nextAction.reason}</div>
+            <div className="grid gap-3 text-sm text-zinc-600">
+              <div className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-3">
+                <span>Benchmarking</span>
+                <span className="max-w-[18rem] text-right text-zinc-900">
+                  {readiness.evaluations.benchmark?.reasonSummary ?? "No governed evaluation"}
+                </span>
+              </div>
+              <div className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-3">
+                <span>BEPS</span>
+                <span className="max-w-[18rem] text-right text-zinc-900">
+                  {readiness.evaluations.beps?.reasonSummary ?? "No governed evaluation"}
+                </span>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <span>Next action</span>
+                <span className="max-w-[18rem] text-right text-zinc-900">
+                  {readiness.nextAction.title}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </Panel>
+        </Panel>
+      </div>
 
-      <Panel
+      <div id="building-open-issues">
+        <Panel
         title="Open data issues"
         subtitle="These are the persistent issues currently blocking or slowing this building's path to review and submission."
       >
         {activeIssues.length === 0 ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            No open data issues remain. This building is ready to move through review based on the latest records.
+                  No open data issues are recorded. The building can move forward using the current governed record.
           </div>
         ) : (
           <div className="space-y-3">
@@ -644,10 +747,13 @@ export function ComplianceOverviewTab({
         )}
       </Panel>
 
-      <ArtifactWorkspacePanel
-        buildingId={building.id}
-        canManageSubmissionWorkflows={canManageOperatorControls}
-      />
+      <div className="border-t border-zinc-200 pt-6">
+        <SectionHeading
+          kicker="Governed interpretation"
+          title="Basis, provenance, and runtime context"
+          description="These sections explain how Quoin selected sources, what runtime state produced the record, and what traceable assumptions or review inputs still matter."
+        />
+      </div>
 
       <Panel
         title="Canonical source reconciliation"
@@ -655,7 +761,7 @@ export function ComplianceOverviewTab({
       >
         {!reconciliation ? (
           <div className="text-sm text-zinc-500">
-            No persisted reconciliation summary is available yet.
+            Source reconciliation has not produced a persisted summary for this building yet. Connect or refresh source data to establish the governed basis.
           </div>
         ) : (
           <div className="space-y-4">
@@ -734,7 +840,7 @@ export function ComplianceOverviewTab({
               </div>
               {reconciliation.conflicts.length === 0 ? (
                 <div className="mt-3 text-sm text-zinc-500">
-                  No reconciliation conflicts are currently recorded.
+                    No reconciliation conflicts are recorded for the current source basis. The canonical source can be reviewed below.
                 </div>
               ) : (
                 <div className="mt-3 space-y-2">
@@ -745,8 +851,8 @@ export function ComplianceOverviewTab({
                     >
                       <div className="font-medium text-zinc-900">{conflict.message}</div>
                       <div className="mt-1 text-zinc-500">
-                        {conflict.code.replaceAll("_", " ")}
-                        {conflict.meterName ? ` · ${conflict.meterName}` : ""}
+                        {humanizeToken(conflict.code)}
+                        {conflict.meterName ? ` | ${conflict.meterName}` : ""}
                       </div>
                     </div>
                   ))}
@@ -770,7 +876,7 @@ export function ComplianceOverviewTab({
                         <div>
                           <div className="font-medium text-zinc-900">{meter.meterName}</div>
                           <div className="mt-1 text-sm text-zinc-500">
-                            {meter.meterType.replaceAll("_", " ")} · {meter.unit}
+                            {humanizeToken(meter.meterType)} | {meter.unit}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -788,10 +894,10 @@ export function ComplianceOverviewTab({
                               {sourceLabel(record.sourceSystem)}
                             </div>
                             <div className="mt-1">
-                              {sourceRecordStateLabel(record.state)} · {record.readingCount} readings
+                              {sourceRecordStateLabel(record.state)} | {record.readingCount} readings
                             </div>
                             <div className="mt-1">
-                              {record.coverageMonthCount} month(s) ·{" "}
+                              {record.coverageMonthCount} month(s) |{" "}
                               {record.totalConsumptionKbtu != null
                                 ? `${Math.round(record.totalConsumptionKbtu).toLocaleString()} kBtu`
                                 : "No total"}
@@ -820,10 +926,11 @@ export function ComplianceOverviewTab({
         )}
       </Panel>
 
-      <Panel
-        title="Integration runtime health"
-        subtitle="These statuses are persisted from the current Portfolio Manager and Green Button runtime records."
-      >
+      <div id="building-runtime-context">
+        <Panel
+          title="Integration runtime health"
+          subtitle="These statuses are persisted from the current Portfolio Manager and Green Button runtime records."
+        >
         <div className="grid gap-4 xl:grid-cols-2">
           {[
             {
@@ -851,7 +958,8 @@ export function ComplianceOverviewTab({
                   <div>
                     <div className="font-medium text-zinc-900">{entry.title}</div>
                     <div className="mt-1 text-sm text-zinc-500">
-                      {entry.summary.attentionReason ?? "No runtime follow-up is currently required."}
+                      {entry.summary.attentionReason ??
+                        "No runtime follow-up is currently flagged from the latest governed integration state."}
                     </div>
                   </div>
                   <StatusBadge label={status.label} tone={status.tone} />
@@ -890,12 +998,13 @@ export function ComplianceOverviewTab({
             );
           })}
         </div>
-      </Panel>
+        </Panel>
+      </div>
 
       {canManageOperatorControls ? (
         <Panel
-          title="Operator controls"
-          subtitle="These controls reuse the governed sync, reconciliation, and penalty services. They are available only to manager and admin roles."
+          title="Technical recovery tools"
+          subtitle="These controls reuse the governed sync, reconciliation, and penalty services. They support recovery work after the primary compliance step is clear."
         >
           <div className="space-y-4">
             {operatorFeedback ? (
@@ -903,6 +1012,9 @@ export function ComplianceOverviewTab({
                 {operatorFeedback}
               </div>
             ) : null}
+            <div className="max-w-3xl text-sm leading-7 text-zinc-500">
+              Use these only when runtime or source state is preventing normal progress. They are intentionally secondary to the compliance and submission actions above.
+            </div>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -915,7 +1027,7 @@ export function ComplianceOverviewTab({
                   )
                 }
                 disabled={retryPortfolioManagerSync.isPending}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+                className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
               >
                 {retryPortfolioManagerSync.isPending
                   ? "Retrying PM sync..."
@@ -934,7 +1046,7 @@ export function ComplianceOverviewTab({
                   reenqueueGreenButtonIngestion.isPending ||
                   runtimeSummary.greenButton.connectionStatus !== "ACTIVE"
                 }
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+                className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
               >
                 {reenqueueGreenButtonIngestion.isPending
                   ? "Re-enqueueing Green Button..."
@@ -950,7 +1062,7 @@ export function ComplianceOverviewTab({
                   )
                 }
                 disabled={rerunSourceReconciliation.isPending}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+                className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
               >
                 {rerunSourceReconciliation.isPending
                   ? "Refreshing reconciliation..."
@@ -966,7 +1078,7 @@ export function ComplianceOverviewTab({
                   )
                 }
                 disabled={refreshPenaltySummary.isPending}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50"
+                className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
               >
                 {refreshPenaltySummary.isPending
                   ? "Refreshing penalty..."
@@ -996,7 +1108,7 @@ export function ComplianceOverviewTab({
         >
           {!readiness.evaluations.benchmark ? (
             <div className="text-sm text-zinc-500">
-              No benchmarking engine result has been recorded yet.
+              Benchmarking has not produced a governed engine result for this building yet. Refresh PM data or run benchmarking to establish the current record.
             </div>
           ) : (
             <div className="space-y-4 text-sm text-zinc-700">
@@ -1042,17 +1154,13 @@ export function ComplianceOverviewTab({
                 </div>
                 <div className="mt-2 text-sm text-zinc-600">
                   Submission status{" "}
-                  {readiness.artifacts.benchmarkSubmission?.status
-                    .toLowerCase()
-                    .replaceAll("_", " ") ?? "not recorded"}
+                  {humanizeToken(readiness.artifacts.benchmarkSubmission?.status) ?? "not recorded"}
                   . Latest readiness check recorded on{" "}
                   {formatDate(readiness.artifacts.benchmarkSubmission?.lastReadinessEvaluatedAt)}.
                   {readiness.artifacts.benchmarkPacket ? (
                     <>
                       {" "}Verification packet{" "}
-                      {readiness.artifacts.benchmarkPacket.status
-                        .toLowerCase()
-                        .replaceAll("_", " ")}.
+                      {humanizeToken(readiness.artifacts.benchmarkPacket.status)}.
                     </>
                   ) : null}
                 </div>
@@ -1067,14 +1175,14 @@ export function ComplianceOverviewTab({
         >
           {!readiness.evaluations.beps ? (
             <div className="text-sm text-zinc-500">
-              No BEPS engine result has been recorded yet.
+              BEPS evaluation has not produced a governed engine result for this cycle yet. Run evaluation in the BEPS tab to establish the current filing record.
             </div>
           ) : (
             <div className="space-y-4 text-sm text-zinc-700">
               <div className="grid gap-4 md:grid-cols-2">
                 <SummaryItem
                   label="Cycle / filing year"
-                  value={`${readiness.evaluations.beps.complianceCycle ?? building.complianceCycle} / ${readiness.evaluations.beps.filingYear ?? "Not recorded"}`}
+                  value={`${formatCycleLabel(readiness.evaluations.beps.complianceCycle ?? building.complianceCycle)} / ${readiness.evaluations.beps.filingYear ?? "Not recorded"}`}
                 />
                 <SummaryItem
                   label="Rule version"
@@ -1107,13 +1215,9 @@ export function ComplianceOverviewTab({
                 </div>
                 <div className="mt-2 text-sm text-zinc-600">
                   Filing status{" "}
-                  {readiness.artifacts.bepsFiling?.status
-                    .toLowerCase()
-                    .replaceAll("_", " ") ?? "not recorded"}
+                  {humanizeToken(readiness.artifacts.bepsFiling?.status) ?? "not recorded"}
                   . Packet{" "}
-                  {readiness.artifacts.bepsPacket?.status
-                    .toLowerCase()
-                    .replaceAll("_", " ") ?? "not started"}
+                  {humanizeToken(readiness.artifacts.bepsPacket?.status) ?? "not started"}
                   .
                   {readiness.artifacts.bepsPacket?.generatedAt ? (
                     <> Last packet generated on {formatDate(readiness.artifacts.bepsPacket.generatedAt)}.</>
@@ -1131,7 +1235,7 @@ export function ComplianceOverviewTab({
       >
         {!penaltySummary ? (
           <div className="text-sm text-zinc-500">
-            Penalty estimate is unavailable right now.
+            No governed penalty run is linked to the current BEPS context yet. Run BEPS evaluation, then refresh the penalty summary when the filing record is ready.
           </div>
         ) : (
           <div className="space-y-4">
@@ -1169,7 +1273,7 @@ export function ComplianceOverviewTab({
                   Filing year {penaltySummary.governingContext.filingYear ?? "Not recorded"}
                   {" | "}
                   {penaltySummary.governingContext.basisPathway
-                    ? penaltySummary.governingContext.basisPathway.replaceAll("_", " ")
+                    ? humanizeToken(penaltySummary.governingContext.basisPathway)
                     : "No pathway basis"}
                 </div>
                 <div className="mt-2 text-sm text-zinc-600">
@@ -1262,271 +1366,8 @@ export function ComplianceOverviewTab({
             </div>
           </div>
         )}
-      </Panel>
-
-      <Panel
-        title="Retrofit priorities"
-        subtitle="These retrofit opportunities are ranked as governed decision-support from the current penalty context, explicit retrofit assumptions, and aligned operational anomalies."
-      >
-        {retrofitSummary.activeCount === 0 ? (
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600">
-            No active retrofit opportunities have been prioritized for this building yet.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Active opportunities
-                </div>
-                <div className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
-                  {retrofitSummary.activeCount}
-                </div>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Highest priority band
-                </div>
-                <div className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
-                  {retrofitSummary.highestPriorityBand ?? "Not ranked"}
-                </div>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Top avoided penalty
-                </div>
-                <div className="mt-2 text-lg font-semibold tracking-tight text-zinc-900">
-                  {formatMoney(
-                    retrofitSummary.topOpportunity?.estimatedAvoidedPenalty ?? null,
-                  )}
-                </div>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Top risk reduction
-                </div>
-                <div className="mt-2 text-lg font-semibold tracking-tight text-zinc-900">
-                  {formatMoney(
-                    retrofitSummary.topOpportunity?.estimatedOperationalRiskReduction
-                      .penaltyImpactUsd ?? null,
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {retrofitSummary.opportunities.map((opportunity) => (
-                <div
-                  key={opportunity.candidateId}
-                  className="rounded-lg border border-zinc-200 bg-white p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="font-medium text-zinc-900">{opportunity.name}</div>
-                      <div className="mt-1 text-sm text-zinc-500">
-                        {opportunity.projectType.toLowerCase().replaceAll("_", " ")}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <StatusBadge
-                        label={opportunity.priorityBand.toLowerCase()}
-                        tone={
-                          opportunity.priorityBand === "CRITICAL" ||
-                          opportunity.priorityBand === "HIGH"
-                            ? "danger"
-                            : opportunity.priorityBand === "MEDIUM"
-                              ? "warning"
-                              : "muted"
-                        }
-                      />
-                      <StatusBadge
-                        label={opportunity.estimatedAvoidedPenaltyStatus
-                          .toLowerCase()
-                          .replaceAll("_", " ")}
-                        tone={
-                          opportunity.estimatedAvoidedPenaltyStatus === "ESTIMATED"
-                            ? "warning"
-                            : "muted"
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-3 text-sm text-zinc-600">
-                    {opportunity.basis.summary}
-                  </div>
-                  <div className="mt-3 grid gap-4 md:grid-cols-4 text-sm text-zinc-700">
-                    <SummaryItem
-                      label="Priority score"
-                      value={String(opportunity.priorityScore)}
-                    />
-                    <SummaryItem
-                      label="Net cost"
-                      value={formatMoney(opportunity.netProjectCost)}
-                    />
-                    <SummaryItem
-                      label="Avoided penalty"
-                      value={formatMoney(opportunity.estimatedAvoidedPenalty)}
-                    />
-                    <SummaryItem
-                      label="Risk reduction"
-                      value={formatMoney(
-                        opportunity.estimatedOperationalRiskReduction.penaltyImpactUsd,
-                      )}
-                    />
-                  </div>
-                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
-                    {opportunity.basis.explanation}
-                  </div>
-                  {opportunity.basis.assumptions.length > 0 ? (
-                    <div className="mt-3 space-y-1 text-sm text-zinc-600">
-                      {opportunity.basis.assumptions.map((assumption) => (
-                        <div key={assumption}>{assumption}</div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </Panel>
-
-      <Panel
-        title="Operational anomalies"
-        subtitle="Explainable operational signals are tracked as decision-support. They do not change the compliance engine result, but they can indicate energy and penalty risk."
-      >
-        {operationalAnomalies.length === 0 ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            No active operational anomalies are recorded for this building.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Active anomalies
-                </div>
-                <div className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
-                  {anomalySummary.activeCount}
-                </div>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  High severity
-                </div>
-                <div className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
-                  {anomalySummary.highSeverityCount}
-                </div>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Estimated energy impact
-                </div>
-                <div className="mt-2 text-lg font-semibold tracking-tight text-zinc-900">
-                  {anomalySummary.totalEstimatedEnergyImpactKbtu == null
-                    ? "Not available"
-                    : `${Math.round(anomalySummary.totalEstimatedEnergyImpactKbtu).toLocaleString()} kBtu`}
-                </div>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Estimated penalty risk
-                </div>
-                <div className="mt-2 text-lg font-semibold tracking-tight text-zinc-900">
-                  {formatMoney(anomalySummary.totalEstimatedPenaltyImpactUsd)}
-                </div>
-                <div className="mt-2">
-                  <StatusBadge
-                    label={
-                      getOperationalAnomalyPenaltyImpactDisplay(
-                        anomalySummary.penaltyImpactStatus,
-                      ).label
-                    }
-                    tone={
-                      getOperationalAnomalyPenaltyImpactDisplay(
-                        anomalySummary.penaltyImpactStatus,
-                      ).tone
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {operationalAnomalies.map((anomaly) => {
-                const confidenceDisplay = getOperationalAnomalyConfidenceDisplay(
-                  anomaly.confidenceBand,
-                );
-                const penaltyImpactDisplay = getOperationalAnomalyPenaltyImpactDisplay(
-                  anomaly.penaltyImpactStatus,
-                );
-
-                return (
-                  <div
-                    key={anomaly.id}
-                    className="rounded-lg border border-zinc-200 bg-white p-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="font-medium text-zinc-900">{anomaly.title}</div>
-                        <div className="mt-1 text-sm text-zinc-500">
-                          {anomalyTypeLabel(anomaly.anomalyType)}
-                          {anomaly.meter ? ` | ${anomaly.meter.name}` : ""}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <StatusBadge
-                          label={anomaly.severity.toLowerCase()}
-                          tone={
-                            anomaly.severity === "HIGH" || anomaly.severity === "CRITICAL"
-                              ? "danger"
-                              : anomaly.severity === "MEDIUM"
-                                ? "warning"
-                                : "muted"
-                          }
-                        />
-                        <StatusBadge
-                          label={confidenceDisplay.label}
-                          tone={confidenceDisplay.tone}
-                        />
-                        <StatusBadge
-                          label={penaltyImpactDisplay.label}
-                          tone={penaltyImpactDisplay.tone}
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-3 text-sm text-zinc-600">{anomaly.explanation}</div>
-                    <div className="mt-2 text-sm text-zinc-500">
-                      {anomaly.causeHypothesis ?? "No cause hypothesis recorded."}
-                    </div>
-                    <div className="mt-3 grid gap-4 md:grid-cols-3 text-sm text-zinc-700">
-                      <SummaryItem
-                        label="Energy impact"
-                        value={
-                          anomaly.estimatedEnergyImpactKbtu == null
-                            ? "Not available"
-                            : `${Math.round(anomaly.estimatedEnergyImpactKbtu).toLocaleString()} kBtu`
-                        }
-                      />
-                      <SummaryItem
-                        label="Penalty impact"
-                        value={formatMoney(anomaly.estimatedPenaltyImpactUsd)}
-                      />
-                      <SummaryItem
-                        label="Detected through"
-                        value={formatDate(anomaly.detectionWindowEnd)}
-                      />
-                    </div>
-                    <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
-                      {anomaly.attribution.penaltyImpactExplanation}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </Panel>
+        </Panel>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel
@@ -1535,7 +1376,7 @@ export function ComplianceOverviewTab({
         >
           {!verificationChecklist ? (
             <div className="text-sm text-zinc-500">
-              No verification checklist has been computed yet.
+              The QA gate has not been computed for the current record yet. Recheck benchmarking to generate the verification checklist.
             </div>
           ) : (
             <div className="space-y-3">
@@ -1548,7 +1389,7 @@ export function ComplianceOverviewTab({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="font-medium text-zinc-900">
-                        {item.key.replaceAll("_", " ")}
+                        {humanizeToken(item.key)}
                       </div>
                       <StatusBadge label={status.label} tone={status.tone} />
                     </div>
@@ -1568,7 +1409,7 @@ export function ComplianceOverviewTab({
         >
           {building.recentAuditLogs.length === 0 ? (
             <div className="text-sm text-zinc-500">
-              No audit events are available for this building yet.
+              No persisted audit events are recorded for this building yet. Audit history begins after the first governed evaluation, packet action, or workflow transition.
             </div>
           ) : (
             <div className="space-y-3">
@@ -1578,7 +1419,7 @@ export function ComplianceOverviewTab({
                   className="rounded-lg border border-zinc-200 bg-white p-4 text-sm"
                 >
                   <div className="font-medium text-zinc-900">
-                    {log.action.replaceAll("_", " ").toLowerCase()}
+                    {humanizeToken(log.action)}
                   </div>
                   <div className="mt-1 text-zinc-500">{formatDate(log.timestamp)}</div>
                   {log.errorCode ? (
@@ -1601,6 +1442,26 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
         {label}
       </div>
       <div className="mt-1 text-sm text-zinc-900">{value}</div>
+    </div>
+  );
+}
+
+function SectionHeading({
+  kicker,
+  title,
+  description,
+}: {
+  kicker: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="quoin-kicker">{kicker}</div>
+      <div className="font-display text-2xl font-medium tracking-tight text-zinc-950">
+        {title}
+      </div>
+      <div className="max-w-3xl text-sm leading-7 text-zinc-600">{description}</div>
     </div>
   );
 }

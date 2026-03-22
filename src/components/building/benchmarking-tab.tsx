@@ -140,9 +140,29 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
 
   const btnClass =
     "rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50";
+  const primaryBtnClass =
+    "btn-primary px-4 py-2 text-[13px] disabled:opacity-50 disabled:hover:translate-y-0";
   const qualityStatus = getReadinessStatusDisplay(
     String(qaPayload?.status ?? "NOT_AVAILABLE"),
   );
+  const primaryBenchmarkingAction =
+    !syncData || syncData.status !== "SUCCEEDED"
+      ? {
+          label: syncMutation.isPending ? "Refreshing data..." : "Refresh PM data",
+          onClick: () => syncMutation.mutate({ buildingId, reportingYear }),
+          disabled: syncMutation.isPending,
+          helper:
+            "Use this when Portfolio Manager linkage or annual coverage needs a governed refresh.",
+        }
+      : {
+          label: evaluateMutation.isPending
+            ? "Rechecking..."
+            : "Recheck benchmarking",
+          onClick: () => evaluateMutation.mutate({ buildingId, reportingYear }),
+          disabled: evaluateMutation.isPending,
+          helper:
+            "Use this after data is current to recompute the governed benchmarking readiness result.",
+        };
 
   return (
     <div className="space-y-6">
@@ -158,31 +178,25 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
               className="w-28 rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13px] font-medium text-zinc-900 shadow-sm transition-colors focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
             <button
-              onClick={() => syncMutation.mutate({ buildingId, reportingYear })}
-              disabled={syncMutation.isPending}
-              className={btnClass}
+              onClick={primaryBenchmarkingAction.onClick}
+              disabled={primaryBenchmarkingAction.disabled}
+              className={primaryBtnClass}
             >
-              {syncMutation.isPending ? "Syncing..." : "Refresh PM Data"}
+              {primaryBenchmarkingAction.label}
             </button>
             <button
               onClick={() => pushMutation.mutate({ buildingId, reportingYear })}
               disabled={pushMutation.isPending}
               className={btnClass}
             >
-              {pushMutation.isPending ? "Pushing..." : "Push Local Data"}
-            </button>
-            <button
-              onClick={() => evaluateMutation.mutate({ buildingId, reportingYear })}
-              disabled={evaluateMutation.isPending}
-              className={btnClass}
-            >
-              {evaluateMutation.isPending
-                ? "Rechecking..."
-                : "Recheck Benchmarking"}
+              {pushMutation.isPending ? "Pushing..." : "Push local data"}
             </button>
           </div>
         }
       >
+        <div className="mb-5 border-b border-zinc-200 pb-4 text-sm text-zinc-600">
+          {primaryBenchmarkingAction.helper}
+        </div>
         <MetricGrid
           items={[
             {
@@ -304,7 +318,7 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
           subtitle="Deterministic checks for PM linkage, sharing, required evidence, coverage, and overlapping bills."
         >
           {findings.length === 0 ? (
-            <EmptyState message="No blocking checks have been generated for this building yet." />
+            <EmptyState message="Benchmarking checks have not been generated for this building and reporting year yet. Refresh PM data or recheck benchmarking to establish the current gate." />
           ) : (
             <div className="space-y-4">
               {findings.map((finding, index) => {
@@ -353,7 +367,7 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
               detail={readiness.error.message}
             />
           ) : readiness.error?.data?.code === "NOT_FOUND" || !readiness.data ? (
-            <EmptyState message="No benchmark submission exists yet for the selected reporting year." />
+            <EmptyState message="No governed benchmark submission exists for the selected reporting year yet. Refresh PM data or recheck benchmarking to create the current readiness record." />
           ) : (
             <div className="space-y-4 text-sm text-zinc-700">
               <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -396,7 +410,7 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
             detail={verificationChecklist.error.message}
           />
         ) : verificationItems.length === 0 ? (
-          <EmptyState message="No verification results have been computed for this reporting year yet. Refresh benchmarking to generate them." />
+          <EmptyState message="The verification checklist has not been generated for this reporting year yet. Recheck benchmarking to compute the current QA gate." />
         ) : (
           <div className="space-y-4">
             {verificationSummary ? (
@@ -478,7 +492,7 @@ export function BenchmarkingTab({ buildingId }: { buildingId: string }) {
         subtitle="Recent governed annual benchmarking records for this building."
       >
         {!submissions.data || submissions.data.length === 0 ? (
-          <EmptyState message="No benchmark submissions exist for this building yet." />
+          <EmptyState message="No governed benchmark submissions are recorded for this building yet. Once benchmarking is evaluated, the annual submission history will appear here." />
         ) : (
           <div className="space-y-4">
             {submissions.data.map((submission) => (

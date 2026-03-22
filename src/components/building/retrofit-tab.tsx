@@ -10,6 +10,7 @@ import {
   formatMoney,
   formatNumber,
 } from "@/components/internal/admin-primitives";
+import { humanizeToken } from "@/components/internal/status-helpers";
 
 const PROJECT_TYPES = [
   "LED_LIGHTING_RETROFIT",
@@ -91,7 +92,7 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
             >
               {PROJECT_TYPES.map((type) => (
                 <option key={type} value={type}>
-                  {type.replaceAll("_", " ").toLowerCase()}
+                  {humanizeToken(type)}
                 </option>
               ))}
             </select>
@@ -175,9 +176,9 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
               })
             }
             disabled={createCandidate.isPending}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50"
+            className="rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50"
           >
-            {createCandidate.isPending ? "Saving..." : "Save retrofit candidate"}
+            {createCandidate.isPending ? "Saving..." : "Save planning candidate"}
           </button>
         </div>
       </Panel>
@@ -201,13 +202,13 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
                     <span className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 shadow-sm">
-                      {candidate.projectType}
+                      {humanizeToken(candidate.projectType)}
                     </span>
                     <span className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 shadow-sm">
-                      {candidate.status}
+                      {humanizeToken(candidate.status)}
                     </span>
                     <span className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 shadow-sm">
-                      {candidate.confidenceBand}
+                      {humanizeToken(candidate.confidenceBand)}
                     </span>
                   </div>
                   <div className="mt-4 grid gap-3 text-[13px] font-medium text-zinc-600 sm:grid-cols-3">
@@ -254,7 +255,7 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
                       {ranking.name}
                     </div>
                     <div className="rounded-md bg-emerald-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-700 shadow-sm">
-                      {ranking.priorityBand}
+                      {humanizeToken(ranking.priorityBand)}
                     </div>
                   </div>
                   <div className="mt-4 grid gap-3 text-[13px] font-medium text-zinc-600 sm:grid-cols-2">
@@ -294,8 +295,8 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
                       Avoided penalty basis:{" "}
                       <span className="text-zinc-900">
                         {ranking.estimatedAvoidedPenaltyStatus
-                          .toLowerCase()
-                          .replaceAll("_", " ")}
+                          ? humanizeToken(ranking.estimatedAvoidedPenaltyStatus)
+                          : "Not available"}
                       </span>
                     </div>
                   </div>
@@ -309,7 +310,7 @@ export function RetrofitTab({ buildingId }: { buildingId: string }) {
                           key={reasonCode}
                           className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-600 shadow-sm"
                         >
-                          {reasonCode}
+                          {humanizeToken(reasonCode)}
                         </span>
                       ))}
                     </div>

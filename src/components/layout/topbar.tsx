@@ -4,13 +4,13 @@ import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 
 export function Topbar() {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-end gap-4 border-b border-zinc-200/60 bg-white/80 px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-end gap-4 border-b border-zinc-200/70 bg-zinc-50/90 px-6 backdrop-blur-md lg:px-10">
       <OrganizationSwitcher
         appearance={{
           elements: {
-            rootBox: "text-[13px] font-medium",
+            rootBox: "text-[12px] font-medium",
             organizationSwitcherTrigger:
-              "border border-zinc-200 rounded-md px-3 py-1.5 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 transition-colors bg-white shadow-sm",
+              "border border-zinc-200 rounded-full px-3 py-1.5 text-[12px] font-medium text-zinc-700 hover:bg-white transition-colors bg-white",
           },
         }}
       />

@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 
 export function LoadingState() {
   return (
-    <div className="overflow-hidden rounded-md">
-      <div className="loading-bar h-1 w-1/3 bg-zinc-300" />
+    <div className="overflow-hidden rounded-none border-t border-zinc-200">
+      <div className="loading-bar h-px w-1/3 bg-zinc-400" />
     </div>
   );
 }
@@ -21,9 +21,10 @@ export function ErrorState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800 shadow-sm">
-      <p className="font-semibold">{message}</p>
-      {detail ? <p className="mt-1 text-[13px] text-red-700">{detail}</p> : null}
+    <div className="border-l border-red-300 bg-red-50/60 px-5 py-4 text-sm text-red-900">
+      <p className="font-semibold uppercase tracking-[0.16em] text-[11px]">Validation issue</p>
+      <p className="mt-2 font-medium">{message}</p>
+      {detail ? <p className="mt-2 text-[13px] text-red-800">{detail}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
@@ -37,9 +38,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 p-8 text-center text-sm text-zinc-500">
+    <div className="border-t border-zinc-200 py-8 text-sm text-zinc-500">
       <p className="font-medium">{message}</p>
-      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+      {action ? <div className="mt-4 flex">{action}</div> : null}
     </div>
   );
 }
@@ -56,11 +57,13 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="card-machined p-6 transition-all duration-200 hover:shadow-md">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <section className="quoin-panel">
+      <div className="quoin-panel-header">
         <div>
-          <h3 className="text-lg font-semibold tracking-tight text-zinc-900">{title}</h3>
-          {subtitle ? <p className="mt-1 text-[13px] text-zinc-500">{subtitle}</p> : null}
+          <h3 className="font-display text-[1.75rem] font-medium tracking-tight text-zinc-900">
+            {title}
+          </h3>
+          {subtitle ? <p className="mt-2 max-w-3xl text-[15px] leading-7 text-zinc-500">{subtitle}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
@@ -86,14 +89,11 @@ export function MetricGrid({
   } as const;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="quoin-metric-strip lg:grid-cols-4">
       {items.map((item) => (
-        <div
-          key={item.label}
-          className="card-machined p-5 transition-all duration-200 hover:shadow-md hover:border-zinc-300"
-        >
-          <p className="text-[13px] font-medium text-zinc-500">{item.label}</p>
-          <p className={`mt-2 font-mono text-2xl font-semibold tracking-tight ${tones[item.tone ?? "default"]}`}>
+        <div key={item.label} className="quoin-metric">
+          <p className="quoin-metric-label">{item.label}</p>
+          <p className={`quoin-metric-value ${tones[item.tone ?? "default"]}`}>
             {item.value}
           </p>
         </div>

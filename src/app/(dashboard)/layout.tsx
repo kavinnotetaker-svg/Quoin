@@ -12,11 +12,13 @@ export default async function DashboardLayout({
   if (!user) redirect("/sign-in");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="quoin-shell min-h-screen">
       <Sidebar />
       <div className="lg:pl-[220px]">
         <Topbar />
-        <main className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8 animate-in fade-in duration-500">{children}</main>
+        <main className="mx-auto max-w-[88rem] px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10 animate-in fade-in duration-500">
+          {children}
+        </main>
       </div>
     </div>
   );

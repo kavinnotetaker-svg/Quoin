@@ -53,17 +53,18 @@ export function BuildingHeader({
     .join(" | ");
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">{name}</h1>
-          <p className="mt-1 text-[15px] font-medium text-zinc-600">{address}</p>
-          <p className="mt-1 text-[13px] text-zinc-500">{details}</p>
+    <div className="space-y-8 border-b border-zinc-200/80 pb-8">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-3">
+          <div className="quoin-kicker">Building workbench</div>
+          <h1 className="font-display text-5xl font-medium tracking-tight text-zinc-900">{name}</h1>
+          <p className="max-w-3xl text-[15px] leading-7 text-zinc-600">{address}</p>
+          <p className="text-[12px] uppercase tracking-[0.16em] text-zinc-500">{details}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={onUpload}
-            className="rounded-md border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium text-zinc-700 shadow-sm transition-all hover:bg-zinc-50 hover:text-zinc-900 active:scale-95"
+            className="btn-primary text-[13px]"
           >
             Upload Utility Data
           </button>
@@ -72,11 +73,11 @@ export function BuildingHeader({
 
       <motion.div 
         layout
-        className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-[13px]"
+        className="flex flex-col gap-3 border-t border-zinc-200 pt-4 text-[13px] lg:flex-row lg:items-center"
       >
-        <span className="flex items-center gap-2 font-semibold text-zinc-700">
+        <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
           <Link size={14} className="text-zinc-400" />
-          Portfolio Manager Property:
+          Portfolio Manager property
         </span>
         
         <AnimatePresence mode="wait">
