@@ -497,9 +497,15 @@ function ArtifactCard({
 export function ArtifactWorkspacePanel({
  buildingId,
  canManageSubmissionWorkflows = false,
+ scopes = ["benchmark", "beps"],
+ title = "Governed artifacts",
+ subtitle = "These are the immutable operational artifacts generated from the current readiness, compliance, and penalty context.",
 }: {
  buildingId: string;
  canManageSubmissionWorkflows?: boolean;
+ scopes?: Array<"benchmark" | "beps">;
+ title?: string;
+ subtitle?: string;
 }) {
  const utils = trpc.useUtils();
  const [benchmarkWorkflowNotes, setBenchmarkWorkflowNotes] = useState("");
@@ -581,8 +587,8 @@ export function ArtifactWorkspacePanel({
  if (artifactWorkspace.isLoading) {
  return (
  <Panel
- title="Governed artifacts"
- subtitle="Immutable filing and submission artifacts generated from the current governed compliance context."
+ title={title}
+ subtitle={subtitle}
  >
  <div className="text-sm text-zinc-500">Preparing the governed artifact workspace...</div>
  </Panel>
@@ -603,10 +609,11 @@ export function ArtifactWorkspacePanel({
 
  return (
  <Panel
- title="Governed artifacts"
- subtitle="These are the immutable operational artifacts generated from the current readiness, compliance, and penalty context."
+ title={title}
+ subtitle={subtitle}
  >
  <div className="space-y-6">
+ {scopes.includes("benchmark") ? (
  <ArtifactCard
  workflow={benchmark}
  onGenerate={() => {
@@ -640,7 +647,9 @@ export function ArtifactWorkspacePanel({
  transitionNotes={benchmarkWorkflowNotes}
  onTransitionNotesChange={setBenchmarkWorkflowNotes}
  />
+ ) : null}
 
+ {scopes.includes("beps") ? (
  <ArtifactCard
  workflow={beps}
  onGenerate={() => {
@@ -680,6 +689,7 @@ export function ArtifactWorkspacePanel({
  transitionNotes={bepsWorkflowNotes}
  onTransitionNotesChange={setBepsWorkflowNotes}
  />
+ ) : null}
  </div>
  </Panel>
  );

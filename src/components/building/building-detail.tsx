@@ -3,18 +3,14 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { BuildingHeader } from "./building-header";
+import { BenchmarkWorkbenchTab } from "./benchmark-workbench-tab";
 import { ComplianceOverviewTab } from "./compliance-overview-tab";
-import { BenchmarkingTab } from "./benchmarking-tab";
-import { VerificationRequestsTab } from "./verification-requests-tab";
 import { BepsTab } from "./beps-tab";
-import { ArtifactWorkspacePanel } from "./artifact-workspace-panel";
 import { BepsDeliveryPanel } from "./beps-delivery-panel";
 import { OperationsTab } from "./operations-tab";
 import { RetrofitTab } from "./retrofit-tab";
 import { UploadModal } from "./upload-modal";
 import { motion, AnimatePresence } from "framer-motion";
-import { formatDate } from "@/components/internal/admin-primitives";
-import { humanizeToken } from "@/components/internal/status-helpers";
 
 interface Tab {
  key: string;
@@ -22,10 +18,9 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
- { key: "overview", label: "COMPLIANCE TRUTH" },
- { key: "interpretation", label: "INTERPRETATION" },
- { key: "evidence", label: "EVIDENCE" },
- { key: "advisory", label: "ADVISORY" },
+ { key: "workflow", label: "BENCHMARK WORKFLOW" },
+ { key: "overview", label: "GOVERNED CONTEXT" },
+ { key: "secondary", label: "SECONDARY SURFACES" },
 ];
 
 function defaultReportingYear() {
@@ -33,7 +28,7 @@ function defaultReportingYear() {
 }
 
 export function BuildingDetail({ buildingId }: { buildingId: string }) {
- const [activeTab, setActiveTab] = useState("overview");
+ const [activeTab, setActiveTab] = useState("workflow");
  const [showUpload, setShowUpload] = useState(false);
 
  const utils = trpc.useUtils();
@@ -67,7 +62,13 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
 
  useEffect(() => {
  const applyHash = () => {
- const hash = window.location.hash.replace("#", "");
+ const rawHash = window.location.hash.replace("#", "");
+ const hash =
+ rawHash === "interpretation" || rawHash === "evidence"
+ ? "workflow"
+ : rawHash === "advisory"
+ ? "secondary"
+ : rawHash;
  if (TABS.some((tab) => tab.key === hash)) {
  setActiveTab(hash);
  }
@@ -113,6 +114,7 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
  grossSquareFeet={data.grossSquareFeet}
  yearBuilt={data.yearBuilt}
  espmPropertyId={data.espmPropertyId?.toString() ?? null}
+ nextAction={data.readinessSummary.nextAction}
  onUpload={() => setShowUpload(true)}
  />
 
@@ -144,6 +146,20 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
  exit={{ opacity: 0, y: -10 }}
  transition={{ duration: 0.2, ease: "easeOut" }}
  >
+ {activeTab === "workflow" && (
+ <BenchmarkWorkbenchTab
+ buildingId={buildingId}
+ canManageSubmissionWorkflows={data.operatorAccess.canManage}
+ onUpload={() => setShowUpload(true)}
+ readinessSummary={data.readinessSummary}
+ governedSummary={{
+ artifactSummary: data.governedSummary.artifactSummary,
+ submissionSummary: data.governedSummary.submissionSummary,
+ runtimeSummary: data.governedSummary.runtimeSummary,
+ }}
+ />
+ )}
+
  {activeTab === "overview" && (
  <ComplianceOverviewTab
  building={data}
@@ -151,44 +167,25 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
  />
  )}
 
- {activeTab === "interpretation" && (
- <div className="space-y-12">
- <BenchmarkingTab buildingId={buildingId} />
- <VerificationRequestsTab buildingId={buildingId} />
- <BepsTab buildingId={buildingId} includeDeliveryWorkspace={false} />
- </div>
- )}
-
- {activeTab === "evidence" && (
- <div className="space-y-12">
- <div className="grid lg:grid-cols-[220px_1fr] gap-8 border-t border-zinc-200/80 pt-10 pb-4">
+ {activeTab === "secondary" && (
+ <div className="space-y-10">
+ <div className="grid gap-8 border-t border-zinc-200/80 pt-10 pb-2 lg:grid-cols-[220px_1fr]">
  <div>
  <h2 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">
- Submission Compilation
+ Secondary release surfaces
  </h2>
  </div>
- <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+ <div className="space-y-3">
  <div className="font-display text-3xl tracking-tight text-zinc-900">
- Governed Delivery Actions
+ BEPS and advisory tools
  </div>
- <div className="flex gap-8">
- <SummaryItem
- label="Next action"
- value={data.readinessSummary.nextAction.title}
- />
- <SummaryItem
- label="Last packet"
- value={formatDate(data.readinessSummary.lastPacketGeneratedAt)}
- />
+ <p className="max-w-3xl text-sm leading-relaxed text-zinc-600">
+ These surfaces remain available for broader compliance operations, but they are
+ secondary to the benchmark readiness and submission workflow for this release.
+ </p>
  </div>
  </div>
- </div>
-
- <ArtifactWorkspacePanel
- buildingId={buildingId}
- canManageSubmissionWorkflows={data.operatorAccess.canManage}
- />
-
+ <BepsTab buildingId={buildingId} includeDeliveryWorkspace={false} />
  {latestBepsRun.error?.data?.code !== "NOT_FOUND" && latestBepsRun.data ? (
  <BepsDeliveryPanel
  buildingId={buildingId}
@@ -197,11 +194,6 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
  cycle={bepsCycle}
  />
  ) : null}
- </div>
- )}
-
- {activeTab === "advisory" && (
- <div className="space-y-10">
  <OperationsTab buildingId={buildingId} />
  <RetrofitTab buildingId={buildingId} />
  </div>
@@ -228,17 +220,6 @@ export function BuildingDetail({ buildingId }: { buildingId: string }) {
  }}
  />
  )}
- </div>
- );
-}
-
-function SummaryItem({ label, value }: { label: string; value: string }) {
- return (
- <div>
- <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
- {label}
- </div>
- <div className="mt-1 text-sm text-zinc-900">{value}</div>
  </div>
  );
 }

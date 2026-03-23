@@ -68,7 +68,13 @@ function getReadinessStatus(data: unknown) {
  return typeof status === "string" ? status : "NOT_STARTED";
 }
 
-export function VerificationRequestsTab({ buildingId }: { buildingId: string }) {
+export function VerificationRequestsTab({
+ buildingId,
+ showPacketActions = true,
+}: {
+ buildingId: string;
+ showPacketActions?: boolean;
+}) {
  const [reportingYear, setReportingYear] = useState(defaultReportingYear());
  const [editingRequestId, setEditingRequestId] = useState<string | undefined>();
  const [category, setCategory] = useState<(typeof REQUEST_CATEGORIES)[number]["value"]>(
@@ -198,8 +204,12 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
  return (
  <div className="space-y-6">
  <Panel
- title="Benchmark verification packet"
- subtitle="Assemble a verifier-ready workpaper packet from the current readiness result, linked evidence, and open checklist items. PDF export generates the formatted reviewer handoff document; JSON and Markdown remain raw packet exports."
+ title={showPacketActions ? "Benchmark verification packet" : "Verification support checklist"}
+ subtitle={
+ showPacketActions
+ ? "Assemble a verifier-ready workpaper packet from the current readiness result, linked evidence, and open checklist items. PDF export generates the formatted reviewer handoff document; JSON and Markdown remain raw packet exports."
+ : "Track the support items and packet blockers that determine whether the governed benchmark packet is actually ready for review."
+ }
  actions={
  <div className="flex flex-wrap items-center gap-3">
  <input
@@ -208,6 +218,8 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
  onChange={(event) => setReportingYear(Number(event.target.value))}
  className="w-28 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
  />
+ {showPacketActions ? (
+ <>
  <button
  className={btnClass}
  onClick={() => generateMutation.mutate({ buildingId, reportingYear })}
@@ -251,9 +263,11 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
  >
  Export PDF
  </button>
+ </>
+ ) : null}
  </div>
  }
- >
+>
  {readiness.error?.data?.code === "NOT_FOUND" ? (
  <EmptyState message="Run benchmarking readiness first. Quoin needs a benchmark submission before it can assemble a verification packet." />
  ) : null}
@@ -299,6 +313,17 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
  : "No benchmark verification packet exists yet for this reporting year."}
  </p>
  </div>
+
+ {!showPacketActions ? (
+ <div className="border border-zinc-200 bg-zinc-50 p-5 text-sm">
+ <div className="font-semibold text-zinc-900">Packet controls</div>
+ <p className="mt-2 text-sm text-zinc-600">
+ Generate, finalize, export, and advance the benchmark packet in the submission
+ section below. This section stays focused on request-item completeness and packet
+ blockers.
+ </p>
+ </div>
+ ) : null}
 
  <div className="border border-zinc-200 bg-zinc-50 p-5 text-sm">
  <div className="font-semibold text-zinc-900">Warnings and blockers</div>

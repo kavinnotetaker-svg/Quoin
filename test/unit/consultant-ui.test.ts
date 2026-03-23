@@ -599,9 +599,9 @@ describe("consultant-facing screens", () => {
   it("renders the governed portfolio worklist with readiness, penalty, and artifact state", () => {
     const markup = renderToStaticMarkup(createElement(ComplianceQueue));
 
-    expect(markup).toContain("Portfolio worklist");
+    expect(markup).toContain("Buildings");
     expect(markup).toContain("Add building");
-    expect(markup).toContain("Needs attention now");
+    expect(markup).toContain("Blocked buildings");
     expect(markup).toContain("Submission queue");
     expect(markup).toContain("Resolve missing utility months");
     expect(markup).toContain("2222 Filing Tower");
@@ -615,7 +615,7 @@ describe("consultant-facing screens", () => {
     expect(markup).toContain("Page 1 of 1");
     expect(markup).toContain("Previous");
     expect(markup).toContain("Next");
-    expect(markup).toContain("Needs attention now");
+    expect(markup).toContain("Secondary signals");
   });
 
   it("renders the compliance overview with engine result fields", () => {
@@ -1039,19 +1039,19 @@ describe("consultant-facing screens", () => {
   });
 
   it("hides non-essential routes from the primary navigation", () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["Work Queue", "Reports"]);
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["Buildings", "Reports"]);
   });
 
-  it("keeps the building workbench organized around overview, compliance, submission, and planning tabs", () => {
+  it("keeps the building workbench organized around the benchmark workflow first", () => {
     const detailSource = readFileSync(
       "C:\\Quoin\\src\\components\\building\\building-detail.tsx",
       "utf8",
     );
 
-    expect(detailSource).toContain('{ key: "overview", label: "COMPLIANCE TRUTH" }');
-    expect(detailSource).toContain('{ key: "interpretation", label: "INTERPRETATION" }');
-    expect(detailSource).toContain('{ key: "evidence", label: "EVIDENCE" }');
-    expect(detailSource).toContain('{ key: "advisory", label: "ADVISORY" }');
+    expect(detailSource).toContain('{ key: "workflow", label: "BENCHMARK WORKFLOW" }');
+    expect(detailSource).toContain('{ key: "overview", label: "GOVERNED CONTEXT" }');
+    expect(detailSource).toContain('{ key: "secondary", label: "SECONDARY SURFACES" }');
+    expect(detailSource).toContain("BenchmarkWorkbenchTab");
   });
 
   it("keeps compliance authority out of the client compliance tab", () => {

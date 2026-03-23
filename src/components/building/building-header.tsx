@@ -20,6 +20,10 @@ interface BuildingHeaderProps {
   grossSquareFeet: number;
   yearBuilt: number | null;
   espmPropertyId: string | null;
+  nextAction: {
+    title: string;
+    reason: string;
+  };
   onUpload: () => void;
 }
 
@@ -31,6 +35,7 @@ export function BuildingHeader({
   grossSquareFeet,
   yearBuilt,
   espmPropertyId,
+  nextAction,
   onUpload,
 }: BuildingHeaderProps) {
   const [editing, setEditing] = useState(false);
@@ -95,6 +100,20 @@ export function BuildingHeader({
 
         {/* Actions */}
         <div className="flex flex-col items-end gap-3">
+          <div className="max-w-xs text-right">
+            <div
+              className="font-sans text-[10px] font-medium uppercase tracking-[0.18em]"
+              style={{ color: "#717c82" }}
+            >
+              Current governed step
+            </div>
+            <div className="mt-2 text-base font-semibold tracking-tight text-[#2a3439]">
+              {nextAction.title}
+            </div>
+            <div className="mt-1 text-sm leading-relaxed text-[#566166]">
+              {nextAction.reason}
+            </div>
+          </div>
           <button
             onClick={onUpload}
             className="font-sans text-[11px] font-semibold uppercase tracking-widest px-5 py-2.5 transition-colors duration-150"
@@ -110,7 +129,7 @@ export function BuildingHeader({
               ((e.currentTarget as HTMLElement).style.backgroundColor = "#545f73")
             }
           >
-            Append Evidence
+            Upload Source Data
           </button>
         </div>
       </div>

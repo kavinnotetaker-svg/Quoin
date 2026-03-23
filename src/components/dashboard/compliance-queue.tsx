@@ -317,8 +317,8 @@ export function ComplianceQueue() {
  <div className="space-y-6">
  <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between border-b-2 border-zinc-900 pb-8 mb-12">
  <PageHeader
- title="Portfolio worklist"
- subtitle="Use the governed worklist to see which buildings are blocked, which are ready for review, and which artifacts are ready to finalize or submit."
+ title="Buildings"
+ subtitle="Prioritize benchmark readiness, verification packets, and submission workflow from the governed worklist."
  />
  <div className="mt-8 lg:mt-0 flex flex-col items-start lg:items-end">
  <div className="text-[10px] font-mono tracking-[0.2em] text-zinc-500 uppercase mb-3">Portfolio Setup</div>
@@ -327,7 +327,7 @@ export function ComplianceQueue() {
  className="group flex items-center gap-2 text-sm font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
  >
  <Plus size={16} className="text-zinc-400 group-hover:text-zinc-900 transition-colors" />
- Add building workflow
+ Add building
  </button>
  </div>
  </div>
@@ -365,24 +365,24 @@ export function ComplianceQueue() {
  <div className="grid lg:grid-cols-4 gap-x-12 gap-y-10">
  {[
  {
- label: "Needs attention now",
- value: data.aggregate.needsAttentionNow.toString().padStart(2, "0"),
- copy: "Buildings with immediate governed blockers, workflow stalls, or urgent operational follow-up.",
+ label: "Blocked buildings",
+ value: data.aggregate.blocked.toString().padStart(2, "0"),
+ copy: "Buildings where governed benchmark readiness or packet workflow is blocked right now.",
  },
  {
  label: "Ready for review",
  value: data.aggregate.readyForReview.toString().padStart(2, "0"),
- copy: "Governed building records prepared for consultant review.",
+ copy: "Buildings with a finalized governed benchmark packet ready for consultant review.",
  },
  {
  label: "Ready to submit",
  value: data.aggregate.readyToSubmit.toString().padStart(2, "0"),
- copy: "Artifacts and workflow state aligned for submission handling.",
+ copy: "Buildings already approved and ready for benchmark submission handling.",
  },
  {
- label: "Penalty exposure",
- value: data.aggregate.withPenaltyExposure.toString().padStart(2, "0"),
- copy: "Buildings with an active governed penalty estimate on record.",
+ label: "Sync attention",
+ value: data.aggregate.withSyncAttention.toString().padStart(2, "0"),
+ copy: "Buildings whose source connection state still needs refresh before benchmark work can proceed cleanly.",
  },
  ].map((item) => (
  <div key={item.label}>
@@ -393,15 +393,19 @@ export function ComplianceQueue() {
  ))}
  </div>
 
- <div className="grid gap-x-12 gap-y-6 border-t border-zinc-200 pt-8 text-sm text-zinc-900 md:grid-cols-2 xl:grid-cols-4 font-mono">
+ <div className="space-y-4 border-t border-zinc-200 pt-8">
+ <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">
+ Secondary signals
+ </div>
+ <div className="grid gap-x-12 gap-y-6 text-sm text-zinc-900 md:grid-cols-2 xl:grid-cols-4 font-mono">
  {[
  ["Blocked", data.aggregate.blocked],
  ["Submission queue", data.aggregate.submissionQueue],
  ["Review queue", data.aggregate.reviewQueue],
  ["Needs correction", data.aggregate.needsCorrection],
+ ["Penalty exposure", data.aggregate.withPenaltyExposure],
  ["Operational risk", data.aggregate.withOperationalRisk],
  ["Retrofit opportunities", data.aggregate.withActionableRetrofits],
- ["Sync attention", data.aggregate.withSyncAttention],
  ["Draft artifacts", data.aggregate.withDraftArtifacts],
  ].map(([label, value]) => (
  <div key={label as string} className="flex flex-col gap-1">
@@ -409,6 +413,7 @@ export function ComplianceQueue() {
  <span className="text-lg">{String(value)}</span>
  </div>
  ))}
+ </div>
  </div>
  </div>
 
