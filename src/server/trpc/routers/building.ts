@@ -36,6 +36,8 @@ import {
   rerunSourceReconciliationFromOperator,
   retryPortfolioManagerSyncFromOperator,
 } from "@/server/compliance/operator-controls";
+import { BUILDING_SELECTED_PATHWAY_VALUES } from "@/lib/contracts/beps";
+import { deleteBuildingLifecycle } from "@/server/lifecycle/building-teardown";
 
 const createBuildingInput = z.object({
   name: z.string().min(1).max(200),
@@ -617,9 +619,7 @@ export const buildingRouter = router({
           bepsTargetScore: z.number().min(0).max(100).optional(),
           maxPenaltyExposure: z.number().min(0).optional(),
           espmPropertyId: z.string().max(50).nullable().optional(),
-          selectedPathway: z
-            .enum(["STANDARD", "PERFORMANCE", "PRESCRIPTIVE", "NONE"])
-            .optional(),
+          selectedPathway: z.enum(BUILDING_SELECTED_PATHWAY_VALUES).optional(),
         }),
       })
     )
@@ -652,53 +652,9 @@ export const buildingRouter = router({
         });
       }
 
-      const childScope = { buildingId: input.id };
-
-      await prisma.$transaction(async (tx) => {
-        await tx.$executeRawUnsafe(
-          `SELECT set_config('app.organization_id', $1, true)`,
-          ctx.organizationId,
-        );
-        await tx.$executeRawUnsafe(`SET LOCAL ROLE quoin_app`);
-
-        await tx.submissionWorkflowEvent.deleteMany({ where: childScope });
-        await tx.submissionWorkflow.deleteMany({ where: childScope });
-        await tx.filingPacket.deleteMany({ where: childScope });
-        await tx.filingRecordEvent.deleteMany({ where: childScope });
-        await tx.benchmarkPacket.deleteMany({ where: childScope });
-        await tx.financingPacket.deleteMany({ where: childScope });
-        await tx.penaltyRun.deleteMany({ where: childScope });
-        await tx.meterSourceReconciliation.deleteMany({ where: childScope });
-        await tx.buildingSourceReconciliation.deleteMany({ where: childScope });
-        await tx.financingCaseCandidate.deleteMany({ where: childScope });
-        await tx.dataIssue.deleteMany({ where: childScope });
-        await tx.benchmarkRequestItem.deleteMany({ where: childScope });
-        await tx.bepsRequestItem.deleteMany({ where: childScope });
-        await tx.evidenceArtifact.deleteMany({ where: childScope });
-        await tx.filingRecord.deleteMany({ where: childScope });
-        await tx.benchmarkSubmission.deleteMany({ where: childScope });
-        await tx.bepsAlternativeComplianceAgreement.deleteMany({
-          where: childScope,
-        });
-        await tx.bepsPrescriptiveItem.deleteMany({ where: childScope });
-        await tx.bepsMetricInput.deleteMany({ where: childScope });
-        await tx.portfolioManagerSyncState.deleteMany({ where: childScope });
-        await tx.operationalAnomaly.deleteMany({ where: childScope });
-        await tx.financingCase.deleteMany({ where: childScope });
-        await tx.retrofitCandidate.deleteMany({ where: childScope });
-        await tx.driftAlert.deleteMany({ where: childScope });
-        await tx.energyReading.deleteMany({ where: childScope });
-        await tx.complianceSnapshot.deleteMany({ where: childScope });
-        await tx.complianceRun.deleteMany({ where: childScope });
-        await tx.pipelineRun.deleteMany({ where: childScope });
-        await tx.meter.deleteMany({ where: childScope });
-        await tx.greenButtonConnection.deleteMany({ where: childScope });
-        await tx.sourceArtifact.deleteMany({ where: childScope });
-        await tx.$executeRaw`
-          DELETE FROM "buildings"
-          WHERE "id" = ${input.id}
-            AND "organization_id" = ${ctx.organizationId}
-        `;
+      await deleteBuildingLifecycle({
+        organizationId: ctx.organizationId,
+        buildingId: input.id,
       });
 
       return { success: true };
@@ -822,6 +778,10 @@ export const buildingRouter = router({
         },
       },
     });
+    const governedSummaries = await listBuildingGovernedOperationalSummaries({
+      organizationId: ctx.organizationId,
+      buildingIds: buildings.map((building) => building.id),
+    });
 
     const penaltySummaries = await listPenaltySummaries({
       organizationId: ctx.organizationId,
@@ -848,33 +808,33 @@ export const buildingRouter = router({
 
     for (const building of buildings) {
       const snapshot = building.complianceSnapshots[0] ?? null;
-      if (snapshot) {
-        switch (snapshot.complianceStatus) {
-          case "NON_COMPLIANT":
-            stats.nonCompliant++;
-            break;
-          case "AT_RISK":
-            stats.atRisk++;
-            break;
-          case "COMPLIANT":
-            stats.compliant++;
-            break;
-          case "EXEMPT":
-            stats.exempt++;
-            break;
-          case "PENDING_DATA":
-            stats.pendingData++;
-            break;
-        }
-        const governedPenalty =
-          penaltyByBuildingId.get(building.id)?.currentEstimatedPenalty ?? null;
-        if (governedPenalty != null) {
-          stats.totalPenaltyExposure += governedPenalty;
-        }
-        if (snapshot.energyStarScore != null) {
-          scoreSum += snapshot.energyStarScore;
-          scoreCount++;
-        }
+      const governedSummary = governedSummaries.get(building.id);
+
+      switch (governedSummary?.complianceSummary.primaryStatus) {
+        case "NON_COMPLIANT":
+          stats.nonCompliant++;
+          break;
+        case "READY":
+          // Compatibility shim: older dashboard consumers still read `atRisk`.
+          stats.atRisk++;
+          break;
+        case "COMPLIANT":
+          stats.compliant++;
+          break;
+        case "DATA_INCOMPLETE":
+        default:
+          stats.pendingData++;
+          break;
+      }
+
+      const governedPenalty =
+        penaltyByBuildingId.get(building.id)?.currentEstimatedPenalty ?? null;
+      if (governedPenalty != null) {
+        stats.totalPenaltyExposure += governedPenalty;
+      }
+      if (snapshot?.energyStarScore != null) {
+        scoreSum += snapshot.energyStarScore;
+        scoreCount++;
       }
     }
 

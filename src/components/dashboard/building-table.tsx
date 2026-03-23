@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import {
  StatusBadge,
- getComplianceStatusDisplay,
+ getPrimaryComplianceStatusDisplay,
 } from "@/components/internal/status-helpers";
 import { motion, type Variants } from "framer-motion";
 
@@ -19,12 +19,30 @@ interface PenaltySummary {
  currentEstimatedPenalty: number | null;
 }
 
+interface BuildingGovernedSummary {
+ complianceSummary: {
+ primaryStatus: string | null;
+ };
+ penaltySummary: PenaltySummary | null;
+ readinessSummary: {
+ nextAction: {
+ title: string;
+ reason: string;
+ };
+ };
+ timestamps: {
+ lastReadinessEvaluatedAt: string | Date | null;
+ lastComplianceEvaluatedAt: string | Date | null;
+ };
+}
+
 interface BuildingRow {
  id: string;
  name: string;
  propertyType: string;
  latestSnapshot: Snapshot | null;
  updatedAt: string | Date;
+ governedSummary: BuildingGovernedSummary;
 }
 
 function formatPenalty(summary: PenaltySummary | null | undefined) {
@@ -108,10 +126,8 @@ const rowVariants: Variants = {
 
 export function BuildingTable({
  buildings,
- penaltySummariesByBuildingId,
 }: {
  buildings: BuildingRow[];
- penaltySummariesByBuildingId: Map<string, PenaltySummary>;
 }) {
  if (buildings.length === 0) {
  return (
@@ -151,14 +167,15 @@ export function BuildingTable({
  >
  {buildings.map((building) => {
  const snapshot = building.latestSnapshot;
- const penalty = formatPenalty(
- penaltySummariesByBuildingId.get(building.id),
- );
+ const penalty = formatPenalty(building.governedSummary.penaltySummary);
  const freshness = relativeTime(
- snapshot?.snapshotDate ?? building.updatedAt,
+ building.governedSummary.timestamps.lastReadinessEvaluatedAt ??
+ building.governedSummary.timestamps.lastComplianceEvaluatedAt ??
+ snapshot?.snapshotDate ??
+ building.updatedAt,
  );
- const compliance = getComplianceStatusDisplay(
- snapshot?.complianceStatus ?? "PENDING_DATA",
+ const compliance = getPrimaryComplianceStatusDisplay(
+ building.governedSummary.complianceSummary.primaryStatus,
  );
 
  return (
@@ -197,13 +214,7 @@ export function BuildingTable({
  tone={compliance.tone}
  />
  <div className="mt-1 text-[12px] text-zinc-500">
- {snapshot?.complianceStatus === "NON_COMPLIANT"
- ? "Immediate follow-up needed"
- : snapshot?.complianceStatus === "AT_RISK"
- ? "Review before filing"
- : snapshot?.complianceStatus === "COMPLIANT"
- ? "No immediate filing risk"
- : "Connect or refresh data"}
+ {building.governedSummary.readinessSummary.nextAction.reason}
  </div>
  </td>
  <td className="px-6 py-4 text-right">

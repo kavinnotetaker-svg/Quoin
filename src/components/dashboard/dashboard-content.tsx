@@ -21,10 +21,10 @@ const BuildingMap = dynamic(
 
 const STATUS_FILTERS = [
  { label: "All", value: undefined },
+ { label: "Data incomplete", value: "DATA_INCOMPLETE" },
+ { label: "Ready", value: "READY" },
  { label: "Compliant", value: "COMPLIANT" },
- { label: "At risk", value: "AT_RISK" },
  { label: "Non-compliant", value: "NON_COMPLIANT" },
- { label: "Needs data", value: "PENDING_DATA" },
 ] as const;
 
 export function DashboardContent() {
@@ -169,21 +169,9 @@ export function DashboardContent() {
  const filtered = statusFilter
  ? b.buildings.filter(
  (building) =>
- building.latestSnapshot?.complianceStatus === statusFilter ||
- (!building.latestSnapshot && statusFilter === "PENDING_DATA"),
+ building.governedSummary.complianceSummary.primaryStatus === statusFilter,
  )
  : b.buildings;
- const penaltySummaries = trpc.building.listPenaltySummaries.useQuery(
- {
- buildingIds: filtered.map((building) => building.id),
- },
- {
- enabled: filtered.length > 0,
- },
- );
- const penaltySummariesByBuildingId = new Map(
- (penaltySummaries.data ?? []).map((entry) => [entry.buildingId, entry.summary]),
- );
 
  return (
  <div className="space-y-8">
@@ -281,10 +269,7 @@ export function DashboardContent() {
 
  <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
  {view === "table" ? (
- <BuildingTable
- buildings={filtered}
- penaltySummariesByBuildingId={penaltySummariesByBuildingId}
- />
+ <BuildingTable buildings={filtered} />
  ) : (
  <BuildingMap buildings={filtered} />
  )}

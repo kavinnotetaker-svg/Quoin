@@ -1057,4 +1057,49 @@ describe("portfolio worklist", () => {
       row?.artifacts.beps.status,
     );
   });
+
+  it("derives portfolio stats from governed summary status", async () => {
+    const caller = createCaller();
+
+    const [list, stats] = await Promise.all([
+      caller.building.list({ page: 1, pageSize: 25 }),
+      caller.building.portfolioStats(),
+    ]);
+
+    const governedCounts = list.buildings.reduce(
+      (acc, building) => {
+        switch (building.governedSummary.complianceSummary.primaryStatus) {
+          case "NON_COMPLIANT":
+            acc.nonCompliant += 1;
+            break;
+          case "READY":
+            acc.atRisk += 1;
+            break;
+          case "COMPLIANT":
+            acc.compliant += 1;
+            break;
+          case "DATA_INCOMPLETE":
+          default:
+            acc.pendingData += 1;
+            break;
+        }
+        return acc;
+      },
+      {
+        totalBuildings: list.buildings.length,
+        nonCompliant: 0,
+        atRisk: 0,
+        compliant: 0,
+        pendingData: 0,
+        exempt: 0,
+      },
+    );
+
+    expect(stats.totalBuildings).toBe(governedCounts.totalBuildings);
+    expect(stats.nonCompliant).toBe(governedCounts.nonCompliant);
+    expect(stats.atRisk).toBe(governedCounts.atRisk);
+    expect(stats.compliant).toBe(governedCounts.compliant);
+    expect(stats.pendingData).toBe(governedCounts.pendingData);
+    expect(stats.exempt).toBe(governedCounts.exempt);
+  });
 });

@@ -1094,11 +1094,23 @@ describe("consultant-facing screens", () => {
       "C:\\Quoin\\src\\components\\dashboard\\building-table.tsx",
       "utf8",
     );
+    const mapSource = readFileSync(
+      "C:\\Quoin\\src\\components\\dashboard\\building-map.tsx",
+      "utf8",
+    );
 
-    expect(dashboardSource).toContain("building.listPenaltySummaries.useQuery");
+    expect(dashboardSource).not.toContain("building.listPenaltySummaries.useQuery");
+    expect(dashboardSource).toContain(
+      "building.governedSummary.complianceSummary.primaryStatus",
+    );
     expect(tableSource).not.toContain("estimatedPenalty: number | null");
     expect(tableSource).not.toContain("snapshot?.estimatedPenalty");
+    expect(tableSource).toContain("building.governedSummary.penaltySummary");
+    expect(tableSource).toContain(
+      "building.governedSummary.readinessSummary.nextAction.reason",
+    );
     expect(tableSource).toContain("Current governed estimate");
+    expect(mapSource).toContain("b.governedSummary.complianceSummary.primaryStatus");
   });
 
   it("keeps dashboard triage surfaces on the governed worklist path", () => {

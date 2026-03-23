@@ -483,10 +483,11 @@ describe("governed penalty runs", () => {
     expect(list).toHaveLength(1);
     expect(list[0]?.buildingId).toBe(activeBuilding.id);
     expect(list[0]?.summary.id).toBe(first.id);
-    expect(report.complianceData.estimatedPenalty).toBe(300000);
+    expect((report as unknown as Record<string, unknown>).complianceData).toBeUndefined();
     expect(report.governedPenalty).not.toBeNull();
     expect(report.governedPenalty?.status).toBe("ESTIMATED");
     expect(report.governedPenalty?.currentEstimatedPenalty).toBe(300000);
+    expect(report.sections.penalty.currentEstimatedPenalty).toBe(300000);
     expect(first.scenarios).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -550,7 +551,8 @@ describe("governed penalty runs", () => {
     expect(first.scenarios).toEqual([]);
     expect(report.governedPenalty).not.toBeNull();
     expect(report.governedPenalty?.status).toBe("INSUFFICIENT_CONTEXT");
-    expect(report.complianceData.estimatedPenalty).toBeNull();
+    expect((report as unknown as Record<string, unknown>).complianceData).toBeUndefined();
+    expect(report.sections.penalty.currentEstimatedPenalty).toBeNull();
     expect(Object.prototype.hasOwnProperty.call(first, "filingPayload")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(first, "submissionPayload")).toBe(false);
   });

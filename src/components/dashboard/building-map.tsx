@@ -4,18 +4,17 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Map, { Marker, Popup, NavigationControl } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { getPrimaryComplianceStatusDisplay } from "@/components/internal/status-helpers";
 
 const STATUS_COLORS: Record<string, string> = {
+ DATA_INCOMPLETE: "#9ca3af",
+ READY: "#2563eb",
  COMPLIANT: "#16a34a",
- AT_RISK: "#ca8a04",
  NON_COMPLIANT: "#dc2626",
- PENDING_DATA: "#9ca3af",
- EXEMPT: "#9ca3af",
 };
 
 interface Snapshot {
  energyStarScore: number | null;
- complianceStatus: string;
 }
 
 interface BuildingPin {
@@ -24,10 +23,14 @@ interface BuildingPin {
  latitude: number | null;
  longitude: number | null;
  latestSnapshot: Snapshot | null;
+ governedSummary: {
+ complianceSummary: {
+ primaryStatus: string | null;
+ };
+ };
 }
 
 interface BuildingMapProps {
- // eslint-disable-next-line @typescript-eslint/no-explicit-any
  buildings: BuildingPin[];
 }
 
@@ -44,11 +47,12 @@ export function BuildingMap({ buildings }: BuildingMapProps) {
 
  if (!MAPBOX_TOKEN) {
  return (
- <div className="flex items-center justify-center rounded border border-dashed border-zinc-300 bg-zinc-50"
+ <div
+ className="flex items-center justify-center rounded border border-dashed border-zinc-300 bg-zinc-50"
  style={{ height: "calc(100vh - 280px)", minHeight: "400px" }}
  >
  <p className="text-sm text-zinc-500">
- Map unavailable — add MAPBOX_TOKEN to .env
+ Map unavailable - add MAPBOX_TOKEN to .env
  </p>
  </div>
  );
@@ -79,7 +83,7 @@ export function BuildingMap({ buildings }: BuildingMapProps) {
  <NavigationControl position="top-right" showCompass={false} />
 
  {pins.map((b) => {
- const status = b.latestSnapshot?.complianceStatus ?? "PENDING_DATA";
+ const status = b.governedSummary.complianceSummary.primaryStatus ?? "DATA_INCOMPLETE";
  const color = STATUS_COLORS[status] ?? "#9ca3af";
  return (
  <Marker
@@ -120,24 +124,22 @@ export function BuildingMap({ buildings }: BuildingMapProps) {
  className="building-popup"
  >
  <div className="p-1">
- <p className="text-sm font-medium text-zinc-900">
- {selected.name}
- </p>
+ <p className="text-sm font-medium text-zinc-900">{selected.name}</p>
  <p className="mt-0.5 text-xs text-zinc-500">
  Score:{" "}
  {selected.latestSnapshot?.energyStarScore != null
  ? selected.latestSnapshot.energyStarScore
- : "—"}
+ : "-"}
  <span className="mx-1">·</span>
- {selected.latestSnapshot?.complianceStatus
- ?.replace("_", " ")
- .toLowerCase() ?? "pending data"}
+ {getPrimaryComplianceStatusDisplay(
+ selected.governedSummary.complianceSummary.primaryStatus,
+ ).label.toLowerCase()}
  </p>
  <button
  onClick={() => router.push(`/buildings/${selected.id}`)}
  className="mt-1 text-xs text-zinc-500 hover:text-zinc-900"
  >
- View details →
+ View details -&gt;
  </button>
  </div>
  </Popup>

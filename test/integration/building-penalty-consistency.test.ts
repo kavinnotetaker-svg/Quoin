@@ -141,9 +141,10 @@ describe("building penalty consistency", () => {
 
     expect(detail.latestSnapshot?.estimatedPenalty).toBe(2_712_000);
     expect(listRow?.latestSnapshot?.estimatedPenalty).toBe(2_712_000);
-    expect(report.complianceData.estimatedPenalty).toBeNull();
+    expect((report as unknown as Record<string, unknown>).complianceData).toBeUndefined();
     expect(report.governedPenalty).toBeNull();
     expect(report.governedOperationalSummary.penaltySummary).toBeNull();
+    expect(report.sections.penalty.currentEstimatedPenalty).toBeNull();
   });
 
   it("uses a deterministic latest snapshot tie-break for historical snapshot fields while governed penalty remains separate", async () => {
@@ -196,9 +197,10 @@ describe("building penalty consistency", () => {
 
     expect(detail.latestSnapshot?.estimatedPenalty).toBe(2_712_000);
     expect(listRow?.latestSnapshot?.estimatedPenalty).toBe(2_712_000);
-    expect(report.complianceData.estimatedPenalty).toBeNull();
+    expect((report as unknown as Record<string, unknown>).complianceData).toBeUndefined();
     expect(report.governedPenalty).toBeNull();
     expect(report.governedOperationalSummary.penaltySummary).toBeNull();
+    expect(report.sections.penalty.currentEstimatedPenalty).toBeNull();
   });
 
   it("keeps the latest governed penalty summary aligned across building, list, and report reads", async () => {

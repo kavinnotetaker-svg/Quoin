@@ -456,17 +456,6 @@ const reportOutputSchema = z.object({
   buildingName: z.string(),
   address: z.string(),
   generatedAt: z.string(),
-  complianceData: z.object({
-    energyStarScore: z.number().nullable(),
-    siteEui: z.number().nullable(),
-    sourceEui: z.number().nullable(),
-    weatherNormalizedSiteEui: z.number().nullable(),
-    complianceStatus: z.string(),
-    complianceGap: z.number().nullable(),
-    estimatedPenalty: z.number().nullable(),
-    dataQualityScore: z.number().nullable(),
-    snapshotDate: z.string().nullable(),
-  }),
   governedPenalty: governedPenaltySummarySchema,
   governedOperationalSummary: governedOperationalSummarySchema,
   sections: reportSectionsSchema,
@@ -739,19 +728,6 @@ async function buildComplianceReportOutput(params: {
     buildingName: building.name,
     address: building.address,
     generatedAt: new Date().toISOString(),
-    complianceData: {
-      energyStarScore: latestSnapshot?.energyStarScore ?? null,
-      siteEui: latestSnapshot?.siteEui ?? null,
-      sourceEui: latestSnapshot?.sourceEui ?? null,
-      weatherNormalizedSiteEui:
-        latestSnapshot?.weatherNormalizedSiteEui ?? null,
-      complianceStatus:
-        latestSnapshot?.complianceStatus ?? "PENDING_DATA",
-      complianceGap: latestSnapshot?.complianceGap ?? null,
-      estimatedPenalty: penaltySummary?.currentEstimatedPenalty ?? null,
-      dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
-      snapshotDate: latestSnapshot?.snapshotDate?.toISOString() ?? null,
-    },
     governedPenalty: penaltySummary
       ? {
           status: penaltySummary.status,
@@ -1221,7 +1197,8 @@ async function buildExemptionReportOutput(params: {
       propertyType: building.propertyType,
       yearBuilt: building.yearBuilt,
       generatedAt: new Date().toISOString(),
-      complianceStatus: latestSnapshot?.complianceStatus ?? "PENDING_DATA",
+      // Transitional compatibility field for the active exemption UI surface.
+      complianceStatus: governedSummary.complianceSummary.primaryStatus,
       exemptionScreening: {
         eligible: exemptionResult.eligible,
         qualifiedExemptions: exemptionResult.qualifiedExemptions,
