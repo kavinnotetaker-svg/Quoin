@@ -33,13 +33,23 @@ export async function upsertOrganization(params: {
 }) {
   const normalizedSlug = params.slug?.trim() || slugify(params.name);
 
-  return prisma.organization.upsert({
+  const existing = await prisma.organization.findFirst({
     where: { clerkOrgId: params.clerkOrgId },
-    update: {
-      name: params.name,
-      slug: normalizedSlug,
-    },
-    create: {
+    select: { id: true },
+  });
+
+  if (existing) {
+    return prisma.organization.update({
+      where: { id: existing.id },
+      data: {
+        name: params.name,
+        slug: normalizedSlug,
+      },
+    });
+  }
+
+  return prisma.organization.create({
+    data: {
       clerkOrgId: params.clerkOrgId,
       name: params.name,
       slug: normalizedSlug,
@@ -136,7 +146,7 @@ export async function deleteOrganizationMembership(params: {
     }
   }
 
-  const organization = await prisma.organization.findUnique({
+  const organization = await prisma.organization.findFirst({
     where: { clerkOrgId: params.clerkOrgId },
     select: { id: true },
   });

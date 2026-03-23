@@ -1,12 +1,49 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
+const LOADING_MESSAGES = [
+  "Evaluating compliance state...",
+  "Reconciling energy sources...",
+  "Reading building record...",
+  "Checking penalty exposure...",
+  "Verifying artifact chain...",
+  "Calculating BEPS position...",
+  "Syncing Portfolio Manager data...",
+  "Resolving submission readiness...",
+  "Auditing triage queue...",
+];
+
 export function LoadingState() {
+  const [msgIndex, setMsgIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    // Randomize starting point client-side only (avoids SSR mismatch)
+    setMsgIndex(Math.floor(Math.random() * LOADING_MESSAGES.length));
+
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+        setVisible(true);
+      }, 200);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="overflow-hidden rounded-none border-t border-zinc-200">
-      <div className="loading-bar h-px w-1/3 bg-zinc-400" />
+    <div className="py-16 flex flex-col items-start gap-6">
+      <div className="overflow-hidden w-48 border-t border-zinc-200">
+        <div className="loading-bar h-px w-1/3 bg-zinc-900" />
+      </div>
+      <p
+        className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-400 transition-opacity duration-200"
+        style={{ opacity: visible ? 1 : 0 }}
+      >
+        {LOADING_MESSAGES[msgIndex]}
+      </p>
     </div>
   );
 }
@@ -21,11 +58,15 @@ export function ErrorState({
   action?: ReactNode;
 }) {
   return (
-    <div className="border-l border-red-300 bg-red-50/60 px-5 py-4 text-sm text-red-900">
-      <p className="font-semibold uppercase tracking-[0.16em] text-[11px]">Validation issue</p>
-      <p className="mt-2 font-medium">{message}</p>
-      {detail ? <p className="mt-2 text-[13px] text-red-800">{detail}</p> : null}
-      {action ? <div className="mt-4">{action}</div> : null}
+    <div className="border-l-2 border-[#D0342C] pl-5 py-4">
+      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D0342C]">
+        Validation issue
+      </p>
+      <p className="mt-3 text-sm font-medium text-zinc-900">{message}</p>
+      {detail ? (
+        <p className="mt-2 font-mono text-[12px] text-zinc-500">{detail}</p>
+      ) : null}
+      {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );
 }
@@ -38,9 +79,11 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="border-t border-zinc-200 py-8 text-sm text-zinc-500">
-      <p className="font-medium">{message}</p>
-      {action ? <div className="mt-4 flex">{action}</div> : null}
+    <div className="border-t border-zinc-200 py-12">
+      <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-400">
+        {message}
+      </p>
+      {action ? <div className="mt-5 flex">{action}</div> : null}
     </div>
   );
 }
@@ -63,9 +106,15 @@ export function Panel({
           <h3 className="font-display text-[1.75rem] font-medium tracking-tight text-zinc-900">
             {title}
           </h3>
-          {subtitle ? <p className="mt-2 max-w-3xl text-[15px] leading-7 text-zinc-500">{subtitle}</p> : null}
+          {subtitle ? (
+            <p className="mt-2 max-w-3xl text-base leading-7 text-zinc-500">
+              {subtitle}
+            </p>
+          ) : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
+        {actions ? (
+          <div className="flex flex-wrap items-center gap-3">{actions}</div>
+        ) : null}
       </div>
       {children}
     </section>

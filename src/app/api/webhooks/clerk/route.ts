@@ -121,7 +121,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       case "organizationMembership.created":
       case "organizationMembership.updated": {
         const { data } = event as ClerkMembershipEvent;
-        const organization = await prisma.organization.findUnique({
+        const organization = await prisma.organization.findFirst({
           where: { clerkOrgId: data.organization.id },
           select: { id: true, slug: true },
         });

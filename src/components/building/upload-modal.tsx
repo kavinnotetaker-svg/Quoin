@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { X } from "lucide-react";
+import { X, Upload, FileText } from "lucide-react";
 
 interface UploadModalProps {
   buildingId: string;
@@ -81,26 +81,63 @@ export function UploadModal({
   };
 
   return (
+    // Stitch: modal overlay
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium text-zinc-900">
-            Upload utility data
-          </h2>
+      <button
+        type="button"
+        className="absolute inset-0 w-full h-full cursor-default outline-none"
+        style={{ backgroundColor: "rgba(42,52,57,0.5)" }}
+        onClick={onClose}
+        aria-label="Close modal"
+        tabIndex={-1}
+      />
+
+      {/* Panel: surface-container-lowest, no radius, ambient shadow */}
+      <div
+        className="relative w-full max-w-md p-6"
+        style={{
+          backgroundColor: "#ffffff",
+          borderRadius: 0,
+          boxShadow: "0 16px 48px 0 rgba(42,52,57,0.12)",
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p
+              className="font-sans text-[10px] font-medium uppercase tracking-[0.2em] mb-1"
+              style={{ color: "#717c82" }}
+            >
+              Data Ingestion
+            </p>
+            <h2
+              className="font-display font-semibold text-lg tracking-tight"
+              style={{ color: "#2a3439" }}
+            >
+              Upload utility data
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-600"
+            className="p-1.5 transition-colors"
+            style={{ color: "#a9b4b9", borderRadius: 0 }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLElement).style.color = "#2a3439")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLElement).style.color = "#a9b4b9")
+            }
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="mt-4">
+        <div>
           {!result ? (
             <>
               {/* Drop zone */}
-              <div
+              <button
+                type="button"
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragOver(true);
@@ -113,25 +150,37 @@ export function UploadModal({
                   if (f) handleFile(f);
                 }}
                 onClick={() => inputRef.current?.click()}
-                className={`cursor-pointer rounded border border-dashed px-4 py-8 text-center text-sm ${
-                  dragOver
-                    ? "border-zinc-400 bg-zinc-50"
-                    : "border-zinc-300"
-                }`}
+                className="w-full cursor-pointer px-4 py-10 text-center text-sm focus:outline-none transition-colors"
+                style={{
+                  border: dragOver
+                    ? "1px dashed #545f73"
+                    : "1px dashed rgba(169,180,185,0.6)",
+                  backgroundColor: dragOver ? "#f0f4f7" : "transparent",
+                  borderRadius: 0,
+                }}
               >
                 {file ? (
-                  <p className="text-zinc-700">
-                    {file.name}{" "}
-                    <span className="text-zinc-400">
-                      ({(file.size / 1024).toFixed(0)} KB)
-                    </span>
-                  </p>
+                  <div className="flex flex-col items-center gap-2">
+                    <FileText size={20} style={{ color: "#545f73" }} />
+                    <p className="font-sans font-medium text-sm" style={{ color: "#2a3439" }}>
+                      {file.name}
+                    </p>
+                    <p className="font-sans text-[11px]" style={{ color: "#a9b4b9" }}>
+                      {(file.size / 1024).toFixed(0)} KB
+                    </p>
+                  </div>
                 ) : (
-                  <p className="text-zinc-500">
-                    Drop CSV file here or click to browse
-                  </p>
+                  <div className="flex flex-col items-center gap-2">
+                    <Upload size={20} style={{ color: "#a9b4b9" }} />
+                    <p className="font-sans" style={{ color: "#566166" }}>
+                      Drop CSV file here or click to browse
+                    </p>
+                    <p className="font-sans text-[11px] uppercase tracking-widest" style={{ color: "#a9b4b9" }}>
+                      .csv · .tsv · .txt · max 10 MB
+                    </p>
+                  </div>
                 )}
-              </div>
+              </button>
               <input
                 ref={inputRef}
                 type="file"
@@ -144,59 +193,105 @@ export function UploadModal({
               />
 
               {error && (
-                <p className="mt-2 text-[13px] text-red-600">{error}</p>
+                <p
+                  className="mt-3 font-sans text-xs uppercase tracking-wider"
+                  style={{ color: "#9f403d" }}
+                >
+                  {error}
+                </p>
               )}
 
-              <div className="mt-4 flex justify-end gap-2">
+              <div className="mt-5 flex justify-end gap-3">
                 <button
                   onClick={onClose}
-                  className="px-3 py-1.5 text-[13px] text-zinc-500 hover:text-zinc-700"
+                  className="font-sans text-sm px-4 py-2 transition-colors"
+                  style={{ color: "#566166" }}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLElement).style.color = "#2a3439")
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLElement).style.color = "#566166")
+                  }
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpload}
                   disabled={!file || uploading}
-                  className="rounded bg-zinc-900 px-3 py-1.5 text-[13px] text-white disabled:opacity-40"
+                  className="font-sans text-[11px] font-semibold uppercase tracking-widest px-5 py-2.5 transition-colors disabled:opacity-40"
+                  style={{
+                    backgroundColor: "#545f73",
+                    color: "#f6f7ff",
+                    borderRadius: 0,
+                  }}
                 >
-                  {uploading ? "Uploading..." : "Upload"}
+                  {uploading ? "Uploading…" : "Upload"}
                 </button>
               </div>
             </>
           ) : (
             <>
               {/* Result */}
-              <div className="space-y-2 text-[13px]">
+              <div className="space-y-3 font-sans text-sm">
                 {result.success ? (
-                  <p className="text-zinc-900">
-                    {result.readingsCreated} readings created
-                    {result.readingsRejected > 0 &&
-                      `, ${result.readingsRejected} rejected`}
-                  </p>
+                  <div
+                    className="p-4"
+                    style={{
+                      borderLeft: "3px solid #006b63",
+                      backgroundColor: "#f0f4f7",
+                    }}
+                  >
+                    <p className="font-semibold" style={{ color: "#2a3439" }}>
+                      {result.readingsCreated} readings created
+                      {result.readingsRejected > 0 &&
+                        ` · ${result.readingsRejected} rejected`}
+                    </p>
+                  </div>
                 ) : (
-                  <p className="text-red-600">Upload failed</p>
+                  <div
+                    className="p-4"
+                    style={{
+                      borderLeft: "3px solid #9f403d",
+                      backgroundColor: "#f0f4f7",
+                    }}
+                  >
+                    <p className="font-semibold" style={{ color: "#9f403d" }}>
+                      Upload failed
+                    </p>
+                  </div>
                 )}
 
                 {result.warnings.length > 0 && (
-                  <div className="text-zinc-500">
+                  <div style={{ color: "#566166" }}>
                     {result.warnings.map((w, i) => (
-                      <p key={i}>{w}</p>
+                      <p key={i} className="text-xs leading-relaxed">
+                        {w}
+                      </p>
                     ))}
                   </div>
                 )}
                 {result.errors.length > 0 && (
-                  <div className="text-red-500">
+                  <div style={{ color: "#9f403d" }}>
                     {result.errors.map((e, i) => (
-                      <p key={i}>{e}</p>
+                      <p key={i} className="text-xs leading-relaxed">
+                        {e}
+                      </p>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="mt-4 flex justify-end">
+              <div className="mt-5 flex justify-end">
                 <button
                   onClick={onClose}
-                  className="px-3 py-1.5 text-[13px] text-zinc-500 hover:text-zinc-700"
+                  className="font-sans text-sm px-4 py-2 transition-colors"
+                  style={{ color: "#566166" }}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLElement).style.color = "#2a3439")
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLElement).style.color = "#566166")
+                  }
                 >
                   Done
                 </button>

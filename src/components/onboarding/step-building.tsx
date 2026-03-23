@@ -5,57 +5,57 @@ import { trpc } from "@/lib/trpc";
 import { BuildingForm, type BuildingFormData } from "./building-form";
 
 interface StepBuildingProps {
-  onNext: (buildingId: string) => void;
-  onSkip: () => void;
+ onNext: (buildingId: string) => void;
+ onSkip: () => void;
 }
 
 export function StepBuilding({ onNext, onSkip }: StepBuildingProps) {
-  const [error, setError] = useState<string | null>(null);
+ const [error, setError] = useState<string | null>(null);
 
-  const createBuilding = trpc.building.create.useMutation({
-    onSuccess: (data) => onNext(data.id),
-    onError: (err) => setError(err.message),
-  });
+ const createBuilding = trpc.building.create.useMutation({
+ onSuccess: (data) => onNext(data.id),
+ onError: (err) => setError(err.message),
+ });
 
-  function handleSubmit(data: BuildingFormData) {
-    setError(null);
-    createBuilding.mutate({
-      name: data.name,
-      address: data.address,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      grossSquareFeet: data.grossSquareFeet,
-      propertyType: data.propertyType as "OFFICE" | "MULTIFAMILY" | "MIXED_USE" | "OTHER",
-      yearBuilt: data.yearBuilt ?? undefined,
-      bepsTargetScore: data.bepsTargetScore,
-      espmPropertyId: data.espmPropertyId,
-    });
-  }
+ function handleSubmit(data: BuildingFormData) {
+ setError(null);
+ createBuilding.mutate({
+ name: data.name,
+ address: data.address,
+ latitude: data.latitude,
+ longitude: data.longitude,
+ grossSquareFeet: data.grossSquareFeet,
+ propertyType: data.propertyType as "OFFICE" | "MULTIFAMILY" | "MIXED_USE" | "OTHER",
+ yearBuilt: data.yearBuilt ?? undefined,
+ bepsTargetScore: data.bepsTargetScore,
+ espmPropertyId: data.espmPropertyId,
+ });
+ }
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Add your first building</h2>
-        <p className="mt-2 text-[15px] text-zinc-500 leading-relaxed">
-          Enter your DC building details. You can add more buildings later.
-        </p>
-      </div>
+ return (
+ <div className="space-y-8">
+ <div>
+ <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Add your first building</h2>
+ <p className="mt-2 text-base text-zinc-500 leading-relaxed">
+ Enter your DC building details. You can add more buildings later.
+ </p>
+ </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 p-4 border border-red-200">
-          <p className="text-[13px] font-medium text-red-800">{error}</p>
-        </div>
-      )}
+ {error && (
+ <div className="border-l-2 border-red-500 bg-red-50/50 pl-4 py-3">
+ <p className="text-sm font-medium text-red-800">{error}</p>
+ </div>
+ )}
 
-      <BuildingForm onSubmit={handleSubmit} loading={createBuilding.isPending} />
+ <BuildingForm onSubmit={handleSubmit} loading={createBuilding.isPending} />
 
-      <button
-        type="button"
-        onClick={onSkip}
-        className="w-full text-center text-[13px] font-medium text-zinc-500 hover:text-zinc-800 transition-colors"
-      >
-        Skip for now
-      </button>
-    </div>
-  );
+ <button
+ type="button"
+ onClick={onSkip}
+ className="w-full text-center text-sm font-medium text-zinc-500 hover:text-zinc-800 transition-colors"
+ >
+ Skip for now
+ </button>
+ </div>
+ );
 }

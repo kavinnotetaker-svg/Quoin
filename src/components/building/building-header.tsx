@@ -50,52 +50,112 @@ export function BuildingHeader({
     yearBuilt ? `Built ${yearBuilt}` : null,
   ]
     .filter(Boolean)
-    .join(" | ");
+    .join(" · ");
 
   return (
-    <div className="space-y-8 border-b border-zinc-200/80 pb-8">
+    // Stitch: building header is a full-bleed editorial canvas
+    <div
+      className="space-y-6 pb-8"
+      style={{ borderBottom: "0.5px solid rgba(169,180,185,0.3)" }}
+    >
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-3">
-          <div className="quoin-kicker">Building workbench</div>
-          <h1 className="font-display text-5xl font-medium tracking-tight text-zinc-900">{name}</h1>
-          <p className="max-w-3xl text-[15px] leading-7 text-zinc-600">{address}</p>
-          <p className="text-[12px] uppercase tracking-[0.16em] text-zinc-500">{details}</p>
+        <div className="space-y-2">
+          {/* Coordinate kicker */}
+          <div
+            className="font-sans text-[10px] font-medium uppercase tracking-[0.2em]"
+            style={{ color: "#717c82" }}
+          >
+            COMP_ID: {buildingId.substring(0, 8)} · Document Active
+          </div>
+
+          {/* Building name: Space Grotesk display */}
+          <h1
+            className="font-display font-bold tracking-tight leading-tight"
+            style={{ fontSize: "2.8rem", color: "#2a3439" }}
+          >
+            {name}
+          </h1>
+
+          {/* Address */}
+          <div
+            className="font-sans text-sm font-medium tracking-[0.08em] uppercase"
+            style={{ color: "#566166" }}
+          >
+            {address}
+          </div>
+
+          {/* Details */}
+          <div
+            className="font-sans text-[11px] tracking-wider uppercase"
+            style={{ color: "#a9b4b9" }}
+          >
+            {details}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Actions */}
+        <div className="flex flex-col items-end gap-3">
           <button
             onClick={onUpload}
-            className="btn-primary text-[13px]"
+            className="font-sans text-[11px] font-semibold uppercase tracking-widest px-5 py-2.5 transition-colors duration-150"
+            style={{
+              backgroundColor: "#545f73",
+              color: "#f6f7ff",
+              borderRadius: 0,
+            }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLElement).style.backgroundColor = "#485367")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLElement).style.backgroundColor = "#545f73")
+            }
           >
-            Upload Utility Data
+            Append Evidence
           </button>
         </div>
       </div>
 
-      <motion.div 
+      {/* Portfolio Manager Row */}
+      <motion.div
         layout
-        className="flex flex-col gap-3 border-t border-zinc-200 pt-4 text-[13px] lg:flex-row lg:items-center"
+        className="flex flex-col gap-3 pt-4 text-sm lg:flex-row lg:items-center"
+        style={{ borderTop: "0.5px solid rgba(169,180,185,0.3)" }}
       >
-        <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-          <Link size={14} className="text-zinc-400" />
-          Portfolio Manager property
+        <span
+          className="flex items-center gap-2 font-sans text-[11px] font-medium uppercase tracking-[0.15em]"
+          style={{ color: "#566166" }}
+        >
+          <Link size={12} style={{ color: "#a9b4b9" }} />
+          Portfolio Manager Property
         </span>
-        
+
         <AnimatePresence mode="wait">
           {editing ? (
-            <motion.div 
+            <motion.div
               key="editing"
-              initial={{ opacity: 0, x: -10 }}
+              initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
+              exit={{ opacity: 0, x: 8 }}
               className="flex items-center gap-2"
             >
               <input
                 type="text"
                 inputMode="numeric"
                 value={espmId}
-                onChange={(event) => setEspmId(event.target.value.replace(/[^0-9]/g, ""))}
+                onChange={(event) =>
+                  setEspmId(event.target.value.replace(/[^0-9]/g, ""))
+                }
                 placeholder="e.g., 88762425"
-                className="w-36 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[13px] text-zinc-900 shadow-sm transition-all focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                className="font-sans text-sm text-[#2a3439] placeholder:text-[#a9b4b9]"
+                style={{
+                  width: "140px",
+                  border: "none",
+                  borderBottom: "2px solid #545f73",
+                  borderRadius: 0,
+                  background: "transparent",
+                  outline: "none",
+                  padding: "2px 0",
+                }}
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -118,11 +178,16 @@ export function BuildingHeader({
                   })
                 }
                 disabled={updateBuilding.isPending}
-                className="flex h-7 items-center gap-1.5 rounded-md bg-zinc-900 px-3 text-xs font-medium text-white shadow-sm transition-all hover:bg-zinc-800 disabled:opacity-50 active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-1 font-sans text-xs font-semibold uppercase tracking-widest transition-colors disabled:opacity-40"
+                style={{
+                  backgroundColor: "#545f73",
+                  color: "#f6f7ff",
+                  borderRadius: 0,
+                }}
               >
-                {updateBuilding.isPending ? "Saving..." : (
+                {updateBuilding.isPending ? "Saving…" : (
                   <>
-                    <Check size={12} />
+                    <Check size={11} />
                     Save
                   </>
                 )}
@@ -132,31 +197,54 @@ export function BuildingHeader({
                   setEditing(false);
                   setEspmId(espmPropertyId ?? "");
                 }}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700"
+                className="flex h-7 w-7 items-center justify-center transition-colors"
+                style={{ color: "#a9b4b9", borderRadius: 0 }}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLElement).style.color = "#2a3439")
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLElement).style.color = "#a9b4b9")
+                }
               >
                 <X size={14} />
               </button>
             </motion.div>
           ) : (
-            <motion.div 
+            <motion.div
               key="static"
-              initial={{ opacity: 0, x: 10 }}
+              initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
+              exit={{ opacity: 0, x: -8 }}
               className="flex items-center gap-3"
             >
               <span
-                className={
-                  espmPropertyId ? "font-medium text-zinc-900" : "italic text-zinc-400"
-                }
+                className="font-sans text-sm"
+                style={{
+                  color: espmPropertyId ? "#2a3439" : "#a9b4b9",
+                  fontStyle: espmPropertyId ? "normal" : "italic",
+                }}
               >
                 {espmPropertyId ?? "Not linked"}
               </span>
               <button
                 onClick={() => setEditing(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 underline decoration-zinc-300 underline-offset-4 transition-all hover:text-zinc-900 hover:decoration-zinc-900"
+                className="flex items-center gap-1.5 font-sans text-xs font-medium transition-all"
+                style={{
+                  color: "#566166",
+                  textDecoration: "underline",
+                  textDecorationColor: "rgba(169,180,185,0.5)",
+                  textUnderlineOffset: "3px",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "#2a3439";
+                  (e.currentTarget as HTMLElement).style.textDecorationColor = "#545f73";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "#566166";
+                  (e.currentTarget as HTMLElement).style.textDecorationColor = "rgba(169,180,185,0.5)";
+                }}
               >
-                <Edit2 size={12} className="no-underline" />
+                <Edit2 size={11} />
                 {espmPropertyId ? "Edit" : "Link"}
               </button>
             </motion.div>

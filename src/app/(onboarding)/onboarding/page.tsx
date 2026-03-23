@@ -9,29 +9,29 @@ import { StepConnect } from "@/components/onboarding/step-connect";
 import { StepDone } from "@/components/onboarding/step-done";
 
 export default function OnboardingPage() {
-  const [step, setStep] = useState(1);
-  const [buildingId, setBuildingId] = useState<string | null>(null);
+ const [step, setStep] = useState(1);
+ const [buildingId, setBuildingId] = useState<string | null>(null);
 
-  function next() {
-    setStep((s) => Math.min(s + 1, 5));
-  }
+ function next() {
+ setStep((s) => Math.min(s + 1, 5));
+ }
 
-  function onBuildingCreated(id: string) {
-    setBuildingId(id);
-    next();
-  }
+ function onBuildingCreated(id: string) {
+ setBuildingId(id);
+ next();
+ }
 
-  return (
-    <WizardShell currentStep={step}>
-      {step === 1 && <StepOrg onNext={next} />}
-      {step === 2 && (
-        <StepBuilding onNext={onBuildingCreated} onSkip={next} />
-      )}
-      {step === 3 && (
-        <StepData buildingId={buildingId} onNext={next} onSkip={next} />
-      )}
-      {step === 4 && <StepConnect onNext={next} onSkip={next} />}
-      {step === 5 && <StepDone />}
-    </WizardShell>
-  );
+ return (
+ <WizardShell currentStep={step}>
+ {step === 1 && <StepOrg onNext={next} />}
+ {step === 2 && (
+ <StepBuilding onNext={onBuildingCreated} onSkip={next} />
+ )}
+ {step === 3 && (
+ <StepData buildingId={buildingId} onNext={next} onSkip={next} />
+ )}
+ {step === 4 && <StepConnect onNext={next} onSkip={next} />}
+ {step === 5 && <StepDone />}
+ </WizardShell>
+ );
 }

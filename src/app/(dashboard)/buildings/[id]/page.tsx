@@ -1,10 +1,10 @@
 import { BuildingDetail } from "@/components/building/building-detail";
 
 export default async function BuildingPage({
-  params,
+ params,
 }: {
-  params: Promise<{ id: string }>;
+ params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  return <BuildingDetail buildingId={id} />;
+ const { id } = await params;
+ return <BuildingDetail buildingId={id} />;
 }

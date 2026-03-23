@@ -174,7 +174,7 @@ export const buildingRouter = router({
     let buildingCount = 0;
 
     if (ctx.clerkOrgId) {
-      const org = await prisma.organization.findUnique({
+      const org = await prisma.organization.findFirst({
         where: { clerkOrgId: ctx.clerkOrgId },
         select: { id: true }
       });

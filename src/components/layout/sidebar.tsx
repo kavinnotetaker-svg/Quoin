@@ -7,10 +7,8 @@ import {
   FileText,
   Menu,
   X,
-  Zap
 } from "lucide-react";
 import { useState } from "react";
-import { motion } from "framer-motion";
 
 interface NavItem {
   href: string;
@@ -20,7 +18,7 @@ interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/buildings", label: "Buildings", icon: Building2 },
+  { href: "/buildings", label: "Work Queue", icon: Building2 },
   {
     href: "/reports",
     label: "Reports",
@@ -37,7 +35,7 @@ export function Sidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed left-3 top-3 z-50 rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 lg:hidden transition-colors"
+        className="fixed left-3 top-3 z-50 p-1.5 text-[#566166] hover:bg-[#e8eff3] hover:text-[#2a3439] lg:hidden transition-colors"
         aria-label="Open navigation"
       >
         <Menu size={20} />
@@ -45,47 +43,60 @@ export function Sidebar() {
 
       {/* Overlay */}
       {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-40 bg-zinc-900/20 backdrop-blur-sm lg:hidden transition-opacity duration-300"
+        <div
+          className="fixed inset-0 z-40 bg-[rgba(42,52,57,0.4)] lg:hidden transition-opacity duration-300"
           onClick={() => setOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar: Stitch — surface-container-low bg, hairline right border */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col bg-zinc-100/80 border-r border-zinc-200/70 text-zinc-600 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{ backgroundColor: "#f0f4f7", borderRight: "0.5px solid rgba(169,180,185,0.3)" }}
       >
-        {/* Brand Header */}
-        <div className="border-b border-zinc-200/60 px-5">
-          <div className="flex h-14 items-center justify-between">
-            <Link
-              href="/buildings"
-              className="flex items-center gap-2.5 text-sm font-bold tracking-tight text-zinc-900 transition-opacity hover:opacity-80"
+        {/* Brand */}
+        <div
+          className="px-6 py-5"
+          style={{ borderBottom: "0.5px solid rgba(169,180,185,0.3)" }}
+        >
+          <Link
+            href="/buildings"
+            className="flex items-center gap-3 transition-opacity hover:opacity-80"
+          >
+            {/* Square monogram */}
+            <div
+              className="flex h-8 w-8 items-center justify-center"
+              style={{ backgroundColor: "#545f73" }}
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-900 shadow-sm">
-                <Zap size={14} className="text-white fill-white" />
+              <span className="font-display font-bold text-[10px] tracking-widest text-[#f6f7ff]">
+                Q
+              </span>
+            </div>
+            <div>
+              <div className="font-display font-bold text-base tracking-tight text-[#2a3439]">
+                Quoin
               </div>
-              <div>
-                <div className="font-display text-base font-semibold tracking-tight">Quoin</div>
+              <div
+                className="font-sans text-[9px] uppercase tracking-[0.2em]"
+                style={{ color: "#717c82" }}
+              >
+                Compliance OS
               </div>
-            </Link>
-            <button
-              onClick={() => setOpen(false)}
-              className="text-zinc-400 hover:text-zinc-900 transition-colors lg:hidden"
-              aria-label="Close navigation"
-            >
-              <X size={16} />
-            </button>
-          </div>
+            </div>
+          </Link>
+          <button
+            onClick={() => setOpen(false)}
+            className="absolute top-3 right-3 text-[#566166] hover:text-[#2a3439] transition-colors lg:hidden"
+            aria-label="Close navigation"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-6">
+        <nav className="flex-1 py-6 px-0">
           {NAV_ITEMS.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(item.href + "/");
@@ -95,34 +106,50 @@ export function Sidebar() {
                 key={item.label}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200 ${
-                  active
-                    ? "text-zinc-900"
-                    : "text-zinc-500 hover:bg-white/70 hover:text-zinc-900"
-                }`}
+                className="flex items-center gap-3 py-3 px-6 transition-all duration-150"
+                style={{
+                  borderLeft: active ? "2px solid #2a3439" : "2px solid transparent",
+                  color: active ? "#2a3439" : "#566166",
+                  backgroundColor: active ? "rgba(255,255,255,0.5)" : "transparent",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "11px",
+                  fontWeight: active ? 600 : 500,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.color = "#2a3439";
+                    (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(232,239,243,0.5)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.color = "#566166";
+                    (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                  }
+                }}
               >
-                {active && (
-                  <motion.div
-                    layoutId="sidebarActive"
-                    className="absolute inset-0 rounded-lg bg-white border border-zinc-200/80"
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <Icon 
-                  size={16} 
-                  strokeWidth={active ? 2 : 1.5} 
-                  className={`relative z-10 transition-colors duration-200 ${active ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-600"}`}
+                <Icon
+                  size={16}
+                  strokeWidth={active ? 2 : 1.5}
+                  style={{ color: active ? "#2a3439" : "#a9b4b9", flexShrink: 0 }}
                 />
-                <span className="relative z-10 uppercase tracking-[0.12em] text-[11px] font-semibold">
-                  {item.label}
-                </span>
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
-        
-        <div className="border-t border-zinc-200/60 px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-zinc-400">
-          Compliance operating system
+
+        {/* Footer */}
+        <div
+          className="px-6 py-4 font-sans text-[9px] uppercase tracking-[0.2em]"
+          style={{
+            borderTop: "0.5px solid rgba(169,180,185,0.3)",
+            color: "#a9b4b9",
+          }}
+        >
+          DC BEPS Compliance
         </div>
       </aside>
     </>

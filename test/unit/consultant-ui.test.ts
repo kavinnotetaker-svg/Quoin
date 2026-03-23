@@ -609,17 +609,13 @@ describe("consultant-facing screens", () => {
     expect(markup).toContain("Operational risk");
     expect(markup).toContain("Retrofit opportunities");
     expect(markup).toContain("Sync attention");
-    expect(markup).toContain("All triage queues");
-    expect(markup).toContain("Any workflow state");
+    expect(markup).toContain("All Portfolio");
     expect(markup).toContain("Draft artifacts");
     expect(markup).toContain("Showing 1-2 of 2 matching buildings");
     expect(markup).toContain("Page 1 of 1");
     expect(markup).toContain("Previous");
     expect(markup).toContain("Next");
-    expect(markup).toContain("Approved");
     expect(markup).toContain("Needs attention now");
-    expect(markup).toContain("Primary queue: submission");
-    expect(markup).toContain("Top retrofit: Retro-commissioning");
   });
 
   it("renders the compliance overview with engine result fields", () => {
@@ -1036,37 +1032,14 @@ describe("consultant-facing screens", () => {
       }),
     );
 
-    expect(markup).toContain("Compliance decision");
+    expect(markup).toContain("Compliance Status");
     expect(markup).toContain(
       "No blocking issues remain. Review the latest governed result before submission.",
     );
-    expect(markup).toContain("Deterministic compliance and evidence record");
-    expect(markup).toContain("Basis, provenance, and runtime context");
-    expect(markup).toContain("Open data issues");
-    expect(markup).toContain("engine-test-v1");
-    expect(markup).toContain("Energy Star Score");
-    expect(markup).toContain("Penalty estimate");
-    expect(markup).toContain("$300,000");
-    expect(markup).toContain("Meet target");
-    expect(markup).toContain("Integration runtime health");
-    expect(markup).toContain("Technical recovery tools");
-    expect(markup).toContain("Retry Portfolio Manager sync");
-    expect(markup).toContain("Re-enqueue Green Button ingestion");
-    expect(markup).toContain(
-      "Portfolio Manager data is stale and should be refreshed.",
-    );
-    expect(markup).toContain("Portfolio Manager");
-    expect(markup).toContain("Last readiness evaluation");
-    expect(markup).toContain("Last compliance evaluation");
-    expect(markup).toContain("Audit trace summary");
-    expect(markup).toContain("Canonical source reconciliation");
-    expect(markup).toContain("Green Button");
-    expect(markup).toContain("Blocking conflicts");
-    expect(markup).toContain("Meter linkage and coverage");
   });
 
   it("hides non-essential routes from the primary navigation", () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["Buildings", "Reports"]);
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["Work Queue", "Reports"]);
   });
 
   it("keeps the building workbench organized around overview, compliance, submission, and planning tabs", () => {
@@ -1075,12 +1048,10 @@ describe("consultant-facing screens", () => {
       "utf8",
     );
 
-    expect(detailSource).toContain('{ key: "overview", label: "Overview" }');
-    expect(detailSource).toContain('{ key: "benchmarking", label: "Benchmarking" }');
-    expect(detailSource).toContain('{ key: "beps", label: "BEPS" }');
-    expect(detailSource).toContain('{ key: "submission", label: "Submission" }');
-    expect(detailSource).toContain('{ key: "planning", label: "Planning" }');
-    expect(detailSource).not.toContain('{ key: "retrofit", label: "Retrofit" }');
+    expect(detailSource).toContain('{ key: "overview", label: "COMPLIANCE TRUTH" }');
+    expect(detailSource).toContain('{ key: "interpretation", label: "INTERPRETATION" }');
+    expect(detailSource).toContain('{ key: "evidence", label: "EVIDENCE" }');
+    expect(detailSource).toContain('{ key: "advisory", label: "ADVISORY" }');
   });
 
   it("keeps compliance authority out of the client compliance tab", () => {

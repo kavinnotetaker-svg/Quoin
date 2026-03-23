@@ -47,12 +47,10 @@ export function ScoreSection({
       : penaltySummary?.status === "NOT_APPLICABLE"
         ? "$0"
         : "Unavailable";
-  const penaltyTone =
+  const penaltyDanger =
     penaltySummary?.status === "ESTIMATED" &&
     penaltySummary.currentEstimatedPenalty != null &&
-    penaltySummary.currentEstimatedPenalty > 0
-      ? "text-red-600"
-      : "text-zinc-900";
+    penaltySummary.currentEstimatedPenalty > 0;
   const penaltyNote =
     penaltySummary?.status === "ESTIMATED"
       ? penaltySummary.basisLabel
@@ -60,28 +58,55 @@ export function ScoreSection({
         ? "No governed penalty applies in the current context."
         : "Insufficient governed context for a current estimate.";
 
+  // Stitch: flat grid with no borders — tonal background shifts between cells
+  const cellStyle: React.CSSProperties = {
+    padding: "1.5rem",
+    backgroundColor: "#ffffff",
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-      <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
-          Latest ENERGY STAR score
+    <div
+      className="grid grid-cols-1 sm:grid-cols-3"
+      style={{ borderTop: "0.5px solid rgba(169,180,185,0.3)" }}
+    >
+      {/* Cell 1: ENERGY STAR Score */}
+      <div
+        style={{ ...cellStyle, borderRight: "0.5px solid rgba(169,180,185,0.3)" }}
+      >
+        <p
+          className="font-sans text-[10px] font-medium uppercase tracking-[0.2em]"
+          style={{ color: "#717c82" }}
+        >
+          Latest ENERGY STAR Score
         </p>
-        <p className="mt-1 text-3xl font-bold tracking-tight text-zinc-900">
-          {energyStarScore ?? "Not scored"}
+        <p
+          className="font-display font-light tracking-tight mt-2"
+          style={{ fontSize: "2.4rem", color: "#2a3439", lineHeight: 1 }}
+        >
+          {energyStarScore ?? "—"}
         </p>
-        <p className="mt-1 text-sm font-medium text-zinc-500">{gapText}</p>
-        <p className="mt-1 text-xs text-zinc-400">
+        <p className="font-sans text-xs mt-2" style={{ color: "#566166" }}>
+          {gapText}
+        </p>
+        <p className="font-sans text-xs mt-1" style={{ color: "#a9b4b9" }}>
           Used when the building qualifies for score-based BEPS review.
         </p>
       </div>
-      <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
-          Current compliance outlook
+
+      {/* Cell 2: Compliance Outlook */}
+      <div
+        style={{ ...cellStyle, borderRight: "0.5px solid rgba(169,180,185,0.3)" }}
+      >
+        <p
+          className="font-sans text-[10px] font-medium uppercase tracking-[0.2em]"
+          style={{ color: "#717c82" }}
+        >
+          Current Compliance Outlook
         </p>
-        <div className="mt-2">
+        <div className="mt-3">
           <StatusBadge label={compliance.label} tone={compliance.tone} />
         </div>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="font-sans text-xs mt-3" style={{ color: "#566166", lineHeight: 1.6 }}>
           {complianceStatus === "NON_COMPLIANT"
             ? "The current snapshot indicates the building is not meeting the active target."
             : complianceStatus === "AT_RISK"
@@ -90,16 +115,34 @@ export function ScoreSection({
                 ? "The latest snapshot supports compliance for the current review."
                 : "A fresh snapshot is still needed before Quoin can assess compliance."}
         </p>
-        <p className="mt-2 text-xs font-medium text-zinc-400">{sinceText || "No recent compliance snapshot"}</p>
+        <p className="font-sans text-xs mt-2" style={{ color: "#a9b4b9" }}>
+          {sinceText || "No recent compliance snapshot"}
+        </p>
       </div>
-      <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+
+      {/* Cell 3: Penalty Estimate */}
+      <div style={cellStyle}>
+        <p
+          className="font-sans text-[10px] font-medium uppercase tracking-[0.2em]"
+          style={{ color: "#717c82" }}
+        >
           Current Penalty Estimate
         </p>
-        <p className={`mt-1 text-3xl font-bold tracking-tight ${penaltyTone}`}>{penaltyText}</p>
-        <p className="mt-1 text-sm font-medium text-zinc-500">{penaltyNote}</p>
+        <p
+          className="font-display font-light tracking-tight mt-2"
+          style={{
+            fontSize: "2.4rem",
+            color: penaltyDanger ? "#9f403d" : "#2a3439",
+            lineHeight: 1,
+          }}
+        >
+          {penaltyText}
+        </p>
+        <p className="font-sans text-xs mt-2" style={{ color: "#566166" }}>
+          {penaltyNote}
+        </p>
         {legacyStatutoryMaximum != null ? (
-          <p className="mt-1 text-xs text-zinc-400">
+          <p className="font-sans text-xs mt-1" style={{ color: "#a9b4b9" }}>
             Legacy statutory ceiling: ${legacyStatutoryMaximum.toLocaleString()}
           </p>
         ) : null}

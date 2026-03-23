@@ -27,7 +27,7 @@ export interface TenantContext {
 }
 
 export async function ensureOrganizationForClerkOrgId(clerkOrgId: string) {
-  const existing = await prisma.organization.findUnique({
+  const existing = await prisma.organization.findFirst({
     where: { clerkOrgId },
   });
   if (existing) {
