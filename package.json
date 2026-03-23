@@ -13,6 +13,7 @@
     "prisma:generate": "prisma generate",
     "db:start": "docker compose up -d postgres redis",
     "db:stop": "docker compose stop postgres redis",
+    "db:backfill:green-button-tokens": "tsx scripts/backfill-green-button-token-encryption.ts",
     "db:audit:tenant": "node scripts/audit-tenant-integrity.mjs",
     "db:validate:constraints": "prisma db execute --file prisma/validate-tenant-constraints.sql",
     "db:validate:fresh": "node scripts/validate-fresh-db.mjs",

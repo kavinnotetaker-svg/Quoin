@@ -7,7 +7,7 @@ import {
   getValidToken,
 } from "@/server/integrations/green-button";
 import {
-  getGreenButtonEncryptionKey,
+  requireGreenButtonTokenMasterKey,
   getOptionalGreenButtonConfig,
 } from "@/server/lib/config";
 import { createLogger, type StructuredLogger } from "@/server/lib/logger";
@@ -207,12 +207,7 @@ export async function processGreenButtonNotificationEnvelope(input: {
     );
   }
 
-  const encryptionKey = getGreenButtonEncryptionKey();
-  if (!encryptionKey) {
-    throw new WorkflowStateError(
-      "Green Button notification cannot be processed because the encryption key is not configured.",
-    );
-  }
+  const encryptionKey = requireGreenButtonTokenMasterKey();
 
   const connection = await input.tenantDb.greenButtonConnection.findFirst({
     where: {

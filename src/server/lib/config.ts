@@ -25,6 +25,7 @@ const envSchema = z
     GREEN_BUTTON_AUTH_ENDPOINT: optStr.pipe(z.string().url().optional()),
     GREEN_BUTTON_TOKEN_ENDPOINT: optStr.pipe(z.string().url().optional()),
     GREEN_BUTTON_REDIRECT_URI: optStr.pipe(z.string().url().optional()),
+    GREEN_BUTTON_TOKEN_MASTER_KEY: optStr.pipe(z.string().min(16).optional()),
     GREEN_BUTTON_ENCRYPTION_KEY: optStr.pipe(z.string().min(16).optional()),
     GREEN_BUTTON_SCOPE: optStr,
   })
@@ -58,12 +59,15 @@ const envSchema = z
       });
     }
 
-    if (providedGreenButtonFields.length > 0 && !value.GREEN_BUTTON_ENCRYPTION_KEY) {
+    const greenButtonTokenMasterKey =
+      value.GREEN_BUTTON_TOKEN_MASTER_KEY ?? value.GREEN_BUTTON_ENCRYPTION_KEY;
+
+    if (providedGreenButtonFields.length > 0 && !greenButtonTokenMasterKey) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          "GREEN_BUTTON_ENCRYPTION_KEY must be set when Green Button OAuth is enabled.",
-        path: ["GREEN_BUTTON_ENCRYPTION_KEY"],
+          "GREEN_BUTTON_TOKEN_MASTER_KEY must be set when Green Button OAuth is enabled.",
+        path: ["GREEN_BUTTON_TOKEN_MASTER_KEY"],
       });
     }
   });
@@ -114,8 +118,19 @@ export function getOptionalGreenButtonConfig() {
   };
 }
 
-export function getGreenButtonEncryptionKey() {
-  return env.GREEN_BUTTON_ENCRYPTION_KEY ?? null;
+export function getGreenButtonTokenMasterKey() {
+  return env.GREEN_BUTTON_TOKEN_MASTER_KEY ?? env.GREEN_BUTTON_ENCRYPTION_KEY ?? null;
+}
+
+export function requireGreenButtonTokenMasterKey() {
+  const key = getGreenButtonTokenMasterKey();
+  if (!key) {
+    throw new ServerConfigError(
+      "Green Button token master key is not configured.",
+    );
+  }
+
+  return key;
 }
 
 export function getClerkWebhookSecret() {

@@ -29,6 +29,7 @@ import {
 } from "@/server/compliance/provenance";
 import { resolveGovernedFilingYear } from "@/server/compliance/beps/config";
 import { getActiveBepsCycleContext } from "@/server/compliance/beps/cycle-registry";
+import { BEPS_PATHWAY_VALUES, COMPLIANCE_CYCLE_VALUES } from "@/lib/contracts/beps";
 import { router, tenantProcedure } from "../init";
 
 async function ensureTenantBuilding(
@@ -50,9 +51,7 @@ async function ensureTenantBuilding(
 
 const bepsOverridesSchema = z.object({
   filingYear: z.number().int().min(2024).max(2100).optional(),
-  selectedPathway: z
-    .enum(["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE", "TRAJECTORY"])
-    .optional(),
+  selectedPathway: z.enum(BEPS_PATHWAY_VALUES).optional(),
   isEnergyStarScoreEligible: z.boolean().optional(),
   baselineAdjustedSiteEui: z.number().positive().optional(),
   currentAdjustedSiteEui: z.number().positive().optional(),
@@ -68,9 +67,7 @@ const bepsOverridesSchema = z.object({
   maxGapForPropertyType: z.number().positive().optional(),
   delayedCycle1OptionApplied: z.boolean().optional(),
   alternativeComplianceAgreementMultiplier: z.number().min(0).max(1).optional(),
-  alternativeComplianceAgreementPathway: z
-    .enum(["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE"])
-    .optional(),
+  alternativeComplianceAgreementPathway: z.enum(BEPS_PATHWAY_VALUES).optional(),
   requestAlternativeComplianceAgreement: z.boolean().optional(),
   maxPenaltyOverrideReason: z
     .enum([
@@ -114,7 +111,7 @@ function toOverrides(input: z.infer<typeof bepsOverridesSchema> | undefined): Be
 }
 
 async function resolveBepsFilingYear(
-  cycle: "CYCLE_1" | "CYCLE_2" | "CYCLE_3",
+  cycle: (typeof COMPLIANCE_CYCLE_VALUES)[number],
   filingYear?: number,
 ) {
   if (filingYear != null) {
@@ -132,7 +129,7 @@ async function resolveBepsFilingYear(
 
 const bepsCanonicalScopeSchema = z.object({
   buildingId: z.string(),
-  cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).default("CYCLE_1"),
+  cycle: z.enum(COMPLIANCE_CYCLE_VALUES).default("CYCLE_1"),
   filingYear: z.number().int().min(2024).max(2100).optional(),
 });
 
@@ -174,7 +171,7 @@ export const bepsRouter = router({
     .input(
       z.object({
         buildingId: z.string(),
-        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).default("CYCLE_1"),
+        cycle: z.enum(COMPLIANCE_CYCLE_VALUES).default("CYCLE_1"),
         overrides: bepsOverridesSchema.optional(),
       }),
     )
@@ -299,7 +296,7 @@ export const bepsRouter = router({
     .input(
       z.object({
         buildingId: z.string(),
-        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).default("CYCLE_1"),
+        cycle: z.enum(COMPLIANCE_CYCLE_VALUES).default("CYCLE_1"),
         filingYear: z.number().int().min(2024).max(2100).optional(),
         baselineYearStart: z.number().int().nullable().optional(),
         baselineYearEnd: z.number().int().nullable().optional(),
@@ -391,7 +388,7 @@ export const bepsRouter = router({
     .input(
       z.object({
         buildingId: z.string(),
-        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).default("CYCLE_1"),
+        cycle: z.enum(COMPLIANCE_CYCLE_VALUES).default("CYCLE_1"),
         filingYear: z.number().int().min(2024).max(2100).optional(),
         itemKey: z.string().min(1),
         name: z.string().min(1),
@@ -442,10 +439,10 @@ export const bepsRouter = router({
     .input(
       z.object({
         buildingId: z.string(),
-        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).default("CYCLE_1"),
+        cycle: z.enum(COMPLIANCE_CYCLE_VALUES).default("CYCLE_1"),
         filingYear: z.number().int().min(2024).max(2100).optional(),
         agreementIdentifier: z.string().min(1),
-        pathway: z.enum(["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE"]),
+        pathway: z.enum(BEPS_PATHWAY_VALUES),
         multiplier: z.number().min(0).max(1),
         status: z.enum(["DRAFT", "ACTIVE", "SUPERSEDED", "EXPIRED"]),
         effectiveFrom: z.string().datetime(),
@@ -480,7 +477,7 @@ export const bepsRouter = router({
     .input(
       z.object({
         buildingId: z.string(),
-        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).default("CYCLE_1"),
+        cycle: z.enum(COMPLIANCE_CYCLE_VALUES).default("CYCLE_1"),
         filingYear: z.number().int().min(2024).max(2100).optional(),
       }),
     )
@@ -606,10 +603,7 @@ export const bepsRouter = router({
           "EXEMPTION_SUPPORT",
           "NOT_APPLICABLE_SUPPORT",
         ]),
-        pathway: z
-          .enum(["PERFORMANCE", "STANDARD_TARGET", "PRESCRIPTIVE", "TRAJECTORY"])
-          .nullable()
-          .optional(),
+        pathway: z.enum(BEPS_PATHWAY_VALUES).nullable().optional(),
         metadata: z.record(z.string(), z.unknown()).optional(),
       }),
     )
@@ -637,7 +631,7 @@ export const bepsRouter = router({
       z.object({
         buildingId: z.string(),
         filingRecordId: z.string().optional(),
-        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).optional(),
+        cycle: z.enum(COMPLIANCE_CYCLE_VALUES).optional(),
         filingYear: z.number().int().min(2024).max(2100).optional(),
         packetType: bepsPacketTypeSchema.optional(),
       }),
@@ -661,7 +655,7 @@ export const bepsRouter = router({
         requestItemId: z.string().optional(),
         buildingId: z.string(),
         filingRecordId: z.string().nullable().optional(),
-        cycle: z.enum(["CYCLE_1", "CYCLE_2", "CYCLE_3"]).nullable().optional(),
+        cycle: z.enum(COMPLIANCE_CYCLE_VALUES).nullable().optional(),
         filingYear: z.number().int().min(2024).max(2100).nullable().optional(),
         packetType: bepsPacketTypeSchema.nullable().optional(),
         category: bepsRequestCategorySchema,

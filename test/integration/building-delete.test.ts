@@ -20,6 +20,8 @@ describe("building delete", () => {
   let financingCase: { id: string };
   let pipelineRun: { id: string };
   let meter: { id: string };
+  let reportArtifact: { id: string };
+  let job: { id: string };
 
   beforeAll(async () => {
     org = await prisma.organization.create({
@@ -264,6 +266,29 @@ describe("building delete", () => {
       },
     });
 
+    await prisma.verificationItemResult.create({
+      data: {
+        organizationId: org.id,
+        buildingId: building.id,
+        reportingYear: 2025,
+        category: "DQC",
+        key: `delete-verification-${scope}`,
+        status: "PASS",
+        explanation: "Delete verification result",
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorType: "SYSTEM",
+        actorId: "test",
+        organizationId: org.id,
+        buildingId: building.id,
+        action: "DELETE_TEST_AUDIT",
+        inputSnapshot: { scope },
+      },
+    });
+
     await prisma.bepsMetricInput.create({
       data: {
         organizationId: org.id,
@@ -380,6 +405,32 @@ describe("building delete", () => {
       },
     });
 
+    reportArtifact = await prisma.reportArtifact.create({
+      data: {
+        organizationId: org.id,
+        buildingId: building.id,
+        reportType: "COMPLIANCE_REPORT",
+        version: 1,
+        reportHash: `report-hash-${scope}`,
+        sourceSummaryHash: `summary-hash-${scope}`,
+        sourceLineage: { scope },
+        payload: { scope },
+        createdByType: "SYSTEM",
+        createdById: "test",
+      },
+      select: { id: true },
+    });
+
+    job = await prisma.job.create({
+      data: {
+        type: "BUILDING_DELETE_TEST",
+        status: "QUEUED",
+        organizationId: org.id,
+        buildingId: building.id,
+      },
+      select: { id: true },
+    });
+
     await prisma.driftAlert.create({
       data: {
         organizationId: org.id,
@@ -413,6 +464,18 @@ describe("building delete", () => {
     });
     await prisma.portfolioManagerSyncState.deleteMany({
       where: { organizationId: org?.id },
+    });
+    await prisma.verificationItemResult.deleteMany({
+      where: { organizationId: org?.id },
+    });
+    await prisma.auditLog.deleteMany({
+      where: { organizationId: org?.id, buildingId: building?.id },
+    });
+    await prisma.reportArtifact.deleteMany({
+      where: { organizationId: org?.id, buildingId: building?.id },
+    });
+    await prisma.job.deleteMany({
+      where: { organizationId: org?.id, buildingId: building?.id },
     });
     await prisma.bepsAlternativeComplianceAgreement.deleteMany({
       where: { organizationId: org?.id },
@@ -522,6 +585,10 @@ describe("building delete", () => {
       sourceArtifactCount,
       snapshotCount,
       complianceRunCount,
+      verificationCount,
+      auditLogCount,
+      reportArtifactCount,
+      jobCount,
     ] = await Promise.all([
       prisma.building.count({ where: { id: building.id } }),
       prisma.bepsMetricInput.count({ where: { buildingId: building.id } }),
@@ -538,6 +605,10 @@ describe("building delete", () => {
       prisma.sourceArtifact.count({ where: { buildingId: building.id } }),
       prisma.complianceSnapshot.count({ where: { buildingId: building.id } }),
       prisma.complianceRun.count({ where: { buildingId: building.id } }),
+      prisma.verificationItemResult.count({ where: { buildingId: building.id } }),
+      prisma.auditLog.count({ where: { buildingId: building.id } }),
+      prisma.reportArtifact.count({ where: { buildingId: building.id } }),
+      prisma.job.count({ where: { buildingId: building.id } }),
     ]);
 
     expect(buildingCount).toBe(0);
@@ -553,5 +624,9 @@ describe("building delete", () => {
     expect(sourceArtifactCount).toBe(0);
     expect(snapshotCount).toBe(0);
     expect(complianceRunCount).toBe(0);
+    expect(verificationCount).toBe(0);
+    expect(auditLogCount).toBe(0);
+    expect(reportArtifactCount).toBe(0);
+    expect(jobCount).toBe(0);
   });
 });

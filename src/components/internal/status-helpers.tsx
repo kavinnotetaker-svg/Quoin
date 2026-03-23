@@ -1,4 +1,5 @@
 import React, { type ReactNode } from "react";
+import { formatPathwayLabel as formatGovernedPathwayLabel } from "@/lib/contracts/beps";
 
 export type StatusTone = "success" | "warning" | "danger" | "muted" | "info";
 export type PrimaryComplianceSurfaceStatus =
@@ -54,6 +55,11 @@ export function toneDotClasses(tone: StatusTone) {
 export function humanizeToken(value: string | null | undefined) {
  if (!value) {
  return "Not available";
+ }
+
+ const pathwayLabel = formatGovernedPathwayLabel(value);
+ if (pathwayLabel) {
+ return pathwayLabel;
  }
 
  const cycleMatch = value.match(/^CYCLE_(\d+)$/);

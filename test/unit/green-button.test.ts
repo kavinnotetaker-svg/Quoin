@@ -10,9 +10,15 @@ import {
   aggregateToMonthly,
 } from "@/server/integrations/green-button/espi-parser";
 import {
-  encryptToken,
-  decryptToken,
-} from "@/server/integrations/green-button/token-manager";
+  getGreenButtonTokensForConnection,
+  GREEN_BUTTON_TOKEN_ENCRYPTION_VERSION,
+  resolveGreenButtonTokensFromRecord,
+  type GreenButtonCredentialRecord,
+} from "@/server/integrations/green-button/credentials";
+import {
+  openSecret,
+  sealSecret,
+} from "@/server/lib/crypto/secret-envelope";
 import {
   buildAuthorizationUrl,
   exchangeCodeForTokens,
@@ -176,11 +182,20 @@ describe("aggregateToMonthly", () => {
 
 describe("Token Encryption", () => {
   const key = "test-encryption-key-for-unit-tests-32chars";
+  const accessPurpose = "green-button-access-token";
 
   it("encrypts and decrypts a token correctly", () => {
     const original = "sk_live_abc123_very_secret_token";
-    const encrypted = encryptToken(original, key);
-    const decrypted = decryptToken(encrypted, key);
+    const encrypted = sealSecret({
+      plaintext: original,
+      masterKey: key,
+      purpose: accessPurpose,
+    });
+    const decrypted = openSecret({
+      envelope: encrypted,
+      masterKey: key,
+      purpose: accessPurpose,
+    });
 
     expect(decrypted).toBe(original);
     expect(encrypted).not.toBe(original);
@@ -188,29 +203,204 @@ describe("Token Encryption", () => {
 
   it("produces different ciphertexts for the same input (random IV)", () => {
     const token = "same-token-each-time";
-    const enc1 = encryptToken(token, key);
-    const enc2 = encryptToken(token, key);
+    const enc1 = sealSecret({
+      plaintext: token,
+      masterKey: key,
+      purpose: accessPurpose,
+    });
+    const enc2 = sealSecret({
+      plaintext: token,
+      masterKey: key,
+      purpose: accessPurpose,
+    });
 
     expect(enc1).not.toBe(enc2);
-    // Both decrypt to the same value
-    expect(decryptToken(enc1, key)).toBe(token);
-    expect(decryptToken(enc2, key)).toBe(token);
+    expect(
+      openSecret({ envelope: enc1, masterKey: key, purpose: accessPurpose }),
+    ).toBe(token);
+    expect(
+      openSecret({ envelope: enc2, masterKey: key, purpose: accessPurpose }),
+    ).toBe(token);
   });
 
   it("fails to decrypt with wrong key", () => {
-    const encrypted = encryptToken("secret", key);
-    expect(() => decryptToken(encrypted, "wrong-key-wrong-key-wrong-key-32")).toThrow();
+    const encrypted = sealSecret({
+      plaintext: "secret",
+      masterKey: key,
+      purpose: accessPurpose,
+    });
+    expect(() =>
+      openSecret({
+        envelope: encrypted,
+        masterKey: "wrong-key-wrong-key-wrong-key-32",
+        purpose: accessPurpose,
+      }),
+    ).toThrow("Secret envelope authentication failed.");
   });
 
-  it("fails on invalid encrypted format", () => {
-    expect(() => decryptToken("not-valid-format", key)).toThrow(
-      "Invalid encrypted Green Button token format.",
+  it("fails on invalid envelope format", () => {
+    expect(() =>
+      openSecret({
+        envelope: "not-valid-format",
+        masterKey: key,
+        purpose: accessPurpose,
+      }),
+    ).toThrow(
+      "Invalid secret envelope format.",
     );
   });
 
+  it("fails on tampered envelope data", () => {
+    const encrypted = sealSecret({
+      plaintext: "secret",
+      masterKey: key,
+      purpose: accessPurpose,
+    });
+    const parsed = JSON.parse(encrypted) as { ciphertext: string };
+    parsed.ciphertext = `${parsed.ciphertext}tampered`;
+
+    expect(() =>
+      openSecret({
+        envelope: JSON.stringify(parsed),
+        masterKey: key,
+        purpose: accessPurpose,
+      }),
+    ).toThrow("Secret envelope authentication failed.");
+  });
+
   it("handles empty string token", () => {
-    const encrypted = encryptToken("", key);
-    expect(decryptToken(encrypted, key)).toBe("");
+    const encrypted = sealSecret({
+      plaintext: "",
+      masterKey: key,
+      purpose: accessPurpose,
+    });
+    expect(
+      openSecret({ envelope: encrypted, masterKey: key, purpose: accessPurpose }),
+    ).toBe("");
+  });
+});
+
+describe("Green Button credential storage", () => {
+  const masterKey = "test-encryption-key-for-unit-tests-32chars";
+
+  function buildRecord(
+    overrides: Partial<GreenButtonCredentialRecord> = {},
+  ): GreenButtonCredentialRecord {
+    return {
+      id: "gb_conn_1",
+      buildingId: "building_1",
+      organizationId: "org_1",
+      status: "ACTIVE",
+      accessToken: null,
+      refreshToken: null,
+      accessTokenEncrypted: null,
+      refreshTokenEncrypted: null,
+      tokenEncryptionVersion: null,
+      tokenExpiresAt: new Date("2026-03-19T00:00:00.000Z"),
+      resourceUri: "https://utility.example.com/espi/resource/Subscription/123",
+      subscriptionId: "123",
+      ...overrides,
+    };
+  }
+
+  it("reads encrypted credentials without migration fallback", () => {
+    const accessTokenEncrypted = sealSecret({
+      plaintext: "encrypted-access",
+      masterKey,
+      purpose: "green-button-access-token",
+    });
+    const refreshTokenEncrypted = sealSecret({
+      plaintext: "encrypted-refresh",
+      masterKey,
+      purpose: "green-button-refresh-token",
+    });
+
+    const resolved = resolveGreenButtonTokensFromRecord({
+      record: buildRecord({
+        accessTokenEncrypted,
+        refreshTokenEncrypted,
+        tokenEncryptionVersion: GREEN_BUTTON_TOKEN_ENCRYPTION_VERSION,
+      }),
+      masterKey,
+    });
+
+    expect(resolved.usedPlaintextFallback).toBe(false);
+    expect(resolved.tokens.accessToken).toBe("encrypted-access");
+    expect(resolved.tokens.refreshToken).toBe("encrypted-refresh");
+  });
+
+  it("supports plaintext fallback during migration", () => {
+    const resolved = resolveGreenButtonTokensFromRecord({
+      record: buildRecord({
+        accessToken: "legacy-access",
+        refreshToken: "legacy-refresh",
+      }),
+      masterKey,
+    });
+
+    expect(resolved.usedPlaintextFallback).toBe(true);
+    expect(resolved.tokens.accessToken).toBe("legacy-access");
+    expect(resolved.tokens.refreshToken).toBe("legacy-refresh");
+  });
+
+  it("re-encrypts plaintext credentials when read through the helper", async () => {
+    const update = vi.fn(async () => null);
+
+    const tokens = await getGreenButtonTokensForConnection({
+      record: buildRecord({
+        accessToken: "legacy-access",
+        refreshToken: "legacy-refresh",
+      }),
+      masterKey,
+      db: {
+        greenButtonConnection: {
+          update,
+        },
+      },
+    });
+
+    expect(tokens.accessToken).toBe("legacy-access");
+    expect(tokens.refreshToken).toBe("legacy-refresh");
+    expect(update).toHaveBeenCalledTimes(1);
+    const updateArgs = (update.mock.calls as unknown as Array<
+      [
+        {
+          where: { id: string };
+          data: {
+            accessToken: null;
+            refreshToken: null;
+            tokenEncryptionVersion: number;
+            accessTokenEncrypted: string;
+            refreshTokenEncrypted: string;
+          };
+        },
+      ]
+    >)[0]?.[0];
+
+    expect(updateArgs).toBeDefined();
+    expect(updateArgs).toMatchObject({
+      where: { id: "gb_conn_1" },
+      data: {
+        accessToken: null,
+        refreshToken: null,
+        tokenEncryptionVersion: GREEN_BUTTON_TOKEN_ENCRYPTION_VERSION,
+      },
+    });
+    expect(updateArgs?.data.accessTokenEncrypted).toEqual(
+      expect.any(String),
+    );
+    expect(updateArgs?.data.refreshTokenEncrypted).toEqual(
+      expect.any(String),
+    );
+  });
+
+  it("fails clearly when no token material is available", () => {
+    expect(() =>
+      resolveGreenButtonTokensFromRecord({
+        record: buildRecord(),
+        masterKey,
+      }),
+    ).toThrow("Green Button connection is missing stored OAuth tokens.");
   });
 });
 

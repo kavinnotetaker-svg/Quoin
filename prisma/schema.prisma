@@ -768,9 +768,11 @@ model GreenButtonConnection {
   attemptCount              Int                      @default(0) @map("attempt_count")
   retryCount                Int                      @default(0) @map("retry_count")
   latestJobId               String?                  @map("latest_job_id")
-  // TODO: Encrypt access and refresh tokens at rest before reaching production
-  accessToken               String                   @map("access_token")
-  refreshToken              String                   @map("refresh_token")
+  accessToken               String?                  @map("access_token")
+  refreshToken              String?                  @map("refresh_token")
+  accessTokenEncrypted      String?                  @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted     String?                  @map("refresh_token_encrypted") @db.Text
+  tokenEncryptionVersion    Int?                     @map("token_encryption_version")
   resourceUri               String?                  @map("resource_uri")
   subscriptionId            String?                  @map("subscription_id")
   tokenExpiresAt            DateTime?                @map("token_expires_at")

@@ -492,6 +492,56 @@ describe("BEPS multi-cycle engine", () => {
     expect(filingRecord.complianceCycle).toBe("CYCLE_2");
   });
 
+  it("accepts TRAJECTORY in the building update contract", async () => {
+    const caller = createCaller();
+
+    const updated = await caller.building.update({
+      id: building.id,
+      data: {
+        selectedPathway: "TRAJECTORY",
+      },
+    });
+
+    expect(updated.selectedPathway).toBe("TRAJECTORY");
+
+    const persisted = await prisma.building.findUnique({
+      where: { id: building.id },
+      select: { selectedPathway: true },
+    });
+
+    expect(persisted?.selectedPathway).toBe("TRAJECTORY");
+  });
+
+  it("accepts TRAJECTORY in the alternative compliance agreement contract", async () => {
+    const caller = createCaller();
+
+    const agreement = await caller.beps.upsertAlternativeComplianceAgreement({
+      buildingId: building.id,
+      cycle: "CYCLE_2",
+      agreementIdentifier: `trajectory-acp-${scope}`,
+      pathway: "TRAJECTORY",
+      multiplier: 0.85,
+      status: "ACTIVE",
+      effectiveFrom: "2028-01-01T00:00:00.000Z",
+    });
+
+    expect(agreement.pathway).toBe("TRAJECTORY");
+
+    const persisted = await prisma.bepsAlternativeComplianceAgreement.findFirst({
+      where: {
+        organizationId: org.id,
+        buildingId: building.id,
+        complianceCycle: "CYCLE_2",
+        agreementIdentifier: `trajectory-acp-${scope}`,
+      },
+      select: {
+        pathway: true,
+      },
+    });
+
+    expect(persisted?.pathway).toBe("TRAJECTORY");
+  });
+
   it("applies cycle 2 to private buildings starting at 25k square feet through the router", async () => {
     const caller = createCaller();
 

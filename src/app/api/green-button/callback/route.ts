@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
   exchangeCodeForTokens,
-  encryptToken,
+  upsertGreenButtonCredentials,
 } from "@/server/integrations/green-button";
 import { toAppError } from "@/server/lib/errors";
 import { createAuditLog } from "@/server/lib/audit-log";
@@ -19,7 +19,7 @@ import {
   requireTenantContextFromSession,
 } from "@/server/lib/tenant-access";
 import {
-  getGreenButtonEncryptionKey,
+  requireGreenButtonTokenMasterKey,
   getOptionalGreenButtonConfig,
 } from "@/server/lib/config";
 import { refreshSourceReconciliationDataIssues } from "@/server/compliance/data-issues";
@@ -157,26 +157,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const encryptionKey = getGreenButtonEncryptionKey();
-  if (!encryptionKey) {
-    jobLogger.error("Green Button callback missing encryption key");
-    await safelyPersist("job.dead", () =>
-      markDead(runningJob.id, "Green Button encryption key is missing"),
-    );
-    await writeAudit({
-      action: "green_button.callback.failed",
-      inputSnapshot: {
-        buildingId,
-      },
-      outputSnapshot: {
-        retryable: false,
-      },
-      errorCode: "CONFIG_ERROR",
-    });
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
-    );
-  }
+  const encryptionKey = requireGreenButtonTokenMasterKey();
 
   const building = await tenant.tenantDb.building.findUnique({
     where: { id: buildingId },
@@ -222,30 +203,14 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    await tenant.tenantDb.greenButtonConnection.upsert({
-      where: { buildingId },
-      update: {
-        status: "ACTIVE",
-        runtimeStatus: "IDLE",
-        accessToken: encryptToken(tokens.accessToken, encryptionKey),
-        refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
-        tokenExpiresAt: tokens.expiresAt,
-        subscriptionId: tokens.subscriptionId,
-        resourceUri: tokens.resourceUri,
-        latestErrorCode: null,
-        latestErrorMessage: null,
-      },
-      create: {
-        buildingId,
-        organizationId: tenant.organizationId,
-        status: "ACTIVE",
-        runtimeStatus: "IDLE",
-        accessToken: encryptToken(tokens.accessToken, encryptionKey),
-        refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
-        tokenExpiresAt: tokens.expiresAt,
-        subscriptionId: tokens.subscriptionId,
-        resourceUri: tokens.resourceUri,
-      }
+    await upsertGreenButtonCredentials({
+      db: tenant.tenantDb,
+      organizationId: tenant.organizationId,
+      buildingId,
+      tokens,
+      masterKey: encryptionKey,
+      status: "ACTIVE",
+      runtimeStatus: "IDLE",
     });
 
     await tenant.tenantDb.building.update({

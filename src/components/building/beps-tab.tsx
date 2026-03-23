@@ -14,8 +14,13 @@ import {
  formatNumber,
 } from "@/components/internal/admin-primitives";
 import { formatCycleLabel } from "@/components/internal/status-helpers";
+import {
+ BEPS_PATHWAY_VALUES,
+ COMPLIANCE_CYCLE_VALUES,
+ formatPathwayLabel,
+} from "@/lib/contracts/beps";
 
-const CYCLES = ["CYCLE_1", "CYCLE_2", "CYCLE_3"] as const;
+const CYCLES = COMPLIANCE_CYCLE_VALUES;
 
 function toNumberOrUndefined(value: string) {
  return value.trim() === "" ? undefined : Number(value);
@@ -44,6 +49,8 @@ export function BepsTab({
  const [prescriptivePointsEarned, setPrescriptivePointsEarned] = useState("");
  const [agreementIdentifier, setAgreementIdentifier] = useState("");
  const [agreementMultiplier, setAgreementMultiplier] = useState("");
+ const [agreementPathway, setAgreementPathway] =
+  useState<(typeof BEPS_PATHWAY_VALUES)[number]>("PERFORMANCE");
 
  const utils = trpc.useUtils();
  const inputState = trpc.beps.inputState.useQuery({ buildingId, cycle }, { retry: false });
@@ -117,6 +124,7 @@ export function BepsTab({
  onSuccess: () => {
  setAgreementIdentifier("");
  setAgreementMultiplier("");
+ setAgreementPathway("PERFORMANCE");
  invalidateCycle();
  },
  });
@@ -310,6 +318,22 @@ export function BepsTab({
  <span className={labelSpanClass}>Multiplier</span>
  <input value={agreementMultiplier} onChange={(event) => setAgreementMultiplier(event.target.value)} className={inputClass} />
  </label>
+ <label className="text-sm md:col-span-2">
+ <span className={labelSpanClass}>Pathway</span>
+ <select
+ value={agreementPathway}
+ onChange={(event) =>
+ setAgreementPathway(event.target.value as (typeof BEPS_PATHWAY_VALUES)[number])
+ }
+ className={inputClass}
+ >
+ {BEPS_PATHWAY_VALUES.map((pathway) => (
+ <option key={pathway} value={pathway}>
+ {formatPathwayLabel(pathway)}
+ </option>
+ ))}
+ </select>
+ </label>
  </div>
  <div className="mt-5">
  <button
@@ -318,7 +342,7 @@ export function BepsTab({
  buildingId,
  cycle,
  agreementIdentifier: agreementIdentifier || `agreement-${Date.now()}`,
- pathway: "PERFORMANCE",
+ pathway: agreementPathway,
  multiplier: toNumberOrUndefined(agreementMultiplier) ?? 1,
  status: "ACTIVE",
  effectiveFrom: todayIso(),
@@ -341,7 +365,7 @@ export function BepsTab({
  </div>
  <div className="mt-2 flex items-center gap-2">
  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{canonical.alternativeComplianceAgreement.status}</span>
- <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{canonical.alternativeComplianceAgreement.pathway}</span>
+ <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 bg-white px-2 py-0.5 rounded-md border border-zinc-200">{formatPathwayLabel(canonical.alternativeComplianceAgreement.pathway)}</span>
  </div>
  <div className="mt-3 text-sm font-medium text-zinc-500">
  Multiplier: <span className="text-zinc-900">{formatNumber(canonical.alternativeComplianceAgreement.multiplier, 2)}</span>
@@ -374,7 +398,7 @@ export function BepsTab({
  <div key={outcome.id} className="border border-zinc-200 p-5 hover: transition-shadow">
  <div className="flex items-center justify-between gap-3">
  <div className="font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
- {outcome.complianceCycle?.replace("_", " ") ?? "—"}
+ {formatCycleLabel(outcome.complianceCycle)}
  <span className="text-zinc-300 font-normal">|</span>
  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">{outcome.status}</span>
  </div>

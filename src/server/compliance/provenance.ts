@@ -1,6 +1,7 @@
 import { Prisma, type ActorType, type ComplianceCycle } from "@/generated/prisma/client";
 import { prisma } from "@/server/lib/db";
 import { hashDeterministicJson } from "@/server/lib/deterministic-json";
+import type { BuildingSelectedPathwayValue } from "@/lib/contracts/beps";
 
 export const BOOTSTRAP_RULE_PACKAGE_KEYS = {
   benchmarking2025: "DC_BENCHMARKING_2025",
@@ -210,7 +211,7 @@ export interface ProvenanceSnapshotData {
   complianceGap?: number | null;
   estimatedPenalty?: number | null;
   dataQualityScore?: number | null;
-  activePathway?: "STANDARD" | "PERFORMANCE" | "PRESCRIPTIVE" | "TRAJECTORY" | "NONE" | null;
+  activePathway?: BuildingSelectedPathwayValue | null;
   targetScore?: number | null;
   targetEui?: number | null;
   penaltyInputsJson?: Record<string, unknown> | null;
