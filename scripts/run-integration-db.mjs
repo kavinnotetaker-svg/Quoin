@@ -4,9 +4,9 @@ import process from "node:process";
 import { Client } from "pg";
 
 function getBaseDatabaseUrl() {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required");
+    throw new Error("DIRECT_URL or DATABASE_URL is required");
   }
 
   return databaseUrl;
@@ -27,6 +27,24 @@ function runCommand(command, env) {
       ...env,
     },
   });
+}
+
+function isProvisioningPrivilegeError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("permission denied to create database") ||
+    message.includes("permission denied to drop database") ||
+    message.includes("must be owner of database") ||
+    message.includes("CREATE DATABASE cannot run inside a transaction block")
+  );
+}
+
+function printProvisioningPrivilegeHelp(scriptName) {
+  console.error(
+    `${scriptName} requires a Postgres role that can create and drop temporary databases. ` +
+      "Use a local admin-capable Postgres instance for this validation path; standard hosted " +
+      "Supabase connection strings are not suitable for it.",
+  );
 }
 
 async function dropDatabase(client, databaseName) {
@@ -59,12 +77,15 @@ async function main() {
 
     runCommand("npx prisma migrate deploy", {
       DATABASE_URL: testUrl,
+      DIRECT_URL: testUrl,
     });
     runCommand("npx prisma generate", {
       DATABASE_URL: testUrl,
+      DIRECT_URL: testUrl,
     });
-    runCommand("npx vitest run test/integration", {
+    runCommand("npx vitest run test/integration --maxWorkers 1 --no-file-parallelism", {
       DATABASE_URL: testUrl,
+      DIRECT_URL: testUrl,
     });
   } finally {
     await dropDatabase(adminClient, testDb).catch(() => undefined);
@@ -73,6 +94,9 @@ async function main() {
 }
 
 main().catch((error) => {
+  if (isProvisioningPrivilegeError(error)) {
+    printProvisioningPrivilegeHelp("npm run test:integration:db");
+  }
   console.error(error);
   process.exit(1);
 });

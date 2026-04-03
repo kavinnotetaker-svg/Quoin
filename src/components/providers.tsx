@@ -7,32 +7,32 @@ import { useState } from "react";
 import superjson from "superjson";
 
 export function TRPCProvider({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 5 * 60 * 1000,
-            retry: 1,
-          },
-        },
-      })
-  );
+ const [queryClient] = useState(
+ () =>
+ new QueryClient({
+ defaultOptions: {
+ queries: {
+ staleTime: 5 * 60 * 1000,
+ retry: 1,
+ },
+ },
+ })
+ );
 
-  const [trpcClient] = useState(() =>
-    trpc.createClient({
-      links: [
-        httpBatchLink({
-          url: "/api/trpc",
-          transformer: superjson,
-        }),
-      ],
-    })
-  );
+ const [trpcClient] = useState(() =>
+ trpc.createClient({
+ links: [
+ httpBatchLink({
+ url: "/api/trpc",
+ transformer: superjson,
+ }),
+ ],
+ })
+ );
 
-  return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </trpc.Provider>
-  );
+ return (
+ <trpc.Provider client={trpcClient} queryClient={queryClient}>
+ <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+ </trpc.Provider>
+ );
 }

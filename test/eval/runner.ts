@@ -58,9 +58,6 @@ async function main(): Promise<void> {
   console.log("  Quoin Eval Framework");
   console.log("═══════════════════════════════════════\n");
 
-  // Import all eval suites
-  await import("./suites/penalty-eval");
-
   const filtered = suiteFilter
     ? suites.filter((s) => s.name === suiteFilter)
     : suites;

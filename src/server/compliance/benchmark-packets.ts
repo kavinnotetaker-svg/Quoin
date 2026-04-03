@@ -4,6 +4,7 @@ import type {
   BenchmarkRequestItemStatus,
   Prisma,
 } from "@/generated/prisma";
+import { createAuditLog } from "@/server/lib/audit-log";
 import { prisma } from "@/server/lib/db";
 import {
   hashDeterministicJson,
@@ -19,6 +20,7 @@ import {
 } from "@/server/rendering/packet-documents";
 import { describePortfolioManagerSyncState } from "./portfolio-manager-sync";
 import { ComplianceProvenanceError } from "./provenance";
+import { reconcileBenchmarkSubmissionWorkflowTx } from "./submission-workflows";
 import {
   computeVerificationEvaluation,
   evaluateVerification,
@@ -679,7 +681,7 @@ export async function markBenchmarkPacketsStaleTx(
     where: {
       benchmarkSubmissionId: { in: benchmarkSubmissionIds },
       status: {
-        in: ["GENERATED", "FINALIZED"],
+        in: ["GENERATED"],
       },
     },
     data: {
@@ -691,7 +693,11 @@ export async function markBenchmarkPacketsStaleTx(
 
 async function ensureBenchmarkPacketStaleness(submission: BenchmarkSubmissionAssembly) {
   const latestPacket = submission.benchmarkPackets[0] ?? null;
-  if (!latestPacket || latestPacket.status === "STALE") {
+  if (
+    !latestPacket ||
+    latestPacket.status === "STALE" ||
+    latestPacket.status === "FINALIZED"
+  ) {
     return latestPacket;
   }
 
@@ -896,6 +902,7 @@ export async function generateBenchmarkPacket(input: {
   reportingYear: number;
   createdByType: ActorType;
   createdById?: string | null;
+  requestId?: string | null;
 }) {
   const verification = await evaluateVerification({
     organizationId: input.organizationId,
@@ -922,7 +929,7 @@ export async function generateBenchmarkPacket(input: {
     });
   }
 
-  return prisma.$transaction(async (tx) => {
+  const packet = await prisma.$transaction(async (tx) => {
     await markBenchmarkPacketsStaleTx(tx, {
       organizationId: input.organizationId,
       buildingId: input.buildingId,
@@ -952,8 +959,39 @@ export async function generateBenchmarkPacket(input: {
       },
     });
 
+    await reconcileBenchmarkSubmissionWorkflowTx(tx, {
+      organizationId: input.organizationId,
+      buildingId: input.buildingId,
+      packet,
+      createdByType: input.createdByType,
+      createdById: input.createdById ?? null,
+      requestId: input.requestId ?? null,
+    });
+
     return packet;
   });
+
+  await createAuditLog({
+    actorType: input.createdByType,
+    actorId: input.createdById ?? null,
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    action: "COMPLIANCE_ARTIFACT_GENERATED",
+    inputSnapshot: {
+      artifactType: "BENCHMARK_VERIFICATION_PACKET",
+      reportingYear: input.reportingYear,
+      benchmarkSubmissionId: context.submission.id,
+    },
+    outputSnapshot: {
+      packetId: packet.id,
+      version: packet.version,
+      status: packet.status,
+      packetHash: packet.packetHash,
+    },
+    requestId: input.requestId ?? null,
+  });
+
+  return packet;
 }
 
 export async function getLatestBenchmarkPacket(params: {
@@ -1024,6 +1062,7 @@ export async function finalizeBenchmarkPacket(input: {
   reportingYear: number;
   createdByType: ActorType;
   createdById?: string | null;
+  requestId?: string | null;
 }) {
   const latestPacket = await getLatestBenchmarkPacket({
     organizationId: input.organizationId,
@@ -1051,18 +1090,54 @@ export async function finalizeBenchmarkPacket(input: {
     );
   }
 
-  return prisma.benchmarkPacket.update({
-    where: { id: latestPacket.id },
-    data: {
-      status: "FINALIZED",
-      finalizedAt: new Date(),
-      finalizedByType: input.createdByType,
-      finalizedById: input.createdById ?? null,
-    },
-    include: {
-      benchmarkSubmission: true,
-    },
+  const finalized = await prisma.$transaction(async (tx) => {
+    const updated = await tx.benchmarkPacket.update({
+      where: { id: latestPacket.id },
+      data: {
+        status: "FINALIZED",
+        finalizedAt: new Date(),
+        finalizedByType: input.createdByType,
+        finalizedById: input.createdById ?? null,
+      },
+      include: {
+        benchmarkSubmission: true,
+      },
+    });
+
+    await reconcileBenchmarkSubmissionWorkflowTx(tx, {
+      organizationId: input.organizationId,
+      buildingId: input.buildingId,
+      packet: updated,
+      createdByType: input.createdByType,
+      createdById: input.createdById ?? null,
+      requestId: input.requestId ?? null,
+    });
+
+    return updated;
   });
+
+  await createAuditLog({
+    actorType: input.createdByType,
+    actorId: input.createdById ?? null,
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    action: "COMPLIANCE_ARTIFACT_FINALIZED",
+    inputSnapshot: {
+      artifactType: "BENCHMARK_VERIFICATION_PACKET",
+      reportingYear: input.reportingYear,
+      packetId: latestPacket.id,
+      version: latestPacket.version,
+    },
+    outputSnapshot: {
+      packetId: finalized.id,
+      version: finalized.version,
+      status: finalized.status,
+      finalizedAt: finalized.finalizedAt?.toISOString() ?? null,
+    },
+    requestId: input.requestId ?? null,
+  });
+
+  return finalized;
 }
 
 function toDisplayValue(value: unknown) {
@@ -1512,6 +1587,9 @@ export async function exportBenchmarkPacket(params: {
   buildingId: string;
   reportingYear: number;
   format: BenchmarkPacketExportFormat;
+  createdByType?: ActorType;
+  createdById?: string | null;
+  requestId?: string | null;
 }) {
   const logger = createLogger({
     organizationId: params.organizationId,
@@ -1532,7 +1610,7 @@ export async function exportBenchmarkPacket(params: {
   ].join("_");
 
   if (params.format === "MARKDOWN") {
-    return {
+    const result = {
       packetId: packet.id,
       version: packet.version,
       status: packet.status,
@@ -1543,6 +1621,28 @@ export async function exportBenchmarkPacket(params: {
       encoding: "utf-8" as const,
       content: renderBenchmarkPacketMarkdown(packetExport),
     };
+
+    await createAuditLog({
+      actorType: params.createdByType ?? "SYSTEM",
+      actorId: params.createdById ?? null,
+      organizationId: params.organizationId,
+      buildingId: params.buildingId,
+      action: "COMPLIANCE_ARTIFACT_EXPORTED",
+      inputSnapshot: {
+        artifactType: "BENCHMARK_VERIFICATION_PACKET",
+        packetId: packet.id,
+        version: packet.version,
+        format: params.format,
+      },
+      outputSnapshot: {
+        fileName: result.fileName,
+        contentType: result.contentType,
+        packetHash: packet.packetHash,
+      },
+      requestId: params.requestId ?? null,
+    });
+
+    return result;
   }
 
   if (params.format === "PDF") {
@@ -1551,7 +1651,7 @@ export async function exportBenchmarkPacket(params: {
         buildBenchmarkPacketRenderDocument(packetExport),
       );
 
-      return {
+      const result = {
         packetId: packet.id,
         version: packet.version,
         status: packet.status,
@@ -1562,6 +1662,28 @@ export async function exportBenchmarkPacket(params: {
         encoding: "base64" as const,
         content,
       };
+
+      await createAuditLog({
+        actorType: params.createdByType ?? "SYSTEM",
+        actorId: params.createdById ?? null,
+        organizationId: params.organizationId,
+        buildingId: params.buildingId,
+        action: "COMPLIANCE_ARTIFACT_EXPORTED",
+        inputSnapshot: {
+          artifactType: "BENCHMARK_VERIFICATION_PACKET",
+          packetId: packet.id,
+          version: packet.version,
+          format: params.format,
+        },
+        outputSnapshot: {
+          fileName: result.fileName,
+          contentType: result.contentType,
+          packetHash: packet.packetHash,
+        },
+        requestId: params.requestId ?? null,
+      });
+
+      return result;
     } catch (error) {
       logger.error("Benchmark packet PDF export failed", {
         error,
@@ -1580,7 +1702,7 @@ export async function exportBenchmarkPacket(params: {
     }
   }
 
-  return {
+  const result = {
     packetId: packet.id,
     version: packet.version,
     status: packet.status,
@@ -1591,6 +1713,28 @@ export async function exportBenchmarkPacket(params: {
     encoding: "utf-8" as const,
     content: stringifyDeterministicJson(packetExport),
   };
+
+  await createAuditLog({
+    actorType: params.createdByType ?? "SYSTEM",
+    actorId: params.createdById ?? null,
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    action: "COMPLIANCE_ARTIFACT_EXPORTED",
+    inputSnapshot: {
+      artifactType: "BENCHMARK_VERIFICATION_PACKET",
+      packetId: packet.id,
+      version: packet.version,
+      format: params.format,
+    },
+    outputSnapshot: {
+      fileName: result.fileName,
+      contentType: result.contentType,
+      packetHash: packet.packetHash,
+    },
+    requestId: params.requestId ?? null,
+  });
+
+  return result;
 }
 
 export function getBenchmarkPacketStatusDisplay(status: BenchmarkPacketStatus | "NONE") {

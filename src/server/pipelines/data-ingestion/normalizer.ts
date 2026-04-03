@@ -14,6 +14,8 @@ const KBTU_FACTORS: Record<
   kwh: { factor: 3.412, meterType: "ELECTRIC", energyUnit: "KWH" },
   mwh: { factor: 3412, meterType: "ELECTRIC", energyUnit: "KWH" },
   kbtu: { factor: 1, meterType: "ELECTRIC", energyUnit: "KBTU" },
+  mbtu: { factor: 1000, meterType: "ELECTRIC", energyUnit: "MMBTU" },
+  mmbtu: { factor: 1000, meterType: "ELECTRIC", energyUnit: "MMBTU" },
 
   // Natural Gas
   therms: { factor: 100, meterType: "GAS", energyUnit: "THERMS" },
@@ -21,11 +23,18 @@ const KBTU_FACTORS: Record<
   kcf: { factor: 1026, meterType: "GAS", energyUnit: "THERMS" },
   mcf: { factor: 1_026_000, meterType: "GAS", energyUnit: "THERMS" },
   cf: { factor: 1.026, meterType: "GAS", energyUnit: "THERMS" },
+  gaskbtu: { factor: 1, meterType: "GAS", energyUnit: "KBTU" },
+  gasmbtu: { factor: 1000, meterType: "GAS", energyUnit: "MMBTU" },
+  gasmmbtu: { factor: 1000, meterType: "GAS", energyUnit: "MMBTU" },
 
   // District Steam
-  mlb: { factor: 1194, meterType: "STEAM", energyUnit: "MMBTU" },
+  mlb: { factor: 1_194_000, meterType: "STEAM", energyUnit: "MMBTU" },
   klb: { factor: 1194, meterType: "STEAM", energyUnit: "MMBTU" },
   lbs: { factor: 1.194, meterType: "STEAM", energyUnit: "MMBTU" },
+  steamkbtu: { factor: 1, meterType: "STEAM", energyUnit: "KBTU" },
+  steammbtu: { factor: 1000, meterType: "STEAM", energyUnit: "MMBTU" },
+  steammmbtu: { factor: 1000, meterType: "STEAM", energyUnit: "MMBTU" },
+  steamtherms: { factor: 100, meterType: "STEAM", energyUnit: "THERMS" },
 
   // GJ
   gj: { factor: 947.817, meterType: "OTHER", energyUnit: "KBTU" },
@@ -50,13 +59,20 @@ export function normalizeUnitKey(unit: string): string {
   if (lower === "kcf") return "kcf";
   if (lower === "mcf") return "mcf";
   if (lower === "cf" || lower === "cubic feet") return "cf";
+  if (lower === "mbtu" || lower === "mmbtu" || lower === "million btu") return "mmbtu";
   if (
     lower === "mlb" ||
+    lower === "mlbs" ||
+    lower === "million lbs" ||
+    lower === "million pounds"
+  )
+    return "mlb";
+  if (
     lower === "klb" ||
     lower === "klbs" ||
     lower === "thousand lbs"
   )
-    return "mlb";
+    return "klb";
   if (lower === "lbs" || lower === "pounds") return "lbs";
   if (lower === "kbtu" || lower === "thousand btu") return "kbtu";
   if (lower === "gj" || lower === "gigajoules") return "gj";
@@ -104,6 +120,29 @@ export function getConversionFactor(unit: string): number | null {
   return KBTU_FACTORS[key]?.factor ?? null;
 }
 
+export function getConversionFactorForMeter(
+  unit: string,
+  meterType: MeterType,
+): number | null {
+  const key = normalizeUnitKey(unit);
+  if (key === "kbtu" && meterType !== "ELECTRIC") {
+    return KBTU_FACTORS[`${meterType.toLowerCase()}kbtu`]?.factor ?? KBTU_FACTORS[key]?.factor ?? null;
+  }
+  if (key === "mmbtu" && meterType !== "ELECTRIC") {
+    return (
+      KBTU_FACTORS[`${meterType.toLowerCase()}mmbtu`]?.factor ??
+      KBTU_FACTORS[`${meterType.toLowerCase()}mbtu`]?.factor ??
+      KBTU_FACTORS[key]?.factor ??
+      null
+    );
+  }
+  if (key === "therms" && meterType === "STEAM") {
+    return KBTU_FACTORS.steamtherms.factor;
+  }
+
+  return KBTU_FACTORS[key]?.factor ?? null;
+}
+
 /**
  * Source energy conversion factors (site → source).
  * Source: ESPM Source Energy Technical Reference
@@ -112,5 +151,8 @@ export const SOURCE_SITE_RATIOS: Record<MeterType, number> = {
   ELECTRIC: 2.8,
   GAS: 1.05,
   STEAM: 1.45,
+  WATER_INDOOR: 0,
+  WATER_OUTDOOR: 0,
+  WATER_RECYCLED: 0,
   OTHER: 1.0,
 };

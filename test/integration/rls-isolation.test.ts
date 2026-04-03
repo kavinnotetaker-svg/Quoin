@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTenantClient, prisma } from "@/server/lib/db";
 
 describe("RLS tenant isolation", () => {
-  let orgA: { id: string; clerkOrgId: string };
-  let orgB: { id: string; clerkOrgId: string };
+  let orgA: { id: string };
+  let orgB: { id: string };
   let buildingA: { id: string };
   let buildingB: { id: string };
 
@@ -14,20 +14,18 @@ describe("RLS tenant isolation", () => {
       data: {
         name: "Test Org A",
         slug: `test-org-a-${ts}`,
-        clerkOrgId: `clerk_test_a_${ts}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     orgB = await prisma.organization.create({
       data: {
         name: "Test Org B",
         slug: `test-org-b-${ts}`,
-        clerkOrgId: `clerk_test_b_${ts}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     buildingA = await prisma.building.create({
@@ -85,8 +83,8 @@ describe("RLS tenant isolation", () => {
     });
     await prisma.user.deleteMany({
       where: {
-        clerkUserId: {
-          startsWith: "clerk_test_user_",
+        authUserId: {
+          startsWith: "supabase_test_user_",
         },
       },
     });
@@ -155,7 +153,7 @@ describe("RLS tenant isolation", () => {
     const ts = Date.now();
     const userA = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_test_user_a_${ts}`,
+        authUserId: `supabase_test_user_a_${ts}`,
         email: `testa_${ts}@test.com`,
         name: "Test User A",
       },
@@ -164,7 +162,7 @@ describe("RLS tenant isolation", () => {
 
     const userB = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_test_user_b_${ts}`,
+        authUserId: `supabase_test_user_b_${ts}`,
         email: `testb_${ts}@test.com`,
         name: "Test User B",
       },
@@ -219,3 +217,5 @@ describe("RLS tenant isolation", () => {
     ).rejects.toThrow();
   });
 });
+
+

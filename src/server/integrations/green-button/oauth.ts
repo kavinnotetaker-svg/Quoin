@@ -3,6 +3,7 @@ import {
   createNonRetryableIntegrationError,
   createRetryableIntegrationError,
 } from "@/server/lib/errors";
+import { fetchWithRetry } from "@/server/lib/external-fetch";
 import type { GreenButtonConfig, GreenButtonTokens } from "./types";
 
 /**
@@ -37,17 +38,22 @@ export async function exchangeCodeForTokens(
 
   let response: Response;
   try {
-    response = await fetch(config.tokenEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${basicAuth}`,
+    response = await fetchWithRetry({
+      url: config.tokenEndpoint,
+      timeoutMs: 15_000,
+      maxAttempts: 3,
+      init: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${basicAuth}`,
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: config.redirectUri,
+        }),
       },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: config.redirectUri,
-      }),
     });
   } catch (error) {
     throw createRetryableIntegrationError(
@@ -109,16 +115,21 @@ export async function refreshAccessToken(
 
   let response: Response;
   try {
-    response = await fetch(config.tokenEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${basicAuth}`,
+    response = await fetchWithRetry({
+      url: config.tokenEndpoint,
+      timeoutMs: 15_000,
+      maxAttempts: 3,
+      init: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${basicAuth}`,
+        },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+        }),
       },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-      }),
     });
   } catch (error) {
     throw createRetryableIntegrationError(

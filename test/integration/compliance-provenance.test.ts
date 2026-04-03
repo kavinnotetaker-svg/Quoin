@@ -14,10 +14,10 @@ import {
 describe("compliance provenance core", () => {
   const scope = `${Date.now()}`;
 
-  let orgA: { id: string; clerkOrgId: string };
-  let orgB: { id: string; clerkOrgId: string };
-  let userA: { id: string; clerkUserId: string };
-  let userB: { id: string; clerkUserId: string };
+  let orgA: { id: string };
+  let orgB: { id: string };
+  let userA: { id: string; authUserId: string };
+  let userB: { id: string; authUserId: string };
   let buildingA: { id: string };
   let buildingB: { id: string };
   let sharedRuleVersion: { id: string };
@@ -28,38 +28,36 @@ describe("compliance provenance core", () => {
       data: {
         name: `Provenance Org A ${scope}`,
         slug: `provenance-org-a-${scope}`,
-        clerkOrgId: `clerk_provenance_org_a_${scope}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     orgB = await prisma.organization.create({
       data: {
         name: `Provenance Org B ${scope}`,
         slug: `provenance-org-b-${scope}`,
-        clerkOrgId: `clerk_provenance_org_b_${scope}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     userA = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_provenance_user_a_${scope}`,
+        authUserId: `supabase_provenance_user_a_${scope}`,
         email: `provenance_a_${scope}@test.com`,
         name: "Provenance User A",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     userB = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_provenance_user_b_${scope}`,
+        authUserId: `supabase_provenance_user_b_${scope}`,
         email: `provenance_b_${scope}@test.com`,
         name: "Provenance User B",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     await prisma.organizationMembership.createMany({
@@ -208,8 +206,8 @@ describe("compliance provenance core", () => {
     });
     await prisma.user.deleteMany({
       where: {
-        clerkUserId: {
-          startsWith: "clerk_provenance_user_",
+        authUserId: {
+          startsWith: "supabase_provenance_user_",
         },
       },
     });
@@ -221,11 +219,10 @@ describe("compliance provenance core", () => {
     });
   });
 
-  function createCaller(clerkUserId: string, clerkOrgId: string) {
+  function createCaller(authUserId: string, activeOrganizationId: string) {
     return appRouter.createCaller({
-      clerkUserId,
-      clerkOrgId,
-      clerkOrgRole: "org:admin",
+      authUserId,
+      activeOrganizationId,
       prisma,
     });
   }
@@ -507,8 +504,8 @@ describe("compliance provenance core", () => {
       createdById: "tester",
     });
 
-    const callerA = createCaller(userA.clerkUserId, orgA.clerkOrgId);
-    const callerB = createCaller(userB.clerkUserId, orgB.clerkOrgId);
+    const callerA = createCaller(userA.authUserId, orgA.id);
+    const callerB = createCaller(userB.authUserId, orgB.id);
 
     const runsForA = await callerA.provenance.complianceRuns({
       buildingId: buildingA.id,
@@ -543,3 +540,6 @@ describe("compliance provenance core", () => {
     expect(runsForB.some((run) => run.id === runA.complianceRun.id)).toBe(false);
   });
 });
+
+
+

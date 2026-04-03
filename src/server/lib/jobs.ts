@@ -45,7 +45,11 @@ export const JOB_STATUS = {
 export type JobStatus = (typeof JOB_STATUS)[keyof typeof JOB_STATUS];
 
 const ALLOWED_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
-  [JOB_STATUS.QUEUED]: [JOB_STATUS.RUNNING],
+  [JOB_STATUS.QUEUED]: [
+    JOB_STATUS.RUNNING,
+    JOB_STATUS.FAILED,
+    JOB_STATUS.DEAD,
+  ],
   [JOB_STATUS.RUNNING]: [
     JOB_STATUS.COMPLETED,
     JOB_STATUS.FAILED,

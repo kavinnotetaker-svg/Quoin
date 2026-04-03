@@ -376,6 +376,142 @@ const CHECKS = [
     `,
   },
   {
+    name: "penalty_runs_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM penalty_runs pr
+      LEFT JOIN buildings b
+        ON b.id = pr.building_id
+       AND b.organization_id = pr.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "penalty_runs_compliance_run_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM penalty_runs pr
+      LEFT JOIN compliance_runs cr
+        ON cr.id = pr.compliance_run_id
+      WHERE pr.compliance_run_id IS NOT NULL
+        AND (
+          cr.id IS NULL
+          OR cr.organization_id <> pr.organization_id
+          OR cr.building_id <> pr.building_id
+        )
+    `,
+  },
+  {
+    name: "building_source_reconciliations_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM building_source_reconciliations bsr
+      LEFT JOIN buildings b
+        ON b.id = bsr.building_id
+       AND b.organization_id = bsr.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "meter_source_reconciliations_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM meter_source_reconciliations msr
+      LEFT JOIN buildings b
+        ON b.id = msr.building_id
+       AND b.organization_id = msr.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "meter_source_reconciliations_meter_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM meter_source_reconciliations msr
+      LEFT JOIN meters m
+        ON m.id = msr.meter_id
+      WHERE m.id IS NULL
+         OR m.organization_id <> msr.organization_id
+         OR m.building_id <> msr.building_id
+    `,
+  },
+  {
+    name: "meter_source_reconciliations_parent_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM meter_source_reconciliations msr
+      LEFT JOIN building_source_reconciliations bsr
+        ON bsr.id = msr.building_source_reconciliation_id
+      WHERE bsr.id IS NULL
+         OR bsr.organization_id <> msr.organization_id
+         OR bsr.building_id <> msr.building_id
+    `,
+  },
+  {
+    name: "submission_workflows_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM submission_workflows sw
+      LEFT JOIN buildings b
+        ON b.id = sw.building_id
+       AND b.organization_id = sw.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "submission_workflows_benchmark_packet_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM submission_workflows sw
+      LEFT JOIN benchmark_packets bp
+        ON bp.id = sw.benchmark_packet_id
+      WHERE sw.benchmark_packet_id IS NOT NULL
+        AND (
+          bp.id IS NULL
+          OR bp.organization_id <> sw.organization_id
+          OR bp.building_id <> sw.building_id
+        )
+    `,
+  },
+  {
+    name: "submission_workflows_filing_packet_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM submission_workflows sw
+      LEFT JOIN filing_packets fp
+        ON fp.id = sw.filing_packet_id
+      WHERE sw.filing_packet_id IS NOT NULL
+        AND (
+          fp.id IS NULL
+          OR fp.organization_id <> sw.organization_id
+          OR fp.building_id <> sw.building_id
+        )
+    `,
+  },
+  {
+    name: "submission_workflow_events_building_org_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM submission_workflow_events swe
+      LEFT JOIN buildings b
+        ON b.id = swe.building_id
+       AND b.organization_id = swe.organization_id
+      WHERE b.id IS NULL
+    `,
+  },
+  {
+    name: "submission_workflow_events_workflow_mismatch",
+    query: `
+      SELECT COUNT(*)::int AS violating_rows
+      FROM submission_workflow_events swe
+      LEFT JOIN submission_workflows sw
+        ON sw.id = swe.workflow_id
+      WHERE sw.id IS NULL
+         OR sw.organization_id <> swe.organization_id
+         OR sw.building_id <> swe.building_id
+    `,
+  },
+  {
     name: "users_without_memberships",
     query: `
       SELECT COUNT(*)::int AS violating_rows

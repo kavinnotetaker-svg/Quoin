@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
-import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/server/lib/db";
 import type { ESPM } from "@/server/integrations/espm";
 import {
@@ -14,24 +13,29 @@ import { createLogger } from "@/server/lib/logger";
 import {
   requireTenantContext,
 } from "@/server/lib/tenant-access";
+import type { AppRole } from "@/server/lib/organization-membership";
+import { resolveRequestAuth } from "@/server/lib/auth";
+import { requireCapability, type Capability } from "@/server/lib/capabilities";
 
 export interface Context {
   requestId?: string;
-  clerkUserId: string | null;
-  clerkOrgId: string | null | undefined;
-  clerkOrgRole: string | null | undefined;
+  authUserId?: string | null;
+  activeOrganizationId?: string | null;
+  email?: string | null;
+  name?: string | null;
   prisma: typeof prisma;
   espmFactory?: (() => ESPM) | undefined;
 }
 
 export async function createContext(): Promise<Context> {
-  const { userId, orgId, orgRole } = await auth();
+  const auth = await resolveRequestAuth();
 
   return {
     requestId: randomUUID(),
-    clerkUserId: userId,
-    clerkOrgId: orgId,
-    clerkOrgRole: orgRole,
+    authUserId: auth.authUserId,
+    activeOrganizationId: auth.activeOrganizationId,
+    email: auth.email,
+    name: auth.name,
     prisma,
   };
 }
@@ -65,7 +69,7 @@ const normalizeProcedureErrors = t.middleware(async ({ ctx, path, type, next }) 
       requestId: ctx.requestId,
       organizationId: "organizationId" in ctx ? String(ctx.organizationId ?? "") : undefined,
       buildingId: undefined,
-      userId: ctx.clerkUserId,
+      userId: ctx.authUserId ?? undefined,
       router: path.includes(".") ? path.split(".").slice(0, -1).join(".") : path,
       procedure: path,
       procedureType: type,
@@ -81,27 +85,23 @@ const normalizeProcedureErrors = t.middleware(async ({ ctx, path, type, next }) 
 export const publicProcedure = t.procedure.use(normalizeProcedureErrors);
 
 const enforceAuth = t.middleware(async ({ ctx, next }) => {
-  if (!ctx.clerkUserId) {
+  if (!ctx.authUserId) {
     throw new AuthorizationError("Unauthorized", {
       httpStatus: 401,
     });
   }
 
-  return next({
-    ctx: {
-      ...ctx,
-      clerkUserId: ctx.clerkUserId,
-    },
-  });
+  return next();
 });
 
 export const protectedProcedure = publicProcedure.use(enforceAuth);
 
 const enforceTenant = t.middleware(async ({ ctx, next }) => {
   const tenant = await requireTenantContext({
-    clerkUserId: ctx.clerkUserId,
-    clerkOrgId: ctx.clerkOrgId,
-    clerkOrgRole: ctx.clerkOrgRole,
+    authUserId: ctx.authUserId,
+    email: ctx.email,
+    name: ctx.name,
+    activeOrganizationId: ctx.activeOrganizationId,
   });
 
   return next({
@@ -113,3 +113,61 @@ const enforceTenant = t.middleware(async ({ ctx, next }) => {
 });
 
 export const tenantProcedure = publicProcedure.use(enforceTenant);
+
+const enforceCapability = (capability: Capability) =>
+  t.middleware(async ({ ctx, next }) => {
+    const maybeAppRole = "appRole" in ctx ? ctx.appRole : null;
+    const appRole =
+      maybeAppRole === "ADMIN" ||
+      maybeAppRole === "MANAGER" ||
+      maybeAppRole === "ENGINEER" ||
+      maybeAppRole === "VIEWER"
+        ? maybeAppRole
+        : null;
+
+    if (!appRole) {
+      throw new AuthorizationError("Tenant access is required for this action.", {
+        httpStatus: 403,
+      });
+    }
+
+    requireCapability({
+      role: appRole,
+      capability,
+    });
+
+    return next();
+  });
+
+export const withCapability = <TProcedure extends typeof tenantProcedure>(
+  procedure: TProcedure,
+  capability: Capability,
+) => procedure.use(enforceCapability(capability));
+
+const OPERATOR_ROLES: AppRole[] = ["ADMIN", "MANAGER"];
+
+const enforceOperator = t.middleware(async ({ ctx, next }) => {
+  const maybeAppRole = "appRole" in ctx ? ctx.appRole : null;
+  const appRole =
+    maybeAppRole === "ADMIN" || maybeAppRole === "MANAGER" || maybeAppRole === "ENGINEER" || maybeAppRole === "VIEWER"
+      ? maybeAppRole
+      : null;
+
+  if (!appRole || !OPERATOR_ROLES.includes(appRole)) {
+    throw new AuthorizationError("Operator access is required for this action.", {
+      httpStatus: 403,
+      details: {
+        requiredRoles: OPERATOR_ROLES,
+      },
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      appRole,
+    },
+  });
+});
+
+export const operatorProcedure = tenantProcedure.use(enforceOperator);

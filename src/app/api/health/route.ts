@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { getPlatformRuntimeHealth } from "@/server/lib/runtime-health";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-  });
+  const health = await getPlatformRuntimeHealth();
+
+  return NextResponse.json(
+    health,
+    { status: health.status === "ok" ? 200 : 503 },
+  );
 }

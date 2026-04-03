@@ -170,6 +170,27 @@ describe("benchmarking workflow", () => {
     expect(result.reasonCodes).toContain(BENCHMARK_FINDING_CODES.overlappingBills);
   });
 
+  it("allows readings whose next period starts on the previous end date", () => {
+    const readings = monthReadings();
+    readings[1] = {
+      ...readings[1],
+      periodStart: new Date("2025-01-31T00:00:00.000Z"),
+      periodEnd: new Date("2025-02-28T00:00:00.000Z"),
+    };
+
+    const result = evaluateBenchmarkReadinessData({
+      building: baseBuilding,
+      readings,
+      evidenceArtifacts: [freshEvidence("DQC_REPORT"), freshEvidence("VERIFICATION")],
+      reportingYear: 2025,
+      ruleConfig: baseRuleConfig,
+      factorConfig: baseFactorConfig,
+      evaluatedAt: new Date("2026-01-15T00:00:00.000Z"),
+    });
+
+    expect(result.reasonCodes).not.toContain(BENCHMARK_FINDING_CODES.overlappingBills);
+  });
+
   it("blocks readiness when the DC property identifier is missing", () => {
     const result = evaluateBenchmarkReadinessData({
       building: {
@@ -290,6 +311,38 @@ describe("benchmarking workflow", () => {
     expect(result2027.summary.verificationCadenceYears).toBe(6);
     expect(result2027.summary.requiredReportingYears).toEqual([2027]);
     expect(result2027.summary.submissionDueDate).toBe("2028-05-01T00:00:00.000Z");
+  });
+
+  it("surfaces manual-path governance metadata only for district/manual benchmarking bands", () => {
+    const privateResult = evaluateBenchmarkReadinessData({
+      building: {
+        ...baseBuilding,
+        grossSquareFeet: 30000,
+      },
+      readings: monthReadings(2027),
+      evidenceArtifacts: [freshEvidence("DQC_REPORT", 2027), freshEvidence("VERIFICATION", 2027)],
+      reportingYear: 2027,
+      ruleConfig: baseRuleConfig,
+      factorConfig: baseFactorConfig,
+      evaluatedAt: new Date("2028-01-15T00:00:00.000Z"),
+    });
+
+    const districtResult = evaluateBenchmarkReadinessData({
+      building: {
+        ...baseBuilding,
+        ownershipType: "DISTRICT",
+        grossSquareFeet: 15000,
+      },
+      readings: monthReadings(2027),
+      evidenceArtifacts: [freshEvidence("DQC_REPORT", 2027)],
+      reportingYear: 2027,
+      ruleConfig: baseRuleConfig,
+      factorConfig: baseFactorConfig,
+      evaluatedAt: new Date("2028-01-15T00:00:00.000Z"),
+    });
+
+    expect(privateResult.summary.manualSubmissionAllowedWhenNotBenchmarkable).toBe(false);
+    expect(districtResult.summary.manualSubmissionAllowedWhenNotBenchmarkable).toBe(true);
   });
 
   it("uses the district/public 60-day relative deadline rule", () => {

@@ -67,6 +67,10 @@ export class ESPMClient {
     return this.request<T>("PUT", path, body, headers);
   }
 
+  async delete<T>(path: string, headers?: Record<string, string>): Promise<T> {
+    return this.request<T>("DELETE", path, undefined, headers);
+  }
+
   private async request<T>(
     method: string,
     path: string,

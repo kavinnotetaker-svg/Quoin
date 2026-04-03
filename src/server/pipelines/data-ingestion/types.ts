@@ -1,8 +1,15 @@
 /** Maps to Prisma MeterType enum */
-export type MeterType = "ELECTRIC" | "GAS" | "STEAM" | "OTHER";
+export type MeterType =
+  | "ELECTRIC"
+  | "GAS"
+  | "STEAM"
+  | "WATER_INDOOR"
+  | "WATER_OUTDOOR"
+  | "WATER_RECYCLED"
+  | "OTHER";
 
 /** Maps to Prisma EnergyUnit enum */
-export type EnergyUnit = "KWH" | "THERMS" | "KBTU" | "MMBTU";
+export type EnergyUnit = "KWH" | "THERMS" | "KBTU" | "MMBTU" | "GAL" | "KGAL" | "CCF";
 
 /** What the CSV parser extracts from each row */
 export interface ParsedRow {

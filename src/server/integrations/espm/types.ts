@@ -51,6 +51,59 @@ export interface ESPMProperty {
   };
 }
 
+export interface ESPMCreateResponse {
+  response?: {
+    id?: number | string;
+    link?: Array<{
+      "@_linkDescription"?: string;
+      "@_link"?: string;
+      "@_httpMethod"?: string;
+    }>;
+  };
+}
+
+export interface ESPMAccountProfile {
+  account?: {
+    "@_id"?: number | string;
+    id?: number | string;
+    accountInfo?: {
+      username?: string;
+      accountName?: string;
+      organization?: string;
+      webserviceUser?: boolean;
+    };
+  };
+}
+
+export interface ESPMCustomerAccount {
+  customer?: {
+    "@_id"?: number;
+    accountInfo?: {
+      organization?: string;
+      username?: string;
+      webserviceUser?: boolean;
+    };
+  };
+}
+
+export interface ESPMPropertyListResponse {
+  response?: {
+    link?:
+      | Array<{
+          "@_id"?: number | string;
+          "@_link"?: string;
+          "@_linkDescription"?: string;
+          "@_httpMethod"?: string;
+        }>
+      | {
+          "@_id"?: number | string;
+          "@_link"?: string;
+          "@_linkDescription"?: string;
+          "@_httpMethod"?: string;
+        };
+  };
+}
+
 export interface ESPMMeter {
   meter: {
     "@_id"?: number;

@@ -1,118 +1,94 @@
 "use client";
 
-import { useState } from "react";
-import dynamic from "next/dynamic";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { PageHeader } from "@/components/layout/page-header";
 import { KPIRow } from "./kpi-row";
-import { BuildingTable } from "./building-table";
-import { PortfolioInsights } from "./portfolio-insights";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AddBuildingDialogTrigger } from "./add-building-dialog-trigger";
 
-const BuildingMap = dynamic(
-  () => import("./building-map").then((mod) => mod.BuildingMap),
-  {
-    ssr: false,
-    loading: () => (
-      <Skeleton className="h-[600px] w-full rounded-xl border border-zinc-200" />
-    ),
-  },
-);
+function truncateCopy(value: string, max = 92) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= max) {
+    return normalized;
+  }
 
-const STATUS_FILTERS = [
-  { label: "All", value: undefined },
-  { label: "Compliant", value: "COMPLIANT" },
-  { label: "At risk", value: "AT_RISK" },
-  { label: "Non-compliant", value: "NON_COMPLIANT" },
-  { label: "Needs data", value: "PENDING_DATA" },
-] as const;
+  return `${normalized.slice(0, max - 3).trimEnd()}...`;
+}
+
+function urgencyClass(level: string) {
+  if (level === "NOW") {
+    return {
+      backgroundColor: "rgba(184, 95, 84, 0.08)",
+      color: "#8d514c",
+    };
+  }
+
+  if (level === "NEXT") {
+    return {
+      backgroundColor: "rgba(180, 146, 88, 0.1)",
+      color: "#8a6a35",
+    };
+  }
+
+  return {
+    backgroundColor: "rgba(118, 128, 138, 0.1)",
+    color: "#6c7580",
+  };
+}
 
 export function DashboardContent() {
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | undefined>();
-  const [view, setView] = useState<"table" | "map">("table");
-
+  const onboarding = trpc.building.onboardingStatus.useQuery();
   const stats = trpc.building.portfolioStats.useQuery();
-  const buildings = trpc.building.list.useQuery({
-    search: search || undefined,
+  const worklist = trpc.building.portfolioWorklist.useQuery({
+    pageSize: 5,
+    sortBy: "PRIORITY",
   });
 
-  if (stats.isLoading || buildings.isLoading) {
+  if (stats.isLoading || worklist.isLoading) {
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="flex items-center justify-between pt-2">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64 rounded-md" />
-            <Skeleton className="h-4 w-96 rounded-md" />
-          </div>
-          <Skeleton className="hidden h-10 w-32 rounded-lg sm:block" />
+        <div className="space-y-3 pt-3">
+          <Skeleton className="h-4 w-24 rounded-full" />
+          <Skeleton className="h-10 w-52 rounded-full" />
+          <Skeleton className="h-5 w-72 rounded-full" />
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
-            >
-              <Skeleton className="h-4 w-28 rounded-md" />
-              <Skeleton className="mt-4 h-8 w-24 rounded-md" />
-              <Skeleton className="mt-3 h-3 w-32 rounded-md" />
-            </div>
+        <Skeleton className="h-28 w-full rounded-[30px]" />
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[1, 2, 3, 4].map((item) => (
+            <Skeleton key={item} className="h-44 w-full rounded-[28px]" />
           ))}
         </div>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Skeleton className="h-10 w-full rounded-lg sm:w-[400px]" />
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-10 w-32 rounded-lg" />
-            <Skeleton className="h-10 w-full rounded-lg sm:w-64" />
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-4 w-full rounded-md" />
-            </div>
-          </div>
-          <div className="divide-y divide-zinc-100">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between px-6 py-4"
-              >
-                <Skeleton className="h-4 w-48 rounded-md" />
-                <Skeleton className="h-4 w-24 rounded-md" />
-                <Skeleton className="h-4 w-16 rounded-md" />
-                <Skeleton className="h-5 w-24 rounded-full" />
-                <Skeleton className="h-4 w-20 rounded-md" />
-                <Skeleton className="h-4 w-20 rounded-md" />
-              </div>
-            ))}
-          </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          {[1, 2].map((item) => (
+            <Skeleton key={item} className="h-80 w-full rounded-[32px]" />
+          ))}
         </div>
       </div>
     );
   }
 
-  if (stats.error || buildings.error) {
-    const err = stats.error ?? buildings.error;
+  if (stats.error || worklist.error) {
+    const err = stats.error ?? worklist.error;
     const code = err?.data?.code;
     const msg = err?.message;
 
     if (code === "FORBIDDEN" || msg?.includes("No organization")) {
       return (
-        <div className="flex min-h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white p-12 text-center shadow-sm">
-          <p className="text-lg font-semibold text-zinc-900">
+        <div className="flex min-h-[500px] flex-col items-center justify-center rounded-[32px] border border-dashed border-zinc-200 bg-white/85 p-12 text-center">
+          <p className="font-dashboard-display text-4xl font-medium tracking-[-0.05em] text-zinc-900">
             No organization selected
           </p>
-          <p className="mt-2 max-w-sm text-sm text-zinc-500">
-            You need to create or select an organization to view your portfolio
-            and workflow data.
+          <p className="mt-3 max-w-sm font-dashboard-sans text-[0.98rem] leading-7 text-zinc-500">
+            Create or choose an organization to see your portfolio.
           </p>
           <a
             href="/onboarding"
-            className="mt-6 rounded-md bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow transition-colors hover:bg-zinc-800"
+            className="mt-6 rounded-full bg-zinc-900 px-5 py-2.5 font-dashboard-sans text-sm font-medium text-white transition-colors hover:bg-zinc-800"
           >
             Get started
           </a>
@@ -122,20 +98,19 @@ export function DashboardContent() {
 
     if (code === "NOT_FOUND" || msg?.includes("Organization not found")) {
       return (
-        <div className="flex min-h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white p-12 text-center shadow-sm">
-          <p className="text-lg font-semibold text-zinc-900">
+        <div className="flex min-h-[500px] flex-col items-center justify-center rounded-[32px] border border-dashed border-zinc-200 bg-white/85 p-12 text-center">
+          <p className="font-dashboard-display text-4xl font-medium tracking-[-0.05em] text-zinc-900">
             Organization syncing
           </p>
-          <p className="mt-2 max-w-sm text-sm text-zinc-500">
-            Your organization is still being set up. This usually takes only a
-            few seconds.
+          <p className="mt-3 max-w-sm font-dashboard-sans text-[0.98rem] leading-7 text-zinc-500">
+            This usually settles in a few seconds.
           </p>
           <button
             onClick={() => {
               stats.refetch();
-              buildings.refetch();
+              worklist.refetch();
             }}
-            className="mt-6 rounded-md border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50"
+            className="mt-6 rounded-full border border-zinc-300 bg-white px-5 py-2.5 font-dashboard-sans text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
           >
             Refresh
           </button>
@@ -144,17 +119,19 @@ export function DashboardContent() {
     }
 
     return (
-      <div className="flex min-h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white p-12 text-center shadow-sm">
-        <p className="text-lg font-semibold text-zinc-900">
+      <div className="flex min-h-[500px] flex-col items-center justify-center rounded-[32px] border border-dashed border-zinc-200 bg-white/85 p-12 text-center">
+        <p className="font-dashboard-display text-4xl font-medium tracking-[-0.05em] text-zinc-900">
           Portfolio data could not load
         </p>
-        <p className="mt-2 max-w-sm text-sm text-zinc-500">{msg}</p>
+        <p className="mt-3 max-w-sm font-dashboard-sans text-[0.98rem] leading-7 text-zinc-500">
+          {msg}
+        </p>
         <button
           onClick={() => {
             stats.refetch();
-            buildings.refetch();
+            worklist.refetch();
           }}
-          className="mt-6 rounded-md border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50"
+          className="mt-6 rounded-full border border-zinc-300 bg-white px-5 py-2.5 font-dashboard-sans text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
         >
           Try again
         </button>
@@ -162,135 +139,177 @@ export function DashboardContent() {
     );
   }
 
-  const s = stats.data!;
-  const b = buildings.data!;
-
-  const scoredCount = s.compliant + s.atRisk + s.nonCompliant;
-  const filtered = statusFilter
-    ? b.buildings.filter(
-        (building) =>
-          building.latestSnapshot?.complianceStatus === statusFilter ||
-          (!building.latestSnapshot && statusFilter === "PENDING_DATA"),
-      )
-    : b.buildings;
+  const portfolioStats = stats.data!;
+  const queue = worklist.data!;
+  const scoredCount =
+    portfolioStats.compliant +
+    portfolioStats.atRisk +
+    portfolioStats.nonCompliant;
+  const priorityItems = queue.items.slice(0, 4);
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Portfolio Overview"
-        subtitle="Review which buildings need consultant attention first, then drill into the building workflow."
+        title="Portfolio"
+        subtitle="A calm view of what matters today."
+        kicker="Overview"
+        variant="portfolio"
+        density="compact"
       />
 
       <KPIRow
         items={[
           {
-            label: "Buildings in portfolio",
-            value: s.totalBuildings,
+            label: "Buildings",
+            value: portfolioStats.totalBuildings,
             subtitle:
-              s.nonCompliant > 0
-                ? `${s.nonCompliant} need immediate BEPS follow-up`
-                : "No buildings currently non-compliant",
-            subtitleColor:
-              s.nonCompliant > 0 ? "rgb(220, 38, 38)" : undefined,
+              portfolioStats.totalBuildings > 0
+                ? "A small, current view of the portfolio."
+                : "Start with the first building record.",
           },
           {
-            label: "Estimated penalty exposure",
-            value: `$${s.totalPenaltyExposure.toLocaleString()}`,
-            subtitle: "From the latest compliance snapshot for each building",
+            label: "Ready for review",
+            value: portfolioStats.atRisk,
+            subtitle:
+              portfolioStats.atRisk > 0
+                ? "These are the next likely reviews."
+                : "Nothing is waiting for review right now.",
           },
           {
-            label: "Average latest score",
-            value: s.averageScore || "Not available",
+            label: "Average score",
+            value: portfolioStats.averageScore || "Not available",
             subtitle:
               scoredCount > 0
-                ? `Across ${scoredCount} scored buildings`
-                : "No score data yet",
+                ? `Based on ${scoredCount} recent score${scoredCount === 1 ? "" : "s"}.`
+                : "Scores will appear once data is available.",
           },
           {
-            label: "Buildings needing fresh data",
-            value: s.pendingData,
+            label: "Needs fresh data",
+            value: portfolioStats.pendingData,
             subtitle:
-              s.pendingData > 0
-                ? "Refresh data before relying on status"
-                : "All buildings have recent data",
+              portfolioStats.pendingData > 0
+                ? "A few records could use a refresh."
+                : "Everything looks current enough to rely on.",
+            subtitleColor:
+              portfolioStats.pendingData > 0 && portfolioStats.pendingData === portfolioStats.totalBuildings
+                ? "danger"
+                : undefined,
           },
         ]}
       />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-1.5 rounded-lg bg-zinc-100/80 p-1 text-[13px] font-medium text-zinc-600">
-          {STATUS_FILTERS.map((filter) => (
-            <button
-              key={filter.label}
-              onClick={() => setStatusFilter(filter.value)}
-              className={`rounded-md px-3 py-1.5 transition-all duration-200 ${
-                statusFilter === filter.value
-                  ? "bg-white text-zinc-950 shadow-sm ring-1 ring-zinc-200/50"
-                  : "hover:bg-zinc-200/50 hover:text-zinc-900"
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-lg bg-zinc-100/80 p-1 text-[13px] font-medium text-zinc-600">
-            <button
-              onClick={() => setView("table")}
-              className={`rounded-md px-3 py-1.5 transition-all duration-200 ${
-                view === "table"
-                  ? "bg-white text-zinc-950 shadow-sm ring-1 ring-zinc-200/50"
-                  : "hover:bg-zinc-200/50 hover:text-zinc-900"
-              }`}
-            >
-              Table
-            </button>
-            <button
-              onClick={() => setView("map")}
-              className={`rounded-md px-3 py-1.5 transition-all duration-200 ${
-                view === "map"
-                  ? "bg-white text-zinc-950 shadow-sm ring-1 ring-zinc-200/50"
-                  : "hover:bg-zinc-200/50 hover:text-zinc-900"
-              }`}
-            >
-              Map
-            </button>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
+        <section
+          className="rounded-[32px] px-7 py-7"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(247,244,239,0.84) 100%)",
+            border: "1px solid rgba(205, 210, 214, 0.72)",
+            boxShadow: "0 24px 52px -38px rgba(27, 39, 51, 0.28)",
+          }}
+        >
+          <div className="space-y-8">
+            <div className="space-y-3">
+              <p
+                className="font-dashboard-sans text-[0.84rem] font-semibold tracking-[0.08em]"
+                style={{ color: "#7a818b" }}
+              >
+                Next step
+              </p>
+              <h2 className="font-dashboard-display text-[2.2rem] font-medium tracking-[-0.045em] text-zinc-900">
+                Keep it simple.
+              </h2>
+              <p className="max-w-md font-dashboard-sans text-[1rem] leading-7 text-zinc-600">
+                Add a building or open the full list when you want more detail.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <AddBuildingDialogTrigger
+                buttonClassName="w-full rounded-full bg-zinc-900 px-5 py-3.5 font-dashboard-sans text-[0.96rem] font-medium text-white transition hover:bg-zinc-800"
+              />
+              <Link
+                href="/buildings"
+                className="flex items-center justify-between rounded-full border border-zinc-300 bg-white/75 px-5 py-3.5 font-dashboard-sans text-[0.95rem] font-medium text-zinc-800 transition-colors hover:bg-white"
+              >
+                <span>Open buildings</span>
+                <ArrowRight size={16} className="text-zinc-400" />
+              </Link>
+            </div>
           </div>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search by building name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="peer w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[13px] text-zinc-900 placeholder:text-zinc-400 transition-all focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 sm:w-64"
-            />
+        </section>
+
+        <section
+          className="rounded-[32px] px-7 py-7"
+          style={{
+            background: "rgba(255,255,255,0.82)",
+            border: "1px solid rgba(205, 210, 214, 0.72)",
+            boxShadow: "0 24px 52px -40px rgba(27, 39, 51, 0.22)",
+          }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-3">
+              <p
+                className="font-dashboard-sans text-[0.84rem] font-semibold tracking-[0.08em]"
+                style={{ color: "#7a818b" }}
+              >
+                Next up
+              </p>
+              <h2 className="font-dashboard-display text-[2.1rem] font-medium tracking-[-0.045em] text-zinc-900">
+                A short list.
+              </h2>
+              <p className="max-w-lg font-dashboard-sans text-[1rem] leading-7 text-zinc-600">
+                These are the few items most worth opening next.
+              </p>
+            </div>
+            <Link
+              href="/buildings"
+              className="pt-1 font-dashboard-sans text-[0.93rem] font-medium text-zinc-500 transition-colors hover:text-zinc-900"
+            >
+              View all
+            </Link>
           </div>
-        </div>
+
+          {priorityItems.length === 0 ? (
+            <div className="mt-6 rounded-[24px] border border-dashed border-zinc-200 px-5 py-6 font-dashboard-sans text-[0.96rem] leading-7 text-zinc-500">
+              Nothing needs attention right now.
+            </div>
+          ) : (
+            <div className="mt-6 space-y-3">
+              {priorityItems.map((item) => (
+                <Link
+                  key={`${item.buildingId}-${item.nextAction.code}`}
+                  href={`/buildings/${item.buildingId}`}
+                  className="block rounded-[24px] border border-zinc-200/80 bg-[rgba(250,248,244,0.82)] px-5 py-4 transition-colors hover:bg-white"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-dashboard-sans text-[1rem] font-semibold text-zinc-900">
+                          {item.buildingName}
+                        </span>
+                        <span
+                          className="rounded-full px-2.5 py-1 font-dashboard-sans text-[0.72rem] font-semibold tracking-[0.06em]"
+                          style={urgencyClass(item.triage.urgency)}
+                        >
+                          {item.triage.urgency}
+                        </span>
+                      </div>
+                      <p className="font-dashboard-sans text-[0.95rem] font-medium text-zinc-800">
+                        {item.nextAction.title}
+                      </p>
+                      <p className="font-dashboard-sans text-[0.94rem] leading-6 text-zinc-500">
+                        {truncateCopy(item.nextAction.reason)}
+                      </p>
+                    </div>
+                    <ArrowRight size={16} className="mt-1 shrink-0 text-zinc-400" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
-
-      <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-        {view === "table" ? (
-          <BuildingTable buildings={filtered} />
-        ) : (
-          <BuildingMap buildings={filtered} />
-        )}
-      </div>
-
-      {b.pagination.totalPages > 1 && (
-        <p className="text-center text-xs font-medium text-zinc-500">
-          Page {b.pagination.page} of {b.pagination.totalPages} (
-          {b.pagination.total} total)
-        </p>
-      )}
-
-      <hr className="my-8 border-zinc-200" />
-
-      <PortfolioInsights
-        buildings={b.buildings.map((building) => ({
-          id: building.id,
-          name: building.name,
-        }))}
-      />
     </div>
   );
 }

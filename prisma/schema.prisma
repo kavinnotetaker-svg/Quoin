@@ -29,6 +29,28 @@ enum PropertyType {
   OTHER
 }
 
+enum BuildingPropertyUseType {
+  BANK_BRANCH
+  FINANCIAL_OFFICE
+  OFFICE
+  MULTIFAMILY_HOUSING
+  RESIDENCE_HALL_DORMITORY
+  RESIDENTIAL_CARE_FACILITY
+  SENIOR_LIVING_COMMUNITY
+  COLLEGE_UNIVERSITY
+  K12_SCHOOL
+  PRESCHOOL_DAYCARE
+  COMMUNITY_CENTER_AND_SOCIAL_MEETING_HALL
+  CONVENTION_CENTER
+  MOVIE_THEATER
+  MUSEUM
+  PERFORMING_ARTS
+  BAR_NIGHTCLUB
+  FAST_FOOD_RESTAURANT
+  SUPERMARKET_GROCERY_STORE
+  WHOLESALE_CLUB_SUPERCENTER
+}
+
 enum BuildingOwnershipType {
   PRIVATE
   DISTRICT
@@ -72,6 +94,7 @@ enum SelectedPathway {
 enum EnergySource {
   GREEN_BUTTON
   CSV_UPLOAD
+  BILL_UPLOAD
   ESPM_SYNC
   MANUAL
 }
@@ -80,6 +103,9 @@ enum MeterType {
   ELECTRIC
   GAS
   STEAM
+  WATER_INDOOR
+  WATER_OUTDOOR
+  WATER_RECYCLED
   OTHER
 }
 
@@ -88,6 +114,9 @@ enum EnergyUnit {
   THERMS
   KBTU
   MMBTU
+  GAL
+  KGAL
+  CCF
 }
 
 enum SnapshotTrigger {
@@ -128,8 +157,21 @@ enum AlertStatus {
 
 enum VersionStatus {
   DRAFT
+  CANDIDATE
   ACTIVE
   SUPERSEDED
+}
+
+enum GovernedPublicationKind {
+  RULE_VERSION
+  FACTOR_SET_VERSION
+}
+
+enum GovernedPublicationRunStatus {
+  PENDING
+  PASSED
+  FAILED
+  PUBLISHED
 }
 
 enum ComplianceRunType {
@@ -158,6 +200,46 @@ enum SourceArtifactType {
   CSV_UPLOAD
   GENERATED_REPORT
   OTHER
+}
+
+enum UtilityBillUploadStatus {
+  QUEUED
+  PROCESSING
+  READY_FOR_REVIEW
+  FAILED
+  CONFIRMED
+}
+
+enum UtilityBillCandidateStatus {
+  PENDING_REVIEW
+  CONFIRMED
+  REJECTED
+}
+
+enum UtilityBillExtractionMethod {
+  PDF_TEXT
+  OCR_SPACE
+  HEURISTIC
+  GEMINI_FALLBACK
+}
+
+enum UtilityBillUtilityType {
+  ELECTRIC
+  GAS
+  WATER
+}
+
+enum ApprovalRequestType {
+  PM_USAGE_PUSH
+  REMOTE_BUILDING_DELETE
+  SUBMISSION_WORKFLOW_TRANSITION
+}
+
+enum ApprovalRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FAILED
 }
 
 enum EvidenceArtifactType {
@@ -255,6 +337,31 @@ enum DataIssueSource {
   USER
 }
 
+enum SourceReconciliationStatus {
+  CLEAN
+  CONFLICTED
+  INCOMPLETE
+}
+
+enum CanonicalSourceSystem {
+  PORTFOLIO_MANAGER
+  GREEN_BUTTON
+  CSV_UPLOAD
+  MANUAL
+}
+
+enum SourceReconciliationConflictType {
+  BUILDING_LINKAGE_INCOMPLETE
+  GREEN_BUTTON_LINKAGE_INCOMPLETE
+  METER_SOURCE_CONFLICT
+  METER_LINKAGE_INCOMPLETE
+  CONSUMPTION_TOTAL_MISMATCH
+}
+
+enum PenaltyCalculationMode {
+  CURRENT_BEPS_EXPOSURE
+}
+
 enum BepsRequestItemCategory {
   PATHWAY_SELECTION_SUPPORT
   COMPLETED_ACTIONS_EVIDENCE
@@ -296,6 +403,21 @@ enum FilingPacketStatus {
   GENERATED
   STALE
   FINALIZED
+}
+
+enum SubmissionWorkflowType {
+  BENCHMARK_VERIFICATION
+  BEPS_FILING
+}
+
+enum SubmissionWorkflowState {
+  DRAFT
+  READY_FOR_REVIEW
+  APPROVED_FOR_SUBMISSION
+  SUBMITTED
+  COMPLETED
+  NEEDS_CORRECTION
+  SUPERSEDED
 }
 
 enum BepsPacketType {
@@ -350,6 +472,105 @@ enum PortfolioManagerSyncStatus {
   FAILED
 }
 
+enum PortfolioManagerManagementMode {
+  QUOIN_MANAGED
+  EXISTING_ESPM
+  PROVIDER_SHARED
+}
+
+enum PortfolioManagerManagementStatus {
+  NOT_STARTED
+  RUNNING
+  READY
+  FAILED
+}
+
+enum PortfolioManagerProvisioningStatus {
+  NOT_STARTED
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum PortfolioManagerImportStatus {
+  NOT_STARTED
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum PortfolioManagerSetupStatus {
+  NOT_STARTED
+  INPUT_REQUIRED
+  READY_TO_APPLY
+  APPLY_QUEUED
+  APPLY_RUNNING
+  APPLIED
+  NEEDS_ATTENTION
+}
+
+enum PortfolioManagerSetupComponentStatus {
+  NOT_STARTED
+  INPUT_REQUIRED
+  READY_TO_APPLY
+  APPLIED
+  NEEDS_ATTENTION
+}
+
+enum PortfolioManagerPropertyUseType {
+  OFFICE
+  MULTIFAMILY
+}
+
+enum PortfolioManagerMeterLinkStrategy {
+  LINK_EXISTING_REMOTE
+  CREATE_REMOTE
+  IMPORT_REMOTE_AS_LOCAL
+}
+
+enum PortfolioManagerUsageDirection {
+  PUSH_LOCAL_TO_PM
+  IMPORT_PM_TO_LOCAL
+}
+
+enum PortfolioManagerUsageStatus {
+  NOT_STARTED
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+enum PortfolioManagerMetricsStatus {
+  NOT_STARTED
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  SKIPPED
+}
+
+enum PortfolioManagerCoverageStatus {
+  NOT_STARTED
+  NO_USABLE_DATA
+  PARTIAL_COVERAGE
+  READY_FOR_METRICS
+  NEEDS_ATTENTION
+}
+
+enum IntegrationRuntimeStatus {
+  IDLE
+  RUNNING
+  SUCCEEDED
+  FAILED
+  RETRYING
+  STALE
+}
+
 enum OperationalAnomalyType {
   ABNORMAL_BASELOAD
   OFF_HOURS_SCHEDULE_DRIFT
@@ -363,6 +584,18 @@ enum OperationalAnomalyStatus {
   ACTIVE
   ACKNOWLEDGED
   DISMISSED
+}
+
+enum OperationalAnomalyConfidenceBand {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum OperationalAnomalyPenaltyImpactStatus {
+  ESTIMATED
+  INSUFFICIENT_CONTEXT
+  NOT_APPLICABLE
 }
 
 enum RetrofitProjectType {
@@ -399,17 +632,20 @@ enum RetrofitConfidenceBand {
   HIGH
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 enum FinancingCaseType {
   SINGLE_CANDIDATE
   BUNDLE
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 enum FinancingCaseStatus {
   DRAFT
   ACTIVE
   ARCHIVED
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 enum FinancingPacketStatus {
   DRAFT
   GENERATED
@@ -432,13 +668,25 @@ enum PipelineStatus {
   CANCELLED
 }
 
+enum GovernedReportType {
+  COMPLIANCE_REPORT
+  EXEMPTION_REPORT
+}
+
+enum ReportArtifactStatus {
+  GENERATED
+}
+
+enum ReportArtifactExportFormat {
+  JSON
+}
+
 // ─── Models ─────────────────────────────────────────────────────────────────
 
 model Organization {
   id               String           @id @default(cuid())
   name             String
   slug             String           @unique
-  clerkOrgId       String           @unique @map("clerk_org_id")
   tier             OrganizationTier @default(FREE)
   stripeCustomerId String?          @map("stripe_customer_id")
   settings         Json             @default("{}")
@@ -447,6 +695,7 @@ model Organization {
 
   memberships                         OrganizationMembership[]
   buildings                           Building[]
+  buildingPropertyUses                BuildingPropertyUse[]
   complianceRuns                      ComplianceRun[]
   sourceArtifacts                     SourceArtifact[]
   evidenceArtifacts                   EvidenceArtifact[]
@@ -462,25 +711,44 @@ model Organization {
   bepsMetricInputs                    BepsMetricInput[]
   bepsPrescriptiveItems               BepsPrescriptiveItem[]
   bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
+  portfolioManagerManagement          PortfolioManagerManagement?
+  portfolioManagerImportState         PortfolioManagerImportState?
+  portfolioManagerRemoteProperties    PortfolioManagerRemoteProperty[]
+  portfolioManagerRemoteMeters        PortfolioManagerRemoteMeter[]
+  portfolioManagerProvisioningStates  PortfolioManagerProvisioningState[]
+  portfolioManagerSetupStates         PortfolioManagerSetupState[]
+  portfolioManagerPropertyUseInputs   PortfolioManagerPropertyUseInput[]
+  portfolioManagerMeterLinkStates     PortfolioManagerMeterLinkState[]
+  portfolioManagerUsageStates         PortfolioManagerUsageState[]
   portfolioManagerSyncStates          PortfolioManagerSyncState[]
   operationalAnomalies                OperationalAnomaly[]
   retrofitCandidates                  RetrofitCandidate[]
   financingCases                      FinancingCase[]
   financingCaseCandidates             FinancingCaseCandidate[]
   financingPackets                    FinancingPacket[]
+  penaltyRuns                         PenaltyRun[]
+  submissionWorkflows                 SubmissionWorkflow[]
+  submissionWorkflowEvents            SubmissionWorkflowEvent[]
   auditLogs                           AuditLog[]
   jobs                                Job[]
+  buildingSourceReconciliations       BuildingSourceReconciliation[]
+  meterSourceReconciliations          MeterSourceReconciliation[]
+  reportArtifacts                     ReportArtifact[]
+  utilityBillUploads                  UtilityBillUpload[]
+  utilityBillCandidates               UtilityBillCandidate[]
+  approvalRequests                    ApprovalRequest[]
 
   @@map("organizations")
 }
 
 model User {
-  id          String   @id @default(cuid())
-  clerkUserId String   @unique @map("clerk_user_id")
-  email       String   @unique
-  name        String
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id              String    @id @default(cuid())
+  authUserId      String    @unique @map("auth_user_id")
+  email           String    @unique
+  name            String
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   memberships OrganizationMembership[]
 
@@ -488,13 +756,12 @@ model User {
 }
 
 model OrganizationMembership {
-  id                String   @id @default(cuid())
-  organizationId    String   @map("organization_id")
-  userId            String   @map("user_id")
-  clerkMembershipId String?  @unique @map("clerk_membership_id")
-  role              UserRole @default(VIEWER)
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  role           UserRole @default(VIEWER)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id])
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -506,33 +773,36 @@ model OrganizationMembership {
 }
 
 model Building {
-  id                        String                @id @default(cuid())
-  organizationId            String                @map("organization_id")
-  name                      String
-  address                   String
-  latitude                  Float
-  longitude                 Float
-  grossSquareFeet           Int                   @map("gross_square_feet")
-  propertyType              PropertyType          @map("property_type")
-  ownershipType             BuildingOwnershipType @default(PRIVATE) @map("ownership_type")
-  yearBuilt                 Int?                  @map("year_built")
-  isEnergyStarScoreEligible Boolean?              @map("is_energy_star_score_eligible")
-  espmPropertyId            BigInt?               @map("espm_property_id")
-  espmShareStatus           EspmShareStatus       @default(UNLINKED) @map("espm_share_status")
-  greenButtonStatus         GreenButtonStatus     @default(NONE) @map("green_button_status")
-  dataIngestionMethod       DataIngestionMethod   @default(CSV_UPLOAD) @map("data_ingestion_method")
-  bepsTargetScore           Float                 @map("beps_target_score")
-  maxPenaltyExposure        Float                 @default(0) @map("max_penalty_exposure")
-  complianceCycle           ComplianceCycle       @default(CYCLE_1) @map("compliance_cycle")
-  selectedPathway           SelectedPathway       @default(NONE) @map("selected_pathway")
-  doeeBuildingId            String?               @map("doee_building_id")
-  baselineYear              Int?                  @map("baseline_year")
-  targetEui                 Float?                @map("target_eui")
-  ward                      Int?
-  hasFinancialDistress      Boolean               @default(false) @map("has_financial_distress")
-  occupancyRate             Float?                @map("occupancy_rate")
-  createdAt                 DateTime              @default(now()) @map("created_at")
-  updatedAt                 DateTime              @updatedAt @map("updated_at")
+  id                                String                @id @default(cuid())
+  organizationId                    String                @map("organization_id")
+  name                              String
+  address                           String
+  latitude                          Float
+  longitude                         Float
+  grossSquareFeet                   Int                   @map("gross_square_feet")
+  propertyType                      PropertyType          @map("property_type")
+  ownershipType                     BuildingOwnershipType @default(PRIVATE) @map("ownership_type")
+  yearBuilt                         Int?                  @map("year_built")
+  isEnergyStarScoreEligible         Boolean?              @map("is_energy_star_score_eligible")
+  espmPropertyId                    BigInt?               @map("espm_property_id")
+  espmShareStatus                   EspmShareStatus       @default(UNLINKED) @map("espm_share_status")
+  greenButtonStatus                 GreenButtonStatus     @default(NONE) @map("green_button_status")
+  dataIngestionMethod               DataIngestionMethod   @default(CSV_UPLOAD) @map("data_ingestion_method")
+  bepsTargetScore                   Float                 @map("beps_target_score")
+  maxPenaltyExposure                Float                 @default(0) @map("max_penalty_exposure")
+  complianceCycle                   ComplianceCycle       @default(CYCLE_1) @map("compliance_cycle")
+  selectedPathway                   SelectedPathway       @default(NONE) @map("selected_pathway")
+  doeeBuildingId                    String?               @map("doee_building_id")
+  baselineYear                      Int?                  @map("baseline_year")
+  targetEui                         Float?                @map("target_eui")
+  ward                              Int?
+  hasFinancialDistress              Boolean               @default(false) @map("has_financial_distress")
+  occupancyRate                     Float?                @map("occupancy_rate")
+  irrigatedAreaSquareFeet           Int?                  @map("irrigated_area_square_feet")
+  numberOfBuildings                 Int                   @default(1) @map("number_of_buildings")
+  plannedConstructionCompletionYear Int?                  @map("planned_construction_completion_year")
+  createdAt                         DateTime              @default(now()) @map("created_at")
+  updatedAt                         DateTime              @updatedAt @map("updated_at")
 
   organization                        Organization                         @relation(fields: [organizationId], references: [id])
   energyReadings                      EnergyReading[]
@@ -556,34 +826,75 @@ model Building {
   bepsMetricInputs                    BepsMetricInput[]
   bepsPrescriptiveItems               BepsPrescriptiveItem[]
   bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
+  propertyUses                        BuildingPropertyUse[]
+  portfolioManagerProvisioningState   PortfolioManagerProvisioningState?
+  portfolioManagerSetupState          PortfolioManagerSetupState?
+  portfolioManagerPropertyUseInputs   PortfolioManagerPropertyUseInput[]
+  portfolioManagerMeterLinkStates     PortfolioManagerMeterLinkState[]
+  portfolioManagerUsageState          PortfolioManagerUsageState?
   portfolioManagerSyncStates          PortfolioManagerSyncState[]
+  portfolioManagerRemoteProperties    PortfolioManagerRemoteProperty[]
   operationalAnomalies                OperationalAnomaly[]
   retrofitCandidates                  RetrofitCandidate[]
   financingCases                      FinancingCase[]
   financingCaseCandidates             FinancingCaseCandidate[]
   financingPackets                    FinancingPacket[]
+  penaltyRuns                         PenaltyRun[]
+  submissionWorkflows                 SubmissionWorkflow[]
+  submissionWorkflowEvents            SubmissionWorkflowEvent[]
+  sourceReconciliation                BuildingSourceReconciliation?
+  meterReconciliations                MeterSourceReconciliation[]
   auditLogs                           AuditLog[]
+  approvalRequests                    ApprovalRequest[]
   jobs                                Job[]
+  reportArtifacts                     ReportArtifact[]
+  utilityBillUploads                  UtilityBillUpload[]
+  utilityBillCandidates               UtilityBillCandidate[]
 
   @@unique([id, organizationId])
   @@index([organizationId])
   @@map("buildings")
 }
 
-model Meter {
-  id             String     @id @default(cuid())
-  buildingId     String     @map("building_id")
-  organizationId String     @map("organization_id")
-  espmMeterId    BigInt?    @map("espm_meter_id")
-  meterType      MeterType  @map("meter_type")
-  name           String
-  unit           EnergyUnit
-  isActive       Boolean    @default(true) @map("is_active")
-  createdAt      DateTime   @default(now()) @map("created_at")
+model BuildingPropertyUse {
+  id                String                  @id @default(cuid())
+  organizationId    String                  @map("organization_id")
+  buildingId        String                  @map("building_id")
+  sortOrder         Int                     @default(0) @map("sort_order")
+  useKey            BuildingPropertyUseType @map("use_key")
+  displayName       String                  @map("display_name")
+  grossSquareFeet   Int                     @map("gross_square_feet")
+  detailsJson       Json                    @default("{}") @map("details_json")
+  espmPropertyUseId BigInt?                 @map("espm_property_use_id")
+  espmUseDetailsId  BigInt?                 @map("espm_use_details_id")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
 
-  building             Building             @relation(fields: [buildingId, organizationId], references: [id, organizationId])
-  energyReadings       EnergyReading[]
-  operationalAnomalies OperationalAnomaly[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([organizationId, buildingId, sortOrder])
+  @@map("building_property_uses")
+}
+
+model Meter {
+  id                        String     @id @default(cuid())
+  buildingId                String     @map("building_id")
+  organizationId            String     @map("organization_id")
+  espmMeterId               BigInt?    @map("espm_meter_id")
+  espmMeterTypeRaw          String?    @map("espm_meter_type_raw")
+  espmMeterUnitOfMeasureRaw String?    @map("espm_meter_unit_of_measure_raw")
+  meterType                 MeterType  @map("meter_type")
+  name                      String
+  unit                      EnergyUnit
+  isActive                  Boolean    @default(true) @map("is_active")
+  createdAt                 DateTime   @default(now()) @map("created_at")
+
+  building                       Building                        @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  energyReadings                 EnergyReading[]
+  operationalAnomalies           OperationalAnomaly[]
+  portfolioManagerMeterLinkState PortfolioManagerMeterLinkState?
+  reconciliation                 MeterSourceReconciliation?
 
   @@index([buildingId])
   @@index([organizationId])
@@ -607,6 +918,9 @@ model EnergyReading {
   rawPayload      Json?        @map("raw_payload")
   ingestedAt      DateTime     @default(now()) @map("ingested_at")
   meterId         String?      @map("meter_id")
+  archivedAt      DateTime?    @map("archived_at")
+  archivedReason  String?      @map("archived_reason")
+  archivedByOperationalJobId String? @map("archived_by_operational_job_id")
 
   building Building @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
   meter    Meter?   @relation(fields: [meterId], references: [id])
@@ -614,7 +928,74 @@ model EnergyReading {
   @@index([buildingId, periodStart(sort: Desc)])
   @@index([buildingId, source, ingestedAt(sort: Desc)])
   @@index([organizationId, buildingId])
+  @@index([organizationId, buildingId, meterId, periodEnd(sort: Desc), ingestedAt(sort: Desc)])
+  @@index([organizationId, buildingId, meterId, archivedAt, periodEnd(sort: Desc), ingestedAt(sort: Desc)])
   @@map("energy_readings")
+}
+
+model UtilityBillUpload {
+  id                 String                       @id @default(cuid())
+  organizationId     String                       @map("organization_id")
+  buildingId         String                       @map("building_id")
+  sourceArtifactId   String?                      @unique @map("source_artifact_id")
+  status             UtilityBillUploadStatus      @default(QUEUED)
+  extractionMethod   UtilityBillExtractionMethod? @map("extraction_method")
+  originalFileName   String                       @map("original_file_name")
+  mimeType           String                       @map("mime_type")
+  fileSizeBytes      Int                          @map("file_size_bytes")
+  storageBucket      String                       @map("storage_bucket")
+  storagePath        String                       @map("storage_path")
+  rawText            String?                      @map("raw_text") @db.Text
+  rawOcrJson         Json                         @default("{}") @map("raw_ocr_json")
+  rawHeuristicJson   Json                         @default("{}") @map("raw_heuristic_json")
+  rawGeminiJson      Json                         @default("{}") @map("raw_gemini_json")
+  latestErrorCode    String?                      @map("latest_error_code")
+  latestErrorMessage String?                      @map("latest_error_message") @db.Text
+  attemptCount       Int                          @default(0) @map("attempt_count")
+  processedAt        DateTime?                    @map("processed_at")
+  confirmedAt        DateTime?                    @map("confirmed_at")
+  createdByType      ActorType                    @map("created_by_type")
+  createdById        String?                      @map("created_by_id")
+  createdAt          DateTime                     @default(now()) @map("created_at")
+  updatedAt          DateTime                     @updatedAt @map("updated_at")
+
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building       Building               @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  sourceArtifact SourceArtifact?        @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  candidates     UtilityBillCandidate[]
+
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@index([organizationId, buildingId, status, updatedAt(sort: Desc)])
+  @@map("utility_bill_uploads")
+}
+
+model UtilityBillCandidate {
+  id                 String                      @id @default(cuid())
+  uploadId           String                      @map("upload_id")
+  organizationId     String                      @map("organization_id")
+  buildingId         String                      @map("building_id")
+  utilityType        UtilityBillUtilityType      @map("utility_type")
+  unit               EnergyUnit
+  periodStart        DateTime                    @map("period_start")
+  periodEnd          DateTime                    @map("period_end")
+  consumption        Float
+  confidence         Float?
+  extractionMethod   UtilityBillExtractionMethod @map("extraction_method")
+  sourcePage         Int?                        @map("source_page")
+  sourceSnippet      String?                     @map("source_snippet") @db.Text
+  rawResultJson      Json                        @default("{}") @map("raw_result_json")
+  status             UtilityBillCandidateStatus  @default(PENDING_REVIEW)
+  confirmedReadingId String?                     @map("confirmed_reading_id")
+  createdAt          DateTime                    @default(now()) @map("created_at")
+  updatedAt          DateTime                    @updatedAt @map("updated_at")
+
+  upload       UtilityBillUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building          @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([uploadId, status, createdAt(sort: Asc)])
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@map("utility_bill_candidates")
 }
 
 model ComplianceSnapshot {
@@ -651,18 +1032,30 @@ model ComplianceSnapshot {
 }
 
 model GreenButtonConnection {
-  id             String            @id @default(cuid())
-  buildingId     String            @unique @map("building_id")
-  organizationId String            @map("organization_id")
-  status         GreenButtonStatus @default(PENDING_AUTH)
-  // TODO: Encrypt access and refresh tokens at rest before reaching production
-  accessToken    String            @map("access_token")
-  refreshToken   String            @map("refresh_token")
-  resourceUri    String?           @map("resource_uri")
-  subscriptionId String?           @map("subscription_id")
-  tokenExpiresAt DateTime?         @map("token_expires_at")
-  connectedAt    DateTime          @default(now()) @map("connected_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
+  id                        String                   @id @default(cuid())
+  buildingId                String                   @unique @map("building_id")
+  organizationId            String                   @map("organization_id")
+  status                    GreenButtonStatus        @default(PENDING_AUTH)
+  runtimeStatus             IntegrationRuntimeStatus @default(IDLE) @map("runtime_status")
+  lastWebhookReceivedAt     DateTime?                @map("last_webhook_received_at")
+  lastAttemptedIngestionAt  DateTime?                @map("last_attempted_ingestion_at")
+  lastSuccessfulIngestionAt DateTime?                @map("last_successful_ingestion_at")
+  lastFailedIngestionAt     DateTime?                @map("last_failed_ingestion_at")
+  latestErrorCode           String?                  @map("latest_error_code")
+  latestErrorMessage        String?                  @map("latest_error_message") @db.Text
+  attemptCount              Int                      @default(0) @map("attempt_count")
+  retryCount                Int                      @default(0) @map("retry_count")
+  latestJobId               String?                  @map("latest_job_id")
+  accessToken               String?                  @map("access_token")
+  refreshToken              String?                  @map("refresh_token")
+  accessTokenEncrypted      String?                  @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted     String?                  @map("refresh_token_encrypted") @db.Text
+  tokenEncryptionVersion    Int?                     @map("token_encryption_version")
+  resourceUri               String?                  @map("resource_uri")
+  subscriptionId            String?                  @map("subscription_id")
+  tokenExpiresAt            DateTime?                @map("token_expires_at")
+  connectedAt               DateTime                 @default(now()) @map("connected_at")
+  updatedAt                 DateTime                 @updatedAt @map("updated_at")
 
   building Building @relation(fields: [buildingId, organizationId], references: [id, organizationId])
 
@@ -724,6 +1117,122 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model ApprovalRequest {
+  id                    String                @id @default(cuid())
+  organizationId        String                @map("organization_id")
+  buildingId            String?               @map("building_id")
+  requestType           ApprovalRequestType   @map("request_type")
+  status                ApprovalRequestStatus @default(PENDING)
+  title                 String
+  summary               String                @db.Text
+  payload               Json                  @default("{}")
+  requestId             String?               @map("request_id")
+  requestedByType       ActorType             @map("requested_by_type")
+  requestedById         String?               @map("requested_by_id")
+  reviewedByType        ActorType?            @map("reviewed_by_type")
+  reviewedById          String?               @map("reviewed_by_id")
+  requestedAt           DateTime              @default(now()) @map("requested_at")
+  reviewedAt            DateTime?             @map("reviewed_at")
+  reviewNotes           String?               @map("review_notes") @db.Text
+  executionErrorCode    String?               @map("execution_error_code")
+  executionErrorMessage String?               @map("execution_error_message") @db.Text
+  executedAt            DateTime?             @map("executed_at")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building?    @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([organizationId, status, requestedAt(sort: Desc)])
+  @@index([buildingId, status, requestedAt(sort: Desc)])
+  @@index([organizationId, requestType, status, requestedAt(sort: Desc)])
+  @@map("approval_requests")
+}
+
+model ReportArtifact {
+  id                 String                      @id @default(cuid())
+  organizationId     String                      @map("organization_id")
+  buildingId         String                      @map("building_id")
+  reportType         GovernedReportType          @map("report_type")
+  version            Int
+  status             ReportArtifactStatus        @default(GENERATED)
+  reportHash         String                      @map("report_hash")
+  sourceSummaryHash  String                      @map("source_summary_hash")
+  sourceLineage      Json                        @default("{}") @map("source_lineage")
+  payload            Json
+  generatedAt        DateTime                    @default(now()) @map("generated_at")
+  latestExportedAt   DateTime?                   @map("latest_exported_at")
+  latestExportFormat ReportArtifactExportFormat? @map("latest_export_format")
+  createdByType      ActorType                   @map("created_by_type")
+  createdById        String?                     @map("created_by_id")
+  createdAt          DateTime                    @default(now()) @map("created_at")
+  updatedAt          DateTime                    @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([buildingId, reportType, version])
+  @@index([organizationId, buildingId, reportType, generatedAt(sort: Desc)])
+  @@index([organizationId, reportType, generatedAt(sort: Desc)])
+  @@map("report_artifacts")
+}
+
+model BuildingSourceReconciliation {
+  id                String                     @id @default(cuid())
+  organizationId    String                     @map("organization_id")
+  buildingId        String                     @unique @map("building_id")
+  status            SourceReconciliationStatus
+  canonicalSource   CanonicalSourceSystem?     @map("canonical_source")
+  referenceYear     Int?                       @map("reference_year")
+  conflictCount     Int                        @default(0) @map("conflict_count")
+  incompleteCount   Int                        @default(0) @map("incomplete_count")
+  sourceRecordsJson Json                       @default("[]") @map("source_records_json")
+  conflictsJson     Json                       @default("[]") @map("conflicts_json")
+  chosenValuesJson  Json                       @default("{}") @map("chosen_values_json")
+  lastReconciledAt  DateTime                   @default(now()) @map("last_reconciled_at")
+  reconciledByType  ActorType                  @map("reconciled_by_type")
+  reconciledById    String?                    @map("reconciled_by_id")
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+
+  organization Organization                @relation(fields: [organizationId], references: [id])
+  building     Building                    @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  meters       MeterSourceReconciliation[]
+
+  @@unique([buildingId, organizationId])
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@index([buildingId, updatedAt(sort: Desc)])
+  @@map("building_source_reconciliations")
+}
+
+model MeterSourceReconciliation {
+  id                             String                     @id @default(cuid())
+  organizationId                 String                     @map("organization_id")
+  buildingId                     String                     @map("building_id")
+  meterId                        String                     @unique @map("meter_id")
+  buildingSourceReconciliationId String                     @map("building_source_reconciliation_id")
+  status                         SourceReconciliationStatus
+  canonicalSource                CanonicalSourceSystem?     @map("canonical_source")
+  conflictCount                  Int                        @default(0) @map("conflict_count")
+  sourceRecordsJson              Json                       @default("[]") @map("source_records_json")
+  conflictsJson                  Json                       @default("[]") @map("conflicts_json")
+  chosenValuesJson               Json                       @default("{}") @map("chosen_values_json")
+  lastReconciledAt               DateTime                   @default(now()) @map("last_reconciled_at")
+  reconciledByType               ActorType                  @map("reconciled_by_type")
+  reconciledById                 String?                    @map("reconciled_by_id")
+  createdAt                      DateTime                   @default(now()) @map("created_at")
+  updatedAt                      DateTime                   @updatedAt @map("updated_at")
+
+  organization                 Organization                 @relation(fields: [organizationId], references: [id])
+  building                     Building                     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  meter                        Meter                        @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  buildingSourceReconciliation BuildingSourceReconciliation @relation(fields: [buildingSourceReconciliationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, buildingId, status, updatedAt(sort: Desc)])
+  @@index([buildingSourceReconciliationId])
+  @@map("meter_source_reconciliations")
+}
+
 model Job {
   id             String    @id @default(cuid())
   type           String
@@ -743,6 +1252,8 @@ model Job {
   @@index([organizationId, status, createdAt(sort: Desc)])
   @@index([buildingId, status, createdAt(sort: Desc)])
   @@index([type, status, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([status, startedAt(sort: Desc)])
   @@map("jobs")
 }
 
@@ -799,11 +1310,13 @@ model RuleVersion {
   configJson        Json          @default("{}") @map("config_json")
   createdAt         DateTime      @default(now()) @map("created_at")
 
-  rulePackage          RulePackage           @relation(fields: [rulePackageId], references: [id], onDelete: Cascade)
-  sourceArtifact       SourceArtifact?       @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  rulePackage          RulePackage              @relation(fields: [rulePackageId], references: [id], onDelete: Cascade)
+  sourceArtifact       SourceArtifact?          @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
   complianceRuns       ComplianceRun[]
   calculationManifests CalculationManifest[]
   benchmarkSubmissions BenchmarkSubmission[]
+  penaltyRuns          PenaltyRun[]
+  publicationRuns      GovernedPublicationRun[]
 
   @@unique([rulePackageId, version])
   @@index([rulePackageId, status, effectiveFrom(sort: Desc)])
@@ -822,11 +1335,13 @@ model FactorSetVersion {
   factorsJson      Json          @default("{}") @map("factors_json")
   createdAt        DateTime      @default(now()) @map("created_at")
 
-  sourceArtifact       SourceArtifact?       @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  sourceArtifact       SourceArtifact?          @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
   complianceRuns       ComplianceRun[]
   calculationManifests CalculationManifest[]
   benchmarkSubmissions BenchmarkSubmission[]
   bepsCycles           BepsCycleRegistry[]
+  penaltyRuns          PenaltyRun[]
+  publicationRuns      GovernedPublicationRun[]
 
   @@unique([key, version])
   @@index([key, status, effectiveFrom(sort: Desc)])
@@ -853,6 +1368,38 @@ model BepsCycleRegistry {
   @@index([rulePackageId])
   @@index([factorSetVersionId])
   @@map("beps_cycle_registries")
+}
+
+model GovernedPublicationRun {
+  id                 String                       @id @default(cuid())
+  publicationKind    GovernedPublicationKind      @map("publication_kind")
+  targetKey          String                       @map("target_key")
+  scopeKey           String                       @map("scope_key")
+  ruleVersionId      String?                      @map("rule_version_id")
+  factorSetVersionId String?                      @map("factor_set_version_id")
+  fixtureSetKey      String                       @map("fixture_set_key")
+  status             GovernedPublicationRunStatus @default(PENDING)
+  summaryPayload     Json                         @default("{}") @map("summary_payload")
+  resultsPayload     Json                         @default("[]") @map("results_payload")
+  validatedAt        DateTime?                    @map("validated_at")
+  publishedAt        DateTime?                    @map("published_at")
+  createdByType      ActorType                    @map("created_by_type")
+  createdById        String?                      @map("created_by_id")
+  supersededByRunId  String?                      @map("superseded_by_run_id")
+  createdAt          DateTime                     @default(now()) @map("created_at")
+  updatedAt          DateTime                     @updatedAt @map("updated_at")
+
+  ruleVersion      RuleVersion?             @relation(fields: [ruleVersionId], references: [id], onDelete: SetNull)
+  factorSetVersion FactorSetVersion?        @relation(fields: [factorSetVersionId], references: [id], onDelete: SetNull)
+  supersededByRun  GovernedPublicationRun?  @relation("GovernedPublicationSupersession", fields: [supersededByRunId], references: [id], onDelete: SetNull)
+  supersededRuns   GovernedPublicationRun[] @relation("GovernedPublicationSupersession")
+
+  @@index([publicationKind, targetKey, createdAt(sort: Desc)])
+  @@index([scopeKey, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([ruleVersionId, createdAt(sort: Desc)])
+  @@index([factorSetVersionId, createdAt(sort: Desc)])
+  @@map("governed_publication_runs")
 }
 
 model ComplianceRun {
@@ -882,6 +1429,7 @@ model ComplianceRun {
   evidenceArtifacts    EvidenceArtifact[]
   benchmarkSubmissions BenchmarkSubmission[]
   filingRecords        FilingRecord[]
+  penaltyRuns          PenaltyRun[]
 
   @@index([organizationId, buildingId, executedAt(sort: Desc)])
   @@index([ruleVersionId, executedAt(sort: Desc)])
@@ -935,6 +1483,7 @@ model SourceArtifact {
   bepsPrescriptiveItems               BepsPrescriptiveItem[]
   bepsAlternativeComplianceAgreements BepsAlternativeComplianceAgreement[]
   retrofitCandidates                  RetrofitCandidate[]
+  utilityBillUploads                  UtilityBillUpload[]
 
   @@index([organizationId, buildingId, createdAt(sort: Desc)])
   @@map("source_artifacts")
@@ -1000,6 +1549,7 @@ model BenchmarkSubmission {
 
   @@unique([buildingId, reportingYear])
   @@index([organizationId, reportingYear])
+  @@index([organizationId, buildingId, reportingYear(sort: Desc), updatedAt(sort: Desc)])
   @@map("benchmark_submissions")
 }
 
@@ -1032,6 +1582,7 @@ model FilingRecord {
 
   @@unique([buildingId, filingType, filingYear, complianceCycle])
   @@index([organizationId, buildingId, filingType, createdAt(sort: Desc)])
+  @@index([organizationId, buildingId, filingType, filingYear(sort: Desc), updatedAt(sort: Desc)])
   @@map("filing_records")
 }
 
@@ -1080,9 +1631,10 @@ model FilingPacket {
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
-  filingRecord FilingRecord @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  building           Building            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  filingRecord       FilingRecord        @relation(fields: [filingRecordId], references: [id], onDelete: Cascade)
+  submissionWorkflow SubmissionWorkflow? @relation("FilingPacketSubmissionWorkflow")
 
   @@unique([filingRecordId, packetType, version])
   @@index([organizationId, buildingId, packetType, generatedAt(sort: Desc)])
@@ -1178,11 +1730,67 @@ model BenchmarkPacket {
   organization        Organization        @relation(fields: [organizationId], references: [id])
   building            Building            @relation(fields: [buildingId, organizationId], references: [id, organizationId])
   benchmarkSubmission BenchmarkSubmission @relation(fields: [benchmarkSubmissionId], references: [id], onDelete: Cascade)
+  submissionWorkflow  SubmissionWorkflow? @relation("BenchmarkPacketSubmissionWorkflow")
 
   @@unique([benchmarkSubmissionId, version])
   @@index([organizationId, buildingId, reportingYear, generatedAt(sort: Desc)])
   @@index([benchmarkSubmissionId, generatedAt(sort: Desc)])
   @@map("benchmark_packets")
+}
+
+model SubmissionWorkflow {
+  id                 String                  @id @default(cuid())
+  organizationId     String                  @map("organization_id")
+  buildingId         String                  @map("building_id")
+  workflowType       SubmissionWorkflowType  @map("workflow_type")
+  state              SubmissionWorkflowState
+  benchmarkPacketId  String?                 @unique @map("benchmark_packet_id")
+  filingPacketId     String?                 @unique @map("filing_packet_id")
+  latestTransitionAt DateTime                @default(now()) @map("latest_transition_at")
+  readyForReviewAt   DateTime?               @map("ready_for_review_at")
+  approvedAt         DateTime?               @map("approved_at")
+  submittedAt        DateTime?               @map("submitted_at")
+  completedAt        DateTime?               @map("completed_at")
+  needsCorrectionAt  DateTime?               @map("needs_correction_at")
+  supersededAt       DateTime?               @map("superseded_at")
+  supersededById     String?                 @map("superseded_by_id")
+  createdByType      ActorType               @map("created_by_type")
+  createdById        String?                 @map("created_by_id")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building        Building                  @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  benchmarkPacket BenchmarkPacket?          @relation("BenchmarkPacketSubmissionWorkflow", fields: [benchmarkPacketId], references: [id], onDelete: SetNull)
+  filingPacket    FilingPacket?             @relation("FilingPacketSubmissionWorkflow", fields: [filingPacketId], references: [id], onDelete: SetNull)
+  supersededBy    SubmissionWorkflow?       @relation("SubmissionWorkflowSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes      SubmissionWorkflow[]      @relation("SubmissionWorkflowSupersession")
+  events          SubmissionWorkflowEvent[]
+
+  @@index([organizationId, buildingId, workflowType, latestTransitionAt(sort: Desc)])
+  @@index([organizationId, workflowType, state, latestTransitionAt(sort: Desc)])
+  @@map("submission_workflows")
+}
+
+model SubmissionWorkflowEvent {
+  id             String                   @id @default(cuid())
+  organizationId String                   @map("organization_id")
+  buildingId     String                   @map("building_id")
+  workflowId     String                   @map("workflow_id")
+  fromState      SubmissionWorkflowState? @map("from_state")
+  toState        SubmissionWorkflowState  @map("to_state")
+  notes          String?                  @db.Text
+  createdByType  ActorType                @map("created_by_type")
+  createdById    String?                  @map("created_by_id")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building           @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  workflow     SubmissionWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId, createdAt(sort: Desc)])
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@map("submission_workflow_events")
 }
 
 model VerificationItemResult {
@@ -1232,6 +1840,35 @@ model DataIssue {
   @@index([organizationId, buildingId, status, severity, detectedAt(sort: Desc)])
   @@index([buildingId, status, detectedAt(sort: Desc)])
   @@map("data_issues")
+}
+
+model PenaltyRun {
+  id                     String                 @id @default(cuid())
+  organizationId         String                 @map("organization_id")
+  buildingId             String                 @map("building_id")
+  complianceRunId        String?                @map("compliance_run_id")
+  ruleVersionId          String?                @map("rule_version_id")
+  factorSetVersionId     String?                @map("factor_set_version_id")
+  calculationMode        PenaltyCalculationMode @map("calculation_mode")
+  inputSnapshotRef       String?                @map("input_snapshot_ref")
+  inputSnapshotHash      String                 @map("input_snapshot_hash")
+  implementationKey      String                 @map("implementation_key")
+  baselineResultPayload  Json                   @default("{}") @map("baseline_result_payload")
+  scenarioResultsPayload Json                   @default("[]") @map("scenario_results_payload")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  building         Building          @relation(fields: [buildingId, organizationId], references: [id, organizationId])
+  complianceRun    ComplianceRun?    @relation(fields: [complianceRunId], references: [id], onDelete: SetNull)
+  ruleVersion      RuleVersion?      @relation(fields: [ruleVersionId], references: [id], onDelete: SetNull)
+  factorSetVersion FactorSetVersion? @relation(fields: [factorSetVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([buildingId, calculationMode, inputSnapshotHash])
+  @@index([organizationId, buildingId, createdAt(sort: Desc)])
+  @@index([organizationId, buildingId, calculationMode, createdAt(sort: Desc)])
+  @@index([complianceRunId, createdAt(sort: Desc)])
+  @@map("penalty_runs")
 }
 
 model BepsMetricInput {
@@ -1335,6 +1972,12 @@ model PortfolioManagerSyncState {
   status               PortfolioManagerSyncStatus @default(IDLE)
   lastAttemptedSyncAt  DateTime?                  @map("last_attempted_sync_at")
   lastSuccessfulSyncAt DateTime?                  @map("last_successful_sync_at")
+  lastFailedSyncAt     DateTime?                  @map("last_failed_sync_at")
+  attemptCount         Int                        @default(0) @map("attempt_count")
+  retryCount           Int                        @default(0) @map("retry_count")
+  latestJobId          String?                    @map("latest_job_id")
+  latestErrorCode      String?                    @map("latest_error_code")
+  latestErrorMessage   String?                    @map("latest_error_message") @db.Text
   lastErrorMetadata    Json                       @default("{}") @map("last_error_metadata")
   sourceMetadata       Json                       @default("{}") @map("source_metadata")
   syncMetadata         Json                       @default("{}") @map("sync_metadata")
@@ -1349,34 +1992,295 @@ model PortfolioManagerSyncState {
   @@map("portfolio_manager_sync_states")
 }
 
+model PortfolioManagerManagement {
+  id                          String                           @id @default(cuid())
+  organizationId              String                           @unique @map("organization_id")
+  managementMode              PortfolioManagerManagementMode   @map("management_mode")
+  status                      PortfolioManagerManagementStatus @default(NOT_STARTED)
+  providerCustomerId          BigInt?                          @map("provider_customer_id")
+  connectedAccountId          BigInt?                          @map("connected_account_id")
+  connectedUsername           String?                          @map("connected_username")
+  targetUsername              String?                          @map("target_username")
+  usernameEncrypted           String?                          @map("username_encrypted") @db.Text
+  passwordEncrypted           String?                          @map("password_encrypted") @db.Text
+  credentialEncryptionVersion Int?                             @map("credential_encryption_version")
+  lastValidatedAt             DateTime?                        @map("last_validated_at")
+  lastConnectionCheckedAt     DateTime?                        @map("last_connection_checked_at")
+  lastConnectionAcceptedAt    DateTime?                        @map("last_connection_accepted_at")
+  lastShareAcceptedAt         DateTime?                        @map("last_share_accepted_at")
+  propertyCacheJson           Json                             @default("{}") @map("property_cache_json")
+  propertyCacheRefreshedAt    DateTime?                        @map("property_cache_refreshed_at")
+  lifecycleMetadataJson       Json                             @default("{}") @map("lifecycle_metadata_json")
+  latestJobId                 String?                          @map("latest_job_id")
+  latestErrorCode             String?                          @map("latest_error_code")
+  latestErrorMessage          String?                          @map("latest_error_message") @db.Text
+  createdAt                   DateTime                         @default(now()) @map("created_at")
+  updatedAt                   DateTime                         @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([managementMode, status, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_management")
+}
+
+model PortfolioManagerRemoteProperty {
+  id                 String    @id @default(cuid())
+  organizationId     String    @map("organization_id")
+  linkedBuildingId   String?   @map("linked_building_id")
+  remoteAccountId    BigInt?   @map("remote_account_id")
+  propertyId         BigInt    @map("property_id")
+  shareStatus        String?   @map("share_status")
+  localSuppressedAt  DateTime? @map("local_suppressed_at")
+  localSuppressedByType ActorType? @map("local_suppressed_by_type")
+  localSuppressedById String?  @map("local_suppressed_by_id")
+  name               String?   @db.Text
+  address            String?   @db.Text
+  primaryFunction    String?   @map("primary_function")
+  grossSquareFeet    Int?      @map("gross_square_feet")
+  yearBuilt          Int?      @map("year_built")
+  propertyUsesJson   Json      @default("[]") @map("property_uses_json")
+  usageSummaryJson   Json      @default("{}") @map("usage_summary_json")
+  latestMetricsJson  Json      @default("{}") @map("latest_metrics_json")
+  rawPayloadJson     Json      @default("{}") @map("raw_payload_json")
+  lastAcceptedAt     DateTime? @map("last_accepted_at")
+  lastSyncedAt       DateTime? @map("last_synced_at")
+  latestErrorCode    String?   @map("latest_error_code")
+  latestErrorMessage String?   @map("latest_error_message") @db.Text
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  organization   Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  linkedBuilding Building?                     @relation(fields: [linkedBuildingId, organizationId], references: [id, organizationId], onDelete: NoAction)
+  remoteMeters   PortfolioManagerRemoteMeter[]
+
+  @@unique([organizationId, propertyId])
+  @@index([organizationId, linkedBuildingId, updatedAt(sort: Desc)])
+  @@index([organizationId, localSuppressedAt, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_remote_properties")
+}
+
+model PortfolioManagerRemoteMeter {
+  id                 String    @id @default(cuid())
+  organizationId     String    @map("organization_id")
+  remotePropertyId   String    @map("remote_property_id")
+  meterId            BigInt    @map("meter_id")
+  shareStatus        String?   @map("share_status")
+  name               String?   @db.Text
+  meterType          String?   @map("meter_type")
+  unit               String?   @map("unit")
+  inUse              Boolean   @default(true) @map("in_use")
+  isAssociated       Boolean   @default(false) @map("is_associated")
+  usageSummaryJson   Json      @default("{}") @map("usage_summary_json")
+  rawPayloadJson     Json      @default("{}") @map("raw_payload_json")
+  lastAcceptedAt     DateTime? @map("last_accepted_at")
+  lastSyncedAt       DateTime? @map("last_synced_at")
+  latestErrorCode    String?   @map("latest_error_code")
+  latestErrorMessage String?   @map("latest_error_message") @db.Text
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  organization   Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  remoteProperty PortfolioManagerRemoteProperty @relation(fields: [remotePropertyId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, meterId])
+  @@index([remotePropertyId, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_remote_meters")
+}
+
+model PortfolioManagerImportState {
+  id                      String                       @id @default(cuid())
+  organizationId          String                       @unique @map("organization_id")
+  status                  PortfolioManagerImportStatus @default(NOT_STARTED)
+  latestJobId             String?                      @map("latest_job_id")
+  selectedPropertyIdsJson Json                         @default("[]") @map("selected_property_ids_json")
+  resultSummaryJson       Json                         @default("{}") @map("result_summary_json")
+  selectedCount           Int                          @default(0) @map("selected_count")
+  importedCount           Int                          @default(0) @map("imported_count")
+  skippedCount            Int                          @default(0) @map("skipped_count")
+  failedCount             Int                          @default(0) @map("failed_count")
+  latestErrorCode         String?                      @map("latest_error_code")
+  latestErrorMessage      String?                      @map("latest_error_message") @db.Text
+  lastAttemptedAt         DateTime?                    @map("last_attempted_at")
+  lastSucceededAt         DateTime?                    @map("last_succeeded_at")
+  lastFailedAt            DateTime?                    @map("last_failed_at")
+  createdAt               DateTime                     @default(now()) @map("created_at")
+  updatedAt               DateTime                     @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([status, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_import_states")
+}
+
+model PortfolioManagerProvisioningState {
+  id                 String                             @id @default(cuid())
+  organizationId     String                             @map("organization_id")
+  buildingId         String                             @unique @map("building_id")
+  status             PortfolioManagerProvisioningStatus @default(NOT_STARTED)
+  espmPropertyId     BigInt?                            @map("espm_property_id")
+  latestJobId        String?                            @map("latest_job_id")
+  attemptCount       Int                                @default(0) @map("attempt_count")
+  retryCount         Int                                @default(0) @map("retry_count")
+  latestErrorCode    String?                            @map("latest_error_code")
+  latestErrorMessage String?                            @map("latest_error_message") @db.Text
+  lastAttemptedAt    DateTime?                          @map("last_attempted_at")
+  lastSucceededAt    DateTime?                          @map("last_succeeded_at")
+  lastFailedAt       DateTime?                          @map("last_failed_at")
+  createdAt          DateTime                           @default(now()) @map("created_at")
+  updatedAt          DateTime                           @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([buildingId, organizationId])
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_provisioning_states")
+}
+
+model PortfolioManagerSetupState {
+  id                    String                               @id @default(cuid())
+  organizationId        String                               @map("organization_id")
+  buildingId            String                               @unique @map("building_id")
+  status                PortfolioManagerSetupStatus          @default(NOT_STARTED)
+  propertyUsesStatus    PortfolioManagerSetupComponentStatus @default(NOT_STARTED) @map("property_uses_status")
+  metersStatus          PortfolioManagerSetupComponentStatus @default(NOT_STARTED) @map("meters_status")
+  associationsStatus    PortfolioManagerSetupComponentStatus @default(NOT_STARTED) @map("associations_status")
+  usageCoverageStatus   PortfolioManagerSetupComponentStatus @default(NOT_STARTED) @map("usage_coverage_status")
+  latestJobId           String?                              @map("latest_job_id")
+  attemptCount          Int                                  @default(0) @map("attempt_count")
+  latestErrorCode       String?                              @map("latest_error_code")
+  latestErrorMessage    String?                              @map("latest_error_message") @db.Text
+  missingInputCodesJson Json                                 @default("[]") @map("missing_input_codes_json")
+  lastAppliedAt         DateTime?                            @map("last_applied_at")
+  lastAttemptedAt       DateTime?                            @map("last_attempted_at")
+  lastFailedAt          DateTime?                            @map("last_failed_at")
+  createdAt             DateTime                             @default(now()) @map("created_at")
+  updatedAt             DateTime                             @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([buildingId, organizationId])
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_setup_states")
+}
+
+model PortfolioManagerPropertyUseInput {
+  id                    String                          @id @default(cuid())
+  organizationId        String                          @map("organization_id")
+  buildingId            String                          @map("building_id")
+  sortOrder             Int                             @default(0) @map("sort_order")
+  useType               PortfolioManagerPropertyUseType @map("use_type")
+  displayName           String                          @map("display_name")
+  grossSquareFeet       Int                             @map("gross_square_feet")
+  weeklyOperatingHours  Float?                          @map("weekly_operating_hours")
+  workersOnMainShift    Int?                            @map("workers_on_main_shift")
+  numberOfComputers     Int?                            @map("number_of_computers")
+  totalResidentialUnits Int?                            @map("total_residential_units")
+  totalBedrooms         Int?                            @map("total_bedrooms")
+  espmPropertyUseId     BigInt?                         @map("espm_property_use_id")
+  espmUseDetailsId      BigInt?                         @map("espm_use_details_id")
+  createdAt             DateTime                        @default(now()) @map("created_at")
+  updatedAt             DateTime                        @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([organizationId, buildingId, sortOrder])
+  @@map("portfolio_manager_property_use_inputs")
+}
+
+model PortfolioManagerMeterLinkState {
+  id                       String                               @id @default(cuid())
+  organizationId           String                               @map("organization_id")
+  buildingId               String                               @map("building_id")
+  meterId                  String                               @unique @map("meter_id")
+  strategy                 PortfolioManagerMeterLinkStrategy    @map("strategy")
+  selectedRemoteMeterId    BigInt?                              @map("selected_remote_meter_id")
+  meterStatus              PortfolioManagerSetupComponentStatus @default(NOT_STARTED) @map("meter_status")
+  associationStatus        PortfolioManagerSetupComponentStatus @default(NOT_STARTED) @map("association_status")
+  latestJobId              String?                              @map("latest_job_id")
+  latestErrorCode          String?                              @map("latest_error_code")
+  latestErrorMessage       String?                              @map("latest_error_message") @db.Text
+  lastMeterAppliedAt       DateTime?                            @map("last_meter_applied_at")
+  lastAssociationAppliedAt DateTime?                            @map("last_association_applied_at")
+  lastFailedAt             DateTime?                            @map("last_failed_at")
+  createdAt                DateTime                             @default(now()) @map("created_at")
+  updatedAt                DateTime                             @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  meter        Meter        @relation(fields: [meterId], references: [id], onDelete: Cascade)
+
+  @@unique([buildingId, meterId])
+  @@index([organizationId, buildingId, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_meter_link_states")
+}
+
+model PortfolioManagerUsageState {
+  id                     String                          @id @default(cuid())
+  organizationId         String                          @map("organization_id")
+  buildingId             String                          @unique @map("building_id")
+  overallStatus          PortfolioManagerUsageStatus     @default(NOT_STARTED) @map("overall_status")
+  usageStatus            PortfolioManagerUsageStatus     @default(NOT_STARTED) @map("usage_status")
+  metricsStatus          PortfolioManagerMetricsStatus   @default(NOT_STARTED) @map("metrics_status")
+  coverageStatus         PortfolioManagerCoverageStatus  @default(NOT_STARTED) @map("coverage_status")
+  lastRunDirection       PortfolioManagerUsageDirection? @map("last_run_direction")
+  reportingYear          Int?                            @map("reporting_year")
+  latestJobId            String?                         @map("latest_job_id")
+  attemptCount           Int                             @default(0) @map("attempt_count")
+  latestErrorCode        String?                         @map("latest_error_code")
+  latestErrorMessage     String?                         @map("latest_error_message") @db.Text
+  lastUsageResultJson    Json                            @default("{}") @map("last_usage_result_json")
+  coverageSummaryJson    Json                            @default("{}") @map("coverage_summary_json")
+  latestMetricsJson      Json                            @default("{}") @map("latest_metrics_json")
+  lastUsageAppliedAt     DateTime?                       @map("last_usage_applied_at")
+  lastMetricsRefreshedAt DateTime?                       @map("last_metrics_refreshed_at")
+  lastAttemptedAt        DateTime?                       @map("last_attempted_at")
+  lastFailedAt           DateTime?                       @map("last_failed_at")
+  createdAt              DateTime                        @default(now()) @map("created_at")
+  updatedAt              DateTime                        @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([buildingId, organizationId])
+  @@index([organizationId, overallStatus, updatedAt(sort: Desc)])
+  @@map("portfolio_manager_usage_states")
+}
+
 model OperationalAnomaly {
-  id                        String                   @id @default(cuid())
-  organizationId            String                   @map("organization_id")
-  buildingId                String                   @map("building_id")
-  meterId                   String?                  @map("meter_id")
-  anomalyType               OperationalAnomalyType   @map("anomaly_type")
+  id                        String                                @id @default(cuid())
+  organizationId            String                                @map("organization_id")
+  buildingId                String                                @map("building_id")
+  meterId                   String?                               @map("meter_id")
+  anomalyType               OperationalAnomalyType                @map("anomaly_type")
   severity                  AlertSeverity
-  status                    OperationalAnomalyStatus @default(ACTIVE)
-  detectionHash             String                   @map("detection_hash")
+  status                    OperationalAnomalyStatus              @default(ACTIVE)
+  confidenceBand            OperationalAnomalyConfidenceBand      @default(MEDIUM) @map("confidence_band")
+  confidenceScore           Float?                                @map("confidence_score")
+  detectionHash             String                                @map("detection_hash")
   title                     String
-  summary                   String                   @db.Text
-  detectionWindowStart      DateTime                 @map("detection_window_start")
-  detectionWindowEnd        DateTime                 @map("detection_window_end")
-  comparisonWindowStart     DateTime?                @map("comparison_window_start")
-  comparisonWindowEnd       DateTime?                @map("comparison_window_end")
-  basisJson                 Json                     @default("{}") @map("basis_json")
-  reasonCodesJson           Json                     @default("[]") @map("reason_codes_json")
-  estimatedEnergyImpactKbtu Float?                   @map("estimated_energy_impact_kbtu")
-  attributionJson           Json                     @default("{}") @map("attribution_json")
-  metadata                  Json                     @default("{}")
-  acknowledgedAt            DateTime?                @map("acknowledged_at")
-  acknowledgedByType        ActorType?               @map("acknowledged_by_type")
-  acknowledgedById          String?                  @map("acknowledged_by_id")
-  dismissedAt               DateTime?                @map("dismissed_at")
-  dismissedByType           ActorType?               @map("dismissed_by_type")
-  dismissedById             String?                  @map("dismissed_by_id")
-  createdAt                 DateTime                 @default(now()) @map("created_at")
-  updatedAt                 DateTime                 @updatedAt @map("updated_at")
+  summary                   String                                @db.Text
+  detectionWindowStart      DateTime                              @map("detection_window_start")
+  detectionWindowEnd        DateTime                              @map("detection_window_end")
+  comparisonWindowStart     DateTime?                             @map("comparison_window_start")
+  comparisonWindowEnd       DateTime?                             @map("comparison_window_end")
+  basisJson                 Json                                  @default("{}") @map("basis_json")
+  reasonCodesJson           Json                                  @default("[]") @map("reason_codes_json")
+  estimatedEnergyImpactKbtu Float?                                @map("estimated_energy_impact_kbtu")
+  estimatedPenaltyImpactUsd Float?                                @map("estimated_penalty_impact_usd")
+  penaltyImpactStatus       OperationalAnomalyPenaltyImpactStatus @default(INSUFFICIENT_CONTEXT) @map("penalty_impact_status")
+  attributionJson           Json                                  @default("{}") @map("attribution_json")
+  metadata                  Json                                  @default("{}")
+  acknowledgedAt            DateTime?                             @map("acknowledged_at")
+  acknowledgedByType        ActorType?                            @map("acknowledged_by_type")
+  acknowledgedById          String?                               @map("acknowledged_by_id")
+  dismissedAt               DateTime?                             @map("dismissed_at")
+  dismissedByType           ActorType?                            @map("dismissed_by_type")
+  dismissedById             String?                               @map("dismissed_by_id")
+  createdAt                 DateTime                              @default(now()) @map("created_at")
+  updatedAt                 DateTime                              @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id])
   building     Building     @relation(fields: [buildingId, organizationId], references: [id, organizationId])
@@ -1423,6 +2327,7 @@ model RetrofitCandidate {
   @@map("retrofit_candidates")
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 model FinancingCase {
   id                                String              @id @default(cuid())
   organizationId                    String              @map("organization_id")
@@ -1453,6 +2358,7 @@ model FinancingCase {
   @@map("financing_cases")
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 model FinancingCaseCandidate {
   id                  String   @id @default(cuid())
   organizationId      String   @map("organization_id")
@@ -1472,6 +2378,7 @@ model FinancingCaseCandidate {
   @@map("financing_case_candidates")
 }
 
+/// Deprecated legacy financing storage. Retained for historical records and cleanup only.
 model FinancingPacket {
   id               String                @id @default(cuid())
   organizationId   String                @map("organization_id")

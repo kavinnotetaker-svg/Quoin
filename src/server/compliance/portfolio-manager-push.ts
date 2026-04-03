@@ -3,6 +3,9 @@ import type { ESPM, PropertyMetrics } from "@/server/integrations/espm";
 import { prisma } from "@/server/lib/db";
 import { syncPortfolioManagerForBuilding } from "./portfolio-manager-sync";
 
+// Legacy benchmarking compatibility layer only. The current Portfolio Manager
+// connection, setup, import, and push workflow lives in src/server/portfolio-manager/*.
+
 type PortfolioManagerPushClient = Pick<ESPM, "meter" | "consumption" | "metrics" | "property">;
 
 interface LocalEnergyReading {

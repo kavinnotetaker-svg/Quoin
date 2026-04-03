@@ -39,7 +39,8 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-[rgba(42,52,57,0.5)]",
+        "duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -61,7 +62,15 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-background p-4 text-sm ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Stitch: 0px radius, ambient shadow, surface-container-lowest background
+          "fixed top-1/2 left-1/2 z-50 grid w-full",
+          "max-w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)]",
+          "-translate-x-1/2 -translate-y-1/2 gap-4 overflow-hidden",
+          "bg-white rounded-none",
+          "shadow-[0_16px_48px_0_rgba(42,52,57,0.12)]",
+          "p-6 text-sm duration-100 outline-none sm:max-w-md",
+          "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
+          "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -71,11 +80,10 @@ function DialogContent({
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-2 right-2"
+              className="absolute top-3 right-3"
               size="icon-sm"
             >
-              <XIcon
-              />
+              <XIcon />
               <span className="sr-only">Close</span>
             </Button>
           </DialogPrimitive.Close>
@@ -107,7 +115,10 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        // Stitch: hairline top, tonal footer bg
+        "-mx-6 -mb-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        "p-4 bg-[#f0f4f7]",
+        "border-t border-[rgba(169,180,185,0.3)]",
         className
       )}
       {...props}
@@ -129,7 +140,10 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-base leading-none font-medium", className)}
+      className={cn(
+        "font-display font-semibold text-base leading-tight tracking-tight text-[#2a3439]",
+        className
+      )}
       {...props}
     />
   )
@@ -143,7 +157,8 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        "font-sans text-sm text-[#566166] leading-relaxed",
+        "*:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-[#2a3439]",
         className
       )}
       {...props}

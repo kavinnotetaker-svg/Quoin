@@ -1,256 +1,375 @@
 "use client";
 
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import {
-  derivePrimaryComplianceStatus,
-  extractComplianceEngineResult,
-  summarizeReasonCodes,
-} from "@/lib/compliance-surface";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState, ErrorState, LoadingState } from "@/components/internal/admin-primitives";
 import {
-  EmptyState,
-  ErrorState,
-  LoadingState,
-} from "@/components/internal/admin-primitives";
-import {
-  StatusBadge,
+  getPacketStatusDisplay,
   getPrimaryComplianceStatusDisplay,
-  getSubmissionReadinessDisplay,
-  getVerificationStatusDisplay,
+  getSubmissionWorkflowStateDisplay,
+  getSyncStatusDisplay,
+  getWorklistTriageDisplay,
 } from "@/components/internal/status-helpers";
+import { AddBuildingDialogTrigger } from "./add-building-dialog-trigger";
 
-function defaultReportingYear() {
-  return new Date().getUTCFullYear() - 1;
+function truncateCopy(value: string, max = 72) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= max) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, max - 3).trimEnd()}...`;
 }
 
-function formatDate(value: string | Date | null | undefined) {
-  if (!value) {
-    return "Not evaluated";
+function buildPrimaryStatus(item: {
+  flags: {
+    readyToSubmit: boolean;
+    readyForReview: boolean;
+    needsCorrection: boolean;
+  };
+  blockingIssueCount: number;
+  runtime: {
+    portfolioManager: {
+      currentState: string;
+    };
+  };
+  triage: {
+    bucket: string;
+  };
+}) {
+  if (item.flags.readyToSubmit) {
+    return "Ready";
   }
 
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Not evaluated";
+  if (item.flags.readyForReview) {
+    return "Needs review";
   }
 
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  if (item.flags.needsCorrection || item.blockingIssueCount > 0) {
+    return "Needs data";
+  }
+
+  if (item.runtime.portfolioManager.currentState === "STALE") {
+    return "Needs sync";
+  }
+
+  const triage = getWorklistTriageDisplay(item.triage.bucket);
+  if (triage.label.toLowerCase().includes("sync")) {
+    return "Needs sync";
+  }
+
+  return "In progress";
+}
+
+function buildSecondaryLine(item: {
+  address?: string | null;
+  nextAction: {
+    title: string;
+    reason: string;
+  };
+}) {
+  return item.address?.trim() || truncateCopy(item.nextAction.reason, 64);
+}
+
+function buildMetaChip(item: {
+  blockingIssueCount: number;
+  triage: {
+    urgency: string;
+  };
+  artifacts: {
+    benchmark: {
+      status: string;
+    };
+  };
+  submission: {
+    overall: {
+      state: string;
+    };
+  };
+  complianceSummary: {
+    primaryStatus: string;
+  };
+  runtime: {
+    portfolioManager: {
+      currentState: string;
+    };
+  };
+}) {
+  if (item.triage.urgency === "NOW") {
+    return "Now";
+  }
+
+  if (item.blockingIssueCount > 0) {
+    return `${item.blockingIssueCount} blocker${item.blockingIssueCount === 1 ? "" : "s"}`;
+  }
+
+  const submission = getSubmissionWorkflowStateDisplay(item.submission.overall.state);
+  if (submission.label.toLowerCase().includes("submitted")) {
+    return "Submitted";
+  }
+
+  const packet = getPacketStatusDisplay(item.artifacts.benchmark.status);
+  if (packet.label.toLowerCase().includes("final")) {
+    return "Packet ready";
+  }
+
+  const sync = getSyncStatusDisplay(item.runtime.portfolioManager.currentState);
+  if (sync.label.toLowerCase().includes("stale")) {
+    return "Sync stale";
+  }
+
+  const compliance = getPrimaryComplianceStatusDisplay(item.complianceSummary.primaryStatus);
+  return compliance.label;
+}
+
+function chipClass(label: string) {
+  const normalized = label.toLowerCase();
+
+  if (
+    normalized.includes("now") ||
+    normalized.includes("blocker") ||
+    normalized.includes("needs")
+  ) {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+
+  if (
+    normalized.includes("ready") ||
+    normalized.includes("submitted") ||
+    normalized.includes("compliant")
+  ) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  return "border-zinc-200 bg-zinc-50 text-zinc-600";
 }
 
 export function ComplianceQueue() {
+  const pageSize = 24;
   const [search, setSearch] = useState("");
-  const reportingYear = defaultReportingYear();
-  const buildingList = trpc.building.list.useQuery({
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    setCursor(undefined);
+    setCursorHistory([]);
+  }, [search, needsAttentionOnly]);
+
+  const worklist = trpc.building.portfolioWorklist.useQuery({
+    cursor,
+    pageSize,
     search: search || undefined,
-    page: 1,
-    pageSize: 100,
+    triageUrgency: needsAttentionOnly ? "NOW" : undefined,
+    sortBy: "PRIORITY",
   });
 
-  const rows = useMemo(() => {
-    if (!buildingList.data) {
-      return [];
-    }
-
-    return buildingList.data.buildings.map((building) => {
-      const latestBenchmarkSubmission = building.latestBenchmarkSubmission;
-      const latestBepsFiling = building.latestBepsFiling;
-      const benchmarkEngine = extractComplianceEngineResult(
-        latestBenchmarkSubmission?.submissionPayload,
-      );
-      const bepsEngine = extractComplianceEngineResult(
-        latestBepsFiling?.filingPayload,
-      );
-      const primaryStatus = derivePrimaryComplianceStatus({
-        benchmark: benchmarkEngine,
-        beps: bepsEngine,
-      });
-      const reasonCodes = bepsEngine?.reasonCodes.length
-        ? bepsEngine.reasonCodes
-        : benchmarkEngine?.reasonCodes ?? [];
-      const lastEvaluationAt =
-        latestBepsFiling?.complianceRun?.executedAt ??
-        latestBenchmarkSubmission?.complianceRun?.executedAt ??
-        null;
-
-      return {
-        id: building.id,
-        name: building.name,
-        qaVerdict: benchmarkEngine?.qaVerdict ?? "FAIL",
-        primaryStatus,
-        readinessState: building.readinessSummary.state,
-        blockingIssueCount: building.activeIssueCounts.blocking,
-        warningIssueCount: building.activeIssueCounts.warning,
-        reasonSummary: summarizeReasonCodes(reasonCodes),
-        lastEvaluationAt,
-        nextActionTitle: building.readinessSummary.nextAction.title,
-        nextActionReason: building.readinessSummary.nextAction.reason,
-      };
-    });
-  }, [buildingList.data]);
-
-  const orderedRows = [...rows].sort((left, right) => {
-    const rank = {
-      DATA_INCOMPLETE: 0,
-      READY_FOR_REVIEW: 1,
-      READY_TO_SUBMIT: 2,
-      SUBMITTED: 3,
-    } as const;
-
-    const readinessDelta = rank[left.readinessState] - rank[right.readinessState];
-    if (readinessDelta !== 0) {
-      return readinessDelta;
-    }
-
-    const blockingDelta = right.blockingIssueCount - left.blockingIssueCount;
-    if (blockingDelta !== 0) {
-      return blockingDelta;
-    }
-
-    const warningDelta = right.warningIssueCount - left.warningIssueCount;
-    if (warningDelta !== 0) {
-      return warningDelta;
-    }
-
-    return left.name.localeCompare(right.name);
-  });
-
-  const readinessCounts = rows.reduce(
-    (acc, row) => {
-      acc[row.readinessState] += 1;
-      return acc;
-    },
-    {
-      DATA_INCOMPLETE: 0,
-      READY_FOR_REVIEW: 0,
-      READY_TO_SUBMIT: 0,
-      SUBMITTED: 0,
-    },
-  );
-
-  if (buildingList.isLoading) {
+  if (worklist.isLoading) {
     return <LoadingState />;
   }
 
-  if (buildingList.error) {
-    const error = buildingList.error;
+  if (worklist.error) {
     return (
-      <ErrorState
-        message="Compliance queue could not load."
-        detail={error?.message}
-      />
+      <ErrorState message="Buildings could not load." detail={worklist.error.message} />
     );
   }
 
+  const data = worklist.data;
+
+  if (!data) {
+    return <EmptyState message="Buildings are not ready yet." />;
+  }
+
+  const pageInfo = data.pageInfo;
+  const currentPage = cursorHistory.length + 1;
+  const totalPages = Math.max(1, Math.ceil(pageInfo.totalMatchingCount / pageSize));
+
+  function moveToNextPage() {
+    if (!pageInfo.nextCursor) {
+      return;
+    }
+
+    setCursorHistory((current) => [...current, cursor ?? ""]);
+    setCursor(pageInfo.nextCursor);
+  }
+
+  function moveToPreviousPage() {
+    if (cursorHistory.length === 0) {
+      setCursor(undefined);
+      return;
+    }
+
+    const previousCursor = cursorHistory[cursorHistory.length - 1];
+    setCursor(previousCursor || undefined);
+    setCursorHistory((current) => current.slice(0, -1));
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        title="Building compliance"
-        subtitle="Use this queue to see data quality, the latest governed result, and the next required action for each building."
-      />
+        title="Buildings"
+        subtitle="Open a building, check what needs attention, and keep moving."
+        kicker="Portfolio"
+        variant="portfolio"
+        density="compact"
+      >
+        {data.operatorAccess.canManage ? (
+          <AddBuildingDialogTrigger
+            buttonClassName="rounded-full bg-zinc-900 px-5 py-2.5 font-dashboard-sans text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          />
+        ) : null}
+      </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Data incomplete", value: readinessCounts.DATA_INCOMPLETE },
-          { label: "Ready for review", value: readinessCounts.READY_FOR_REVIEW },
-          { label: "Ready to submit", value: readinessCounts.READY_TO_SUBMIT },
-          { label: "Submitted", value: readinessCounts.SUBMITTED },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setNeedsAttentionOnly(false)}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              !needsAttentionOnly
+                ? "bg-white text-zinc-900 ring-1 ring-inset ring-zinc-200"
+                : "text-zinc-500 hover:bg-white/60 hover:text-zinc-900"
+            }`}
           >
-            <div className="text-[12px] font-semibold uppercase tracking-wider text-slate-500">
-              {item.label}
-            </div>
-            <div className="mt-2 font-mono text-3xl font-semibold text-slate-900">
-              {item.value}
-            </div>
-          </div>
-        ))}
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setNeedsAttentionOnly(true)}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              needsAttentionOnly
+                ? "bg-white text-zinc-900 ring-1 ring-inset ring-zinc-200"
+                : "text-zinc-500 hover:bg-white/60 hover:text-zinc-900"
+            }`}
+          >
+            Needs attention
+          </button>
+        </div>
+
+        <div className="w-full lg:w-80">
+          <input
+            type="text"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search buildings"
+            className="w-full rounded-full border border-zinc-200 bg-white/80 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none transition-colors"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <input
-          type="text"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search buildings"
-          className="w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition-colors focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+      <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-500">
+        <span>{pageInfo.totalMatchingCount} buildings</span>
+        <span aria-hidden="true">•</span>
+        <span>{data.aggregate.needsAttentionNow} need attention</span>
+        <span aria-hidden="true">•</span>
+        <span>{data.aggregate.readyForReview} ready</span>
+      </div>
+
+      {data.items.length === 0 ? (
+        <EmptyState
+          message={
+            search || needsAttentionOnly
+              ? "No buildings match this view."
+              : "No buildings yet."
+          }
+          action={
+            search || needsAttentionOnly ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setNeedsAttentionOnly(false);
+                }}
+                className="btn-secondary px-3 py-2"
+              >
+                Clear
+              </button>
+            ) : data.operatorAccess.canManage ? (
+              <AddBuildingDialogTrigger buttonClassName="btn-secondary px-3 py-2" />
+            ) : undefined
+          }
         />
-        <div className="text-sm text-slate-500">Reporting year {reportingYear}</div>
-      </div>
-
-      {orderedRows.length === 0 ? (
-        <EmptyState message="No buildings match the current filter." />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50">
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500">
-                  <th className="px-5 py-3 font-semibold">Building</th>
-                  <th className="px-5 py-3 font-semibold">Readiness</th>
-                  <th className="px-5 py-3 font-semibold">QA</th>
-                  <th className="px-5 py-3 font-semibold">Compliance</th>
-                  <th className="px-5 py-3 font-semibold">Issues</th>
-                  <th className="px-5 py-3 font-semibold">Reason</th>
-                  <th className="px-5 py-3 font-semibold">Last evaluation</th>
-                  <th className="px-5 py-3 font-semibold">Next action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {orderedRows.map((row) => {
-                  const qa = getVerificationStatusDisplay(row.qaVerdict);
-                  const readiness = getSubmissionReadinessDisplay(row.readinessState);
-                  const status = getPrimaryComplianceStatusDisplay(row.primaryStatus);
+        <div className="grid gap-4 xl:grid-cols-2">
+          {data.items.map((item) => {
+            const primaryStatus = buildPrimaryStatus(item);
+            const metaChip = buildMetaChip(item);
+            const nextAction = truncateCopy(item.nextAction.title, 42);
 
-                  return (
-                    <tr key={row.id} className="align-top">
-                      <td className="px-5 py-4">
-                        <Link
-                          href={`/buildings/${row.id}`}
-                          className="font-semibold text-slate-900 hover:text-slate-700"
-                        >
-                          {row.name}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-4">
-                        <StatusBadge label={readiness.label} tone={readiness.tone} />
-                      </td>
-                      <td className="px-5 py-4">
-                        <StatusBadge label={qa.label} tone={qa.tone} />
-                      </td>
-                      <td className="px-5 py-4">
-                        <StatusBadge label={status.label} tone={status.tone} />
-                      </td>
-                      <td className="px-5 py-4 text-slate-600">
-                        {row.blockingIssueCount} blocking / {row.warningIssueCount} warning
-                      </td>
-                      <td className="px-5 py-4 text-slate-600">{row.reasonSummary}</td>
-                      <td className="px-5 py-4 text-slate-600">
-                        {formatDate(row.lastEvaluationAt)}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="font-medium text-slate-900">
-                          {row.nextActionTitle}
-                        </div>
-                        <div className="mt-1 text-[13px] text-slate-500">
-                          {row.nextActionReason}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+            return (
+              <Link
+                key={item.buildingId}
+                href={`/buildings/${item.buildingId}`}
+                className="group rounded-[28px] px-6 py-5 transition-all hover:bg-white"
+                style={{
+                  background: "rgba(255,255,255,0.82)",
+                  border: "1px solid rgba(205, 210, 214, 0.72)",
+                  boxShadow: "0 24px 52px -40px rgba(27, 39, 51, 0.22)",
+                }}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-dashboard-display text-[1.65rem] font-medium tracking-[-0.04em] text-zinc-900">
+                        {item.buildingName}
+                      </h2>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${chipClass(metaChip)}`}
+                      >
+                        {metaChip}
+                      </span>
+                    </div>
+
+                    <p className="font-dashboard-sans text-[0.95rem] text-zinc-500">
+                      {buildSecondaryLine(item)}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-3 font-dashboard-sans text-sm">
+                      <span className="font-medium text-zinc-900">{primaryStatus}</span>
+                      <span className="text-zinc-400">•</span>
+                      <span className="text-zinc-600">{nextAction}</span>
+                    </div>
+                  </div>
+
+                  <ArrowRight
+                    size={18}
+                    className="mt-1 shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5"
+                  />
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
+
+      {pageInfo.totalMatchingCount > pageSize ? (
+        <div className="flex items-center justify-between pt-2 text-sm text-zinc-500">
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={moveToPreviousPage}
+              disabled={cursorHistory.length === 0}
+              className="btn-secondary px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={moveToNextPage}
+              disabled={!pageInfo.nextCursor}
+              className="btn-secondary px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

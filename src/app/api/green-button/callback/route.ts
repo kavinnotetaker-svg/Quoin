@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
   exchangeCodeForTokens,
-  encryptToken,
+  upsertGreenButtonCredentials,
 } from "@/server/integrations/green-button";
 import { toAppError } from "@/server/lib/errors";
 import { createAuditLog } from "@/server/lib/audit-log";
@@ -19,9 +19,22 @@ import {
   requireTenantContextFromSession,
 } from "@/server/lib/tenant-access";
 import {
-  getGreenButtonEncryptionKey,
+  requireGreenButtonTokenMasterKey,
   getOptionalGreenButtonConfig,
 } from "@/server/lib/config";
+import { refreshSourceReconciliationDataIssues } from "@/server/compliance/data-issues";
+import {
+  applyRateLimit,
+  createRateLimitExceededResponse,
+  getRateLimitClientKey,
+} from "@/server/lib/rate-limit";
+
+const GREEN_BUTTON_STATE_COOKIE = "quoin_green_button_oauth_state";
+
+function clearStateCookie(response: NextResponse) {
+  response.cookies.delete(GREEN_BUTTON_STATE_COOKIE);
+  return response;
+}
 
 /**
  * GET /api/green-button/callback?code=xxx&state=xxx
@@ -34,12 +47,26 @@ export async function GET(req: NextRequest) {
     requestId,
     procedure: "greenButton.callback",
   });
+  const rateLimit = await applyRateLimit({
+    scope: "green-button-callback",
+    key: getRateLimitClientKey(req),
+    limit: 30,
+    windowSeconds: 60,
+  });
+  if (!rateLimit.allowed) {
+    return createRateLimitExceededResponse({
+      message: "Too many Green Button callback attempts. Please wait and try again.",
+      result: rateLimit,
+    });
+  }
   let tenant;
   try {
     tenant = await requireTenantContextFromSession();
   } catch (error) {
     if (error instanceof TenantAccessError) {
-      return NextResponse.redirect(new URL("/sign-in", req.nextUrl.origin));
+      return clearStateCookie(
+        NextResponse.redirect(new URL("/sign-in", req.nextUrl.origin)),
+      );
     }
 
     throw error;
@@ -55,20 +82,36 @@ export async function GET(req: NextRequest) {
     const redirectUrl = buildingId
       ? `/buildings/${buildingId}?gb=denied`
       : "/dashboard?gb=denied";
-    return NextResponse.redirect(new URL(redirectUrl, req.nextUrl.origin));
+    return clearStateCookie(
+      NextResponse.redirect(new URL(redirectUrl, req.nextUrl.origin)),
+    );
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(
-      new URL("/dashboard?gb=error", req.nextUrl.origin),
+    return clearStateCookie(
+      NextResponse.redirect(
+        new URL("/dashboard?gb=error", req.nextUrl.origin),
+      ),
+    );
+  }
+
+  const expectedState = req.cookies.get(GREEN_BUTTON_STATE_COOKIE)?.value ?? null;
+  if (!expectedState || expectedState !== state) {
+    logger.warn("Green Button callback state validation failed");
+    return clearStateCookie(
+      NextResponse.redirect(
+        new URL("/dashboard?gb=error", req.nextUrl.origin),
+      ),
     );
   }
 
   // Extract buildingId from state (format: csrfToken:buildingId)
   const stateParts = state.split(":");
   if (stateParts.length < 2) {
-    return NextResponse.redirect(
-      new URL("/dashboard?gb=error", req.nextUrl.origin),
+    return clearStateCookie(
+      NextResponse.redirect(
+        new URL("/dashboard?gb=error", req.nextUrl.origin),
+      ),
     );
   }
   const buildingId = stateParts[1]!;
@@ -83,7 +126,7 @@ export async function GET(req: NextRequest) {
     jobId: job.id,
     organizationId: tenant.organizationId,
     buildingId,
-    userId: tenant.clerkUserId,
+    userId: tenant.authUserId,
   });
   const safelyPersist = async (
     label: string,
@@ -106,7 +149,7 @@ export async function GET(req: NextRequest) {
   }) =>
     createAuditLog({
       actorType: "USER",
-      actorId: tenant.clerkUserId,
+      actorId: tenant.authUserId,
       organizationId: tenant.organizationId,
       buildingId,
       requestId,
@@ -151,31 +194,14 @@ export async function GET(req: NextRequest) {
       },
       errorCode: "CONFIG_ERROR",
     });
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
+    return clearStateCookie(
+      NextResponse.redirect(
+        new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
+      ),
     );
   }
 
-  const encryptionKey = getGreenButtonEncryptionKey();
-  if (!encryptionKey) {
-    jobLogger.error("Green Button callback missing encryption key");
-    await safelyPersist("job.dead", () =>
-      markDead(runningJob.id, "Green Button encryption key is missing"),
-    );
-    await writeAudit({
-      action: "green_button.callback.failed",
-      inputSnapshot: {
-        buildingId,
-      },
-      outputSnapshot: {
-        retryable: false,
-      },
-      errorCode: "CONFIG_ERROR",
-    });
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
-    );
-  }
+  const encryptionKey = requireGreenButtonTokenMasterKey();
 
   const building = await tenant.tenantDb.building.findUnique({
     where: { id: buildingId },
@@ -195,8 +221,10 @@ export async function GET(req: NextRequest) {
       },
       errorCode: "NOT_FOUND",
     });
-    return NextResponse.redirect(
-      new URL("/dashboard?gb=error", req.nextUrl.origin),
+    return clearStateCookie(
+      NextResponse.redirect(
+        new URL("/dashboard?gb=error", req.nextUrl.origin),
+      ),
     );
   }
 
@@ -221,26 +249,14 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    await tenant.tenantDb.greenButtonConnection.upsert({
-      where: { buildingId },
-      update: {
-        status: "ACTIVE",
-        accessToken: encryptToken(tokens.accessToken, encryptionKey),
-        refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
-        tokenExpiresAt: tokens.expiresAt,
-        subscriptionId: tokens.subscriptionId,
-        resourceUri: tokens.resourceUri,
-      },
-      create: {
-        buildingId,
-        organizationId: tenant.organizationId,
-        status: "ACTIVE",
-        accessToken: encryptToken(tokens.accessToken, encryptionKey),
-        refreshToken: encryptToken(tokens.refreshToken, encryptionKey),
-        tokenExpiresAt: tokens.expiresAt,
-        subscriptionId: tokens.subscriptionId,
-        resourceUri: tokens.resourceUri,
-      }
+    await upsertGreenButtonCredentials({
+      db: tenant.tenantDb,
+      organizationId: tenant.organizationId,
+      buildingId,
+      tokens,
+      masterKey: encryptionKey,
+      status: "ACTIVE",
+      runtimeStatus: "IDLE",
     });
 
     await tenant.tenantDb.building.update({
@@ -250,6 +266,20 @@ export async function GET(req: NextRequest) {
         dataIngestionMethod: "GREEN_BUTTON",
       },
     });
+
+    try {
+      await refreshSourceReconciliationDataIssues({
+        organizationId: tenant.organizationId,
+        buildingId,
+        actorType: "USER",
+        actorId: tenant.authUserId,
+        requestId,
+      });
+    } catch (reconciliationError) {
+      jobLogger.warn("Green Button callback reconciliation refresh failed", {
+        error: reconciliationError,
+      });
+    }
 
     await safelyPersist("job.completed", () => markCompleted(runningJob.id));
     await writeAudit({
@@ -263,8 +293,10 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=success`, req.nextUrl.origin),
+    return clearStateCookie(
+      NextResponse.redirect(
+        new URL(`/buildings/${buildingId}?gb=success`, req.nextUrl.origin),
+      ),
     );
   } catch (err) {
     const appError = toAppError(err);
@@ -308,9 +340,37 @@ export async function GET(req: NextRequest) {
       where: { id: buildingId },
       data: { greenButtonStatus: "FAILED" },
     });
+    await tenant.tenantDb.greenButtonConnection.updateMany({
+      where: {
+        buildingId,
+        organizationId: tenant.organizationId,
+      },
+      data: {
+        status: "FAILED",
+        latestErrorCode: appError.code,
+        latestErrorMessage: appError.message,
+      },
+    });
 
-    return NextResponse.redirect(
-      new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
+    try {
+      await refreshSourceReconciliationDataIssues({
+        organizationId: tenant.organizationId,
+        buildingId,
+        actorType: "USER",
+        actorId: tenant.authUserId,
+        requestId,
+      });
+    } catch (reconciliationError) {
+      jobLogger.warn("Green Button callback reconciliation refresh failed", {
+        error: reconciliationError,
+      });
+    }
+
+    return clearStateCookie(
+      NextResponse.redirect(
+        new URL(`/buildings/${buildingId}?gb=error`, req.nextUrl.origin),
+      ),
     );
   }
 }
+

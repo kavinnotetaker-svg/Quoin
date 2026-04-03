@@ -9,6 +9,9 @@ const SOURCE_SITE_RATIOS: Record<MeterType, number> = {
   ELECTRIC: 2.8,
   GAS: 1.05,
   STEAM: 1.45,
+  WATER_INDOOR: 0,
+  WATER_OUTDOOR: 0,
+  WATER_RECYCLED: 0,
   OTHER: 1.0,
 };
 
@@ -57,6 +60,14 @@ export function calculateEUI(
   const months = new Set<string>();
 
   for (const reading of readings) {
+    if (
+      reading.meterType !== "ELECTRIC" &&
+      reading.meterType !== "GAS" &&
+      reading.meterType !== "STEAM"
+    ) {
+      continue;
+    }
+
     const kbtu = reading.consumptionKbtu;
     totalSiteKBtu += kbtu;
 

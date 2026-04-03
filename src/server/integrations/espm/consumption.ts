@@ -58,6 +58,11 @@ export class ConsumptionService {
     return this.client.put(`/consumptionData/${consumptionDataId}`, xml);
   }
 
+  /** Delete one existing meter consumption record */
+  async deleteConsumptionData(consumptionDataId: number): Promise<unknown> {
+    return this.client.delete(`/consumptionData/${consumptionDataId}`);
+  }
+
   /** Get consumption data for a meter (paginated, 120 per page) */
   async getConsumptionData(
     meterId: number,

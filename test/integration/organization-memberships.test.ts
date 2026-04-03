@@ -8,8 +8,8 @@ import {
 import { requireTenantContext } from "@/server/lib/tenant-access";
 
 describe("organization memberships", () => {
-  let orgA: { id: string; clerkOrgId: string };
-  let orgB: { id: string; clerkOrgId: string };
+  let orgA: { id: string };
+  let orgB: { id: string };
   let buildingA: { id: string };
   let buildingB: { id: string };
 
@@ -20,20 +20,18 @@ describe("organization memberships", () => {
       data: {
         name: "Membership Org A",
         slug: `membership-org-a-${ts}`,
-        clerkOrgId: `clerk_membership_a_${ts}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     orgB = await prisma.organization.create({
       data: {
         name: "Membership Org B",
         slug: `membership-org-b-${ts}`,
-        clerkOrgId: `clerk_membership_b_${ts}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     buildingA = await prisma.building.create({
@@ -73,8 +71,8 @@ describe("organization memberships", () => {
     });
     await prisma.user.deleteMany({
       where: {
-        clerkUserId: {
-          startsWith: "clerk_membership_user_",
+        authUserId: {
+          startsWith: "supabase_membership_user_",
         },
       },
     });
@@ -89,23 +87,21 @@ describe("organization memberships", () => {
   it("keeps one user in multiple organizations", async () => {
     const ts = Date.now();
     const user = await ensureUserRecord({
-      clerkUserId: `clerk_membership_user_${ts}`,
+      authUserId: `supabase_membership_user_${ts}`,
       email: `membership_${ts}@test.com`,
       name: "Membership User",
     });
 
     await upsertOrganizationMembership({
       organizationId: orgA.id,
-      clerkMembershipId: `membership_${ts}_a`,
-      clerkUserId: user.clerkUserId,
+      authUserId: user.authUserId,
       role: "ADMIN",
       email: user.email,
       name: user.name,
     });
     await upsertOrganizationMembership({
       organizationId: orgB.id,
-      clerkMembershipId: `membership_${ts}_b`,
-      clerkUserId: user.clerkUserId,
+      authUserId: user.authUserId,
       role: "VIEWER",
       email: user.email,
       name: user.name,
@@ -124,30 +120,27 @@ describe("organization memberships", () => {
 
   it("removes one membership without destroying the user", async () => {
     const ts = Date.now();
-    const clerkUserId = `clerk_membership_user_${ts}`;
+    const authUserId = `supabase_membership_user_${ts}`;
     const user = await ensureUserRecord({
-      clerkUserId,
+      authUserId,
       email: `membership_remove_${ts}@test.com`,
       name: "Remove Membership User",
     });
 
     await upsertOrganizationMembership({
       organizationId: orgA.id,
-      clerkMembershipId: `membership_remove_${ts}_a`,
-      clerkUserId,
+      authUserId,
       role: "MANAGER",
     });
     await upsertOrganizationMembership({
       organizationId: orgB.id,
-      clerkMembershipId: `membership_remove_${ts}_b`,
-      clerkUserId,
+      authUserId,
       role: "ENGINEER",
     });
 
     const deleted = await deleteOrganizationMembership({
-      clerkMembershipId: `membership_remove_${ts}_a`,
-      clerkOrgId: orgA.clerkOrgId,
-      clerkUserId,
+      organizationId: orgA.id,
+      userId: user.id,
     });
 
     expect(deleted).toBe(1);
@@ -161,27 +154,35 @@ describe("organization memberships", () => {
     const survivingUser = await prisma.user.findUnique({
       where: { id: user.id },
     });
-    expect(survivingUser?.clerkUserId).toBe(clerkUserId);
+    expect(survivingUser?.authUserId).toBe(authUserId);
   });
 
   it("derives tenant-scoped access from the authenticated org context", async () => {
     const ts = Date.now();
-    const clerkUserId = `clerk_membership_user_${ts}`;
+    const authUserId = `supabase_membership_user_${ts}`;
     await ensureUserRecord({
-      clerkUserId,
+      authUserId,
       email: `tenant_scope_${ts}@test.com`,
       name: "Tenant Scope User",
     });
+    await upsertOrganizationMembership({
+      organizationId: orgA.id,
+      authUserId,
+      role: "ADMIN",
+    });
+    await upsertOrganizationMembership({
+      organizationId: orgB.id,
+      authUserId,
+      role: "VIEWER",
+    });
 
     const tenantA = await requireTenantContext({
-      clerkUserId,
-      clerkOrgId: orgA.clerkOrgId,
-      clerkOrgRole: "org:admin",
+      authUserId,
+      activeOrganizationId: orgA.id,
     });
     const tenantB = await requireTenantContext({
-      clerkUserId,
-      clerkOrgId: orgB.clerkOrgId,
-      clerkOrgRole: "org:viewer",
+      authUserId,
+      activeOrganizationId: orgB.id,
     });
 
     const buildingsForA = await tenantA.tenantDb.building.findMany({
@@ -197,7 +198,7 @@ describe("organization memberships", () => {
     const memberships = await prisma.organizationMembership.findMany({
       where: {
         user: {
-          clerkUserId,
+          authUserId,
         },
       },
       orderBy: { organizationId: "asc" },
@@ -205,3 +206,5 @@ describe("organization memberships", () => {
     expect(memberships).toHaveLength(2);
   });
 });
+
+

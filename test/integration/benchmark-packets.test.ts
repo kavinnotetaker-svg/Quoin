@@ -10,10 +10,10 @@ describe("benchmark request workflow and benchmark packets", () => {
   let sourceArtifactId: string;
   let ruleVersionId: string;
   let factorSetVersionId: string;
-  let orgA: { id: string; clerkOrgId: string };
-  let orgB: { id: string; clerkOrgId: string };
-  let userA: { id: string; clerkUserId: string };
-  let userB: { id: string; clerkUserId: string };
+  let orgA: { id: string };
+  let orgB: { id: string };
+  let userA: { id: string; authUserId: string };
+  let userB: { id: string; authUserId: string };
   let readyBuilding: { id: string };
   let blockedBuilding: { id: string };
 
@@ -88,38 +88,36 @@ describe("benchmark request workflow and benchmark packets", () => {
       data: {
         name: `Benchmark Packet Org A ${scope}`,
         slug: `benchmark-packet-org-a-${scope}`,
-        clerkOrgId: `clerk_benchmark_packet_org_a_${scope}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     orgB = await prisma.organization.create({
       data: {
         name: `Benchmark Packet Org B ${scope}`,
         slug: `benchmark-packet-org-b-${scope}`,
-        clerkOrgId: `clerk_benchmark_packet_org_b_${scope}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     userA = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_benchmark_packet_user_a_${scope}`,
+        authUserId: `supabase_benchmark_packet_user_a_${scope}`,
         email: `benchmark_packet_a_${scope}@test.com`,
         name: "Benchmark Packet User A",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     userB = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_benchmark_packet_user_b_${scope}`,
+        authUserId: `supabase_benchmark_packet_user_b_${scope}`,
         email: `benchmark_packet_b_${scope}@test.com`,
         name: "Benchmark Packet User B",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     await prisma.organizationMembership.createMany({
@@ -510,17 +508,16 @@ describe("benchmark request workflow and benchmark packets", () => {
     });
   });
 
-  function createCaller(clerkUserId: string, clerkOrgId: string) {
+  function createCaller(authUserId: string, activeOrganizationId: string) {
     return appRouter.createCaller({
-      clerkUserId,
-      clerkOrgId,
-      clerkOrgRole: "org:admin",
+      authUserId,
+      activeOrganizationId,
       prisma,
     });
   }
 
   it("supports the request item lifecycle for a building", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const created = await caller.benchmarking.upsertRequestItem({
       buildingId: readyBuilding.id,
@@ -557,7 +554,7 @@ describe("benchmark request workflow and benchmark packets", () => {
   });
 
   it("supports Data Quality Checker request items", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const created = await caller.benchmarking.upsertRequestItem({
       buildingId: readyBuilding.id,
@@ -585,7 +582,7 @@ describe("benchmark request workflow and benchmark packets", () => {
   });
 
   it("generates, stales, and finalizes benchmark packets deterministically", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const generated = await caller.benchmarking.generateBenchmarkPacket({
       buildingId: readyBuilding.id,
@@ -662,7 +659,7 @@ describe("benchmark request workflow and benchmark packets", () => {
   });
 
   it("surfaces packet warnings and blocks finalization when readiness is blocked", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const packet = await caller.benchmarking.generateBenchmarkPacket({
       buildingId: blockedBuilding.id,
@@ -698,7 +695,7 @@ describe("benchmark request workflow and benchmark packets", () => {
   });
 
   it("enforces tenant-safe access for request items and packets", async () => {
-    const caller = createCaller(userB.clerkUserId, orgB.clerkOrgId);
+    const caller = createCaller(userB.authUserId, orgB.id);
 
     await expect(
       caller.benchmarking.listRequestItems({
@@ -724,7 +721,7 @@ describe("benchmark request workflow and benchmark packets", () => {
   });
 
   it("surfaces PDF export failures as normalized packet export errors", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     await caller.benchmarking.generateBenchmarkPacket({
       buildingId: readyBuilding.id,
@@ -747,3 +744,6 @@ describe("benchmark request workflow and benchmark packets", () => {
     });
   });
 });
+
+
+

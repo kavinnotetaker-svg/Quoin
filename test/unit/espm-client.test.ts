@@ -169,12 +169,15 @@ describe("ESPM Client", () => {
     expect(result.sourceIntensity).toBe(289.9);
   });
 
-  it("requests weather-normalized metrics in the PM-Metrics header", async () => {
+  it("requests only ESPM-supported property metrics in the PM-Metrics header", async () => {
     server.use(
       http.get(`${BASE_URL}/property/12345/metrics`, ({ request }) => {
         const metricsHeader = request.headers.get("PM-Metrics") ?? "";
-        expect(metricsHeader).toContain("weatherNormalizedSiteIntensity");
-        expect(metricsHeader).toContain("weatherNormalizedSourceIntensity");
+        expect(metricsHeader).toContain("score");
+        expect(metricsHeader).toContain("siteIntensity");
+        expect(metricsHeader).toContain("sourceIntensity");
+        expect(metricsHeader).not.toContain("weatherNormalizedSiteIntensity");
+        expect(metricsHeader).not.toContain("weatherNormalizedSourceIntensity");
 
         return new HttpResponse(loadFixture("property-metrics-compliant.xml"), {
           headers: { "Content-Type": "application/xml" },

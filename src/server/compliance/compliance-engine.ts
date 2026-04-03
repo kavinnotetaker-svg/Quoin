@@ -38,6 +38,7 @@ import type {
   BepsPathwayType,
   BepsSnapshotInput,
 } from "./beps/types";
+import { toBuildingSelectedPathway } from "@/lib/contracts/beps";
 
 const COMPLIANCE_ENGINE_REASON_CODES = {
   qaGateFailed: "QA_GATE_FAILED",
@@ -403,6 +404,8 @@ async function evaluateBenchmarkingCompliance(
         deadlineType: baseReadiness.summary.deadlineType,
         submissionDueDate: baseReadiness.summary.submissionDueDate,
         deadlineDaysFromGeneration: baseReadiness.summary.deadlineDaysFromGeneration,
+        manualSubmissionAllowedWhenNotBenchmarkable:
+          baseReadiness.summary.manualSubmissionAllowedWhenNotBenchmarkable,
       },
     };
 
@@ -887,10 +890,7 @@ async function evaluateBepsCompliance(input: BepsComplianceRequest): Promise<Bep
             : null,
         estimatedPenalty: evaluation?.alternativeCompliance.recommended?.amountDue ?? null,
         dataQualityScore: latestSnapshot?.dataQualityScore ?? null,
-        activePathway:
-          evaluation?.selectedPathway === "STANDARD_TARGET"
-            ? "STANDARD"
-            : evaluation?.selectedPathway ?? null,
+        activePathway: toBuildingSelectedPathway(evaluation?.selectedPathway),
         targetScore: building.bepsTargetScore,
         targetEui: building.targetEui,
         penaltyInputsJson: {

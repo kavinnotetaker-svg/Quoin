@@ -1,7 +1,11 @@
 # deploy.ps1
 $ErrorActionPreference = "Stop"
 
-$pemKey = "quoin-staging.pem"
+$pemKey = if ($env:QUOIN_STAGING_PEM_PATH) {
+    $env:QUOIN_STAGING_PEM_PATH
+} else {
+    ".secrets/quoin-staging.pem"
+}
 $ec2Host = "ec2-user@18.211.40.168"
 
 Write-Host "Checking for .env.production..."
@@ -10,13 +14,28 @@ if (-not (Test-Path ".env.production")) {
     exit 1
 }
 
-Write-Host "Checking if CLERK_SECRET_KEY is still a dummy value..."
-$envFile = Get-Content ".env.production"
-if ($envFile -match "sk_test_xxx" -or $envFile -match "CLERK_SECRET_KEY=$" -or $envFile -match "sk_live_xxx") {
-    Write-Host "WARNING: CLERK_SECRET_KEY in .env.production looks like a placeholder."
-    Write-Host "You must provide the real secret key from the Clerk dashboard."
-    Write-Host "Please update .env.production and run this script again."
+Write-Host "Checking for deployment PEM..."
+if (-not (Test-Path $pemKey)) {
+    Write-Host "Missing deployment PEM at $pemKey"
+    Write-Host "Set QUOIN_STAGING_PEM_PATH or place the PEM at .secrets/quoin-staging.pem"
     exit 1
+}
+
+Write-Host "Checking for required runtime env values..."
+$envFile = Get-Content ".env.production"
+$requiredEnvKeys = @(
+    "DATABASE_URL",
+    "REDIS_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY"
+)
+
+foreach ($key in $requiredEnvKeys) {
+    if (-not ($envFile -match "^$key=.+")) {
+        Write-Host "Missing required value for $key in .env.production"
+        exit 1
+    }
 }
 
 Write-Host "Building project locally..."

@@ -2,8 +2,13 @@ import "dotenv/config";
 import { PrismaClient, type Prisma } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
+const connectionString = process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"];
+if (!connectionString) {
+  throw new Error("DIRECT_URL or DATABASE_URL is required");
+}
+
 const adapter = new PrismaPg({
-  connectionString: process.env["DATABASE_URL"]!,
+  connectionString,
 });
 const prisma = new PrismaClient({ adapter });
 
@@ -14,10 +19,10 @@ const DEMO_ORG_SLUGS = [
   "district-housing",
   "foggy-bottom-hotels",
 ] as const;
-const DEMO_USER_CLERK_IDS = [
-  "clerk_user_meridian_admin_001",
-  "clerk_user_dha_admin_001",
-  "clerk_user_fbh_admin_001",
+const DEMO_USER_AUTH_IDS = [
+  "supabase_user_meridian_admin_001",
+  "supabase_user_dha_admin_001",
+  "supabase_user_fbh_admin_001",
 ] as const;
 const DEMO_BUILDING_NAMES = [
   "K Street Tower",
@@ -32,6 +37,7 @@ const DEMO_BUILDING_NAMES = [
   "M Street Boutique Hotel",
   "Ward 8 Services Annex",
 ] as const;
+void DEMO_BUILDING_NAMES;
 const BENCHMARKING_APPLICABILITY_BANDS = [
   {
     ownershipType: "PRIVATE",
@@ -331,7 +337,7 @@ async function upsertOrganization(input: Prisma.OrganizationUncheckedCreateInput
 
 async function upsertUser(input: Prisma.UserUncheckedCreateInput) {
   return prisma.user.upsert({
-    where: { clerkUserId: input.clerkUserId },
+    where: { authUserId: input.authUserId },
     update: input,
     create: input,
   });
@@ -412,8 +418,8 @@ async function clearExistingDemoTenantData() {
   });
   const users = await prisma.user.findMany({
     where: {
-      clerkUserId: {
-        in: [...DEMO_USER_CLERK_IDS],
+      authUserId: {
+        in: [...DEMO_USER_AUTH_IDS],
       },
     },
     select: { id: true },
@@ -685,6 +691,7 @@ async function clearExistingDemoTenantData() {
     });
   }
 }
+void clearExistingDemoTenantData;
 
 async function main(): Promise<void> {
   console.log("Seeding database...");
@@ -1399,13 +1406,12 @@ async function main(): Promise<void> {
   const org1 = await upsertOrganization({
     name: "Meridian Capital Partners",
     slug: "meridian-capital",
-    clerkOrgId: "clerk_org_meridian_001",
     tier: "PRO",
     settings: {},
   });
 
   const org1User = await upsertUser({
-    clerkUserId: "clerk_user_meridian_admin_001",
+    authUserId: "supabase_user_meridian_admin_001",
     email: "admin@meridiancapital.com",
     name: "Sarah Chen",
   });
@@ -1574,13 +1580,12 @@ async function main(): Promise<void> {
   const org2 = await upsertOrganization({
     name: "District Housing Alliance",
     slug: "district-housing",
-    clerkOrgId: "clerk_org_dha_002",
     tier: "ENTERPRISE",
     settings: {},
   });
 
   const org2User = await upsertUser({
-    clerkUserId: "clerk_user_dha_admin_001",
+    authUserId: "supabase_user_dha_admin_001",
     email: "admin@districthousing.org",
     name: "Marcus Williams",
   });
@@ -1684,13 +1689,12 @@ async function main(): Promise<void> {
   const org3 = await upsertOrganization({
     name: "Foggy Bottom Hotels LLC",
     slug: "foggy-bottom-hotels",
-    clerkOrgId: "clerk_org_fbh_003",
     tier: "FREE",
     settings: {},
   });
 
   const org3User = await upsertUser({
-    clerkUserId: "clerk_user_fbh_admin_001",
+    authUserId: "supabase_user_fbh_admin_001",
     email: "admin@foggybottomhotels.com",
     name: "Patricia Nguyen",
   });
@@ -2076,8 +2080,8 @@ async function main(): Promise<void> {
     select: { id: true },
   });
 
-  const seededRetrofitCandidate = existingSeededRetrofitCandidate
-    ? await prisma.retrofitCandidate.update({
+  await (existingSeededRetrofitCandidate
+    ? prisma.retrofitCandidate.update({
         where: {
           id: existingSeededRetrofitCandidate.id,
         },
@@ -2109,7 +2113,7 @@ async function main(): Promise<void> {
           },
         },
       })
-    : await prisma.retrofitCandidate.create({
+    : prisma.retrofitCandidate.create({
         data: {
           organizationId: org1.id,
           buildingId: org1Buildings[1].id,
@@ -2137,90 +2141,7 @@ async function main(): Promise<void> {
             note: "Structural retrofit candidate seed for Sprint 13 validation.",
           },
         },
-      });
-
-  const existingFinancingCase = await prisma.financingCase.findFirst({
-    where: {
-      organizationId: org1.id,
-      buildingId: org1Buildings[1].id,
-      name: "L Street lighting financing case",
-    },
-    select: { id: true },
-  });
-
-  const financingCase = existingFinancingCase
-    ? await prisma.financingCase.update({
-        where: {
-          id: existingFinancingCase.id,
-        },
-        data: {
-          organizationId: org1.id,
-          buildingId: org1Buildings[1].id,
-          name: "L Street lighting financing case",
-          description: "Seeded financing case tied to the top-ranked LED retrofit candidate.",
-          caseType: "SINGLE_CANDIDATE",
-          status: "ACTIVE",
-          complianceCycle: "CYCLE_1",
-          targetFilingYear: 2026,
-          estimatedCapex: seededRetrofitCandidate.estimatedCapex,
-          estimatedAnnualSavingsKbtu: seededRetrofitCandidate.estimatedAnnualSavingsKbtu,
-          estimatedAnnualSavingsUsd: seededRetrofitCandidate.estimatedAnnualSavingsUsd,
-          estimatedAvoidedPenalty: 60000,
-          estimatedComplianceImprovementPct:
-            seededRetrofitCandidate.estimatedBepsImprovementPct,
-          casePayload: {
-            seeded: true,
-            note: "Structural financing case seed for Sprint 14 validation.",
-          },
-          createdByType: "SYSTEM",
-          createdById: "seed",
-        },
-      })
-    : await prisma.financingCase.create({
-        data: {
-          organizationId: org1.id,
-          buildingId: org1Buildings[1].id,
-          name: "L Street lighting financing case",
-          description: "Seeded financing case tied to the top-ranked LED retrofit candidate.",
-          caseType: "SINGLE_CANDIDATE",
-          status: "ACTIVE",
-          complianceCycle: "CYCLE_1",
-          targetFilingYear: 2026,
-          estimatedCapex: seededRetrofitCandidate.estimatedCapex,
-          estimatedAnnualSavingsKbtu: seededRetrofitCandidate.estimatedAnnualSavingsKbtu,
-          estimatedAnnualSavingsUsd: seededRetrofitCandidate.estimatedAnnualSavingsUsd,
-          estimatedAvoidedPenalty: 60000,
-          estimatedComplianceImprovementPct:
-            seededRetrofitCandidate.estimatedBepsImprovementPct,
-          casePayload: {
-            seeded: true,
-            note: "Structural financing case seed for Sprint 14 validation.",
-          },
-          createdByType: "SYSTEM",
-          createdById: "seed",
-        },
-      });
-
-  await prisma.financingCaseCandidate.upsert({
-    where: {
-      financingCaseId_retrofitCandidateId: {
-        financingCaseId: financingCase.id,
-        retrofitCandidateId: seededRetrofitCandidate.id,
-      },
-    },
-    update: {
-      organizationId: org1.id,
-      buildingId: org1Buildings[1].id,
-      sortOrder: 0,
-    },
-    create: {
-      organizationId: org1.id,
-      buildingId: org1Buildings[1].id,
-      financingCaseId: financingCase.id,
-      retrofitCandidateId: seededRetrofitCandidate.id,
-      sortOrder: 0,
-    },
-  });
+      }));
 
   console.log("Seed complete:");
   console.log("  Rule Packages: 3");
@@ -2237,7 +2158,6 @@ async function main(): Promise<void> {
   console.log("  BEPS ACP Agreements: 1");
   console.log("  PM Sync States: 1");
   console.log("  Retrofit Candidates: 1");
-  console.log("  Financing Cases: 1");
 }
 
 main()
@@ -2249,3 +2169,4 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
+

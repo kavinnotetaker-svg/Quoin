@@ -42,6 +42,10 @@ import {
   evaluateAndUpsertBenchmarkSubmission,
   type BenchmarkReadinessResult,
 } from "./benchmarking";
+import { refreshSourceReconciliationDataIssues } from "./data-issues";
+
+// Legacy benchmarking compatibility layer only. The current Portfolio Manager
+// connection, setup, import, and push workflow lives in src/server/portfolio-manager/*.
 
 const PM_SYNC_SYSTEM = "ENERGY_STAR_PORTFOLIO_MANAGER";
 const PM_STALE_DAYS = 30;
@@ -371,7 +375,17 @@ function buildQaPayload(input: {
   const readinessFinding = (code: string) =>
     input.readiness?.findings.find((finding) => finding.code === code) ?? null;
 
-  const missingCoverage = readinessFinding("MISSING_COVERAGE");
+  const missingCoverage =
+    readinessFinding("MISSING_COVERAGE") ??
+    (input.readiness?.summary.coverageComplete === false
+      ? {
+          status: "FAIL" as const,
+          message: "Utility data does not fully cover the reporting year without gaps.",
+          metadata: {
+            missingCoverageStreams: input.readiness.summary.missingCoverageStreams,
+          },
+        }
+      : null);
   findings.push({
     code: "MISSING_COVERAGE",
     status: missingCoverage?.status === "FAIL" ? "FAIL" : "PASS",
@@ -382,7 +396,17 @@ function buildQaPayload(input: {
     metadata: missingCoverage?.metadata,
   });
 
-  const overlappingBills = readinessFinding("OVERLAPPING_BILLS");
+  const overlappingBills =
+    readinessFinding("OVERLAPPING_BILLS") ??
+    ((input.readiness?.summary.overlapStreams.length ?? 0) > 0
+      ? {
+          status: "FAIL" as const,
+          message: "Overlapping billing periods were detected in utility data.",
+          metadata: {
+            overlapStreams: input.readiness?.summary.overlapStreams ?? [],
+          },
+        }
+      : null);
   findings.push({
     code: "OVERLAPPING_PERIODS",
     status: overlappingBills?.status === "FAIL" ? "FAIL" : "PASS",
@@ -409,6 +433,12 @@ async function persistSyncState(input: {
   status: PortfolioManagerSyncStatus;
   lastAttemptedSyncAt: Date;
   lastSuccessfulSyncAt?: Date | null;
+  lastFailedSyncAt?: Date | null;
+  attemptCount?: number;
+  retryCount?: number;
+  latestJobId?: string | null;
+  latestErrorCode?: string | null;
+  latestErrorMessage?: string | null;
   lastErrorMetadata?: Record<string, unknown>;
   sourceMetadata?: Record<string, unknown>;
   syncMetadata?: Record<string, unknown>;
@@ -424,6 +454,12 @@ async function persistSyncState(input: {
       status: input.status,
       lastAttemptedSyncAt: input.lastAttemptedSyncAt,
       lastSuccessfulSyncAt: input.lastSuccessfulSyncAt ?? null,
+      lastFailedSyncAt: input.lastFailedSyncAt ?? null,
+      attemptCount: input.attemptCount ?? 0,
+      retryCount: input.retryCount ?? 0,
+      latestJobId: input.latestJobId ?? null,
+      latestErrorCode: input.latestErrorCode ?? null,
+      latestErrorMessage: input.latestErrorMessage ?? null,
       lastErrorMetadata: toJson(input.lastErrorMetadata ?? {}),
       sourceMetadata: toJson(input.sourceMetadata ?? {}),
       syncMetadata: toJson(input.syncMetadata ?? {}),
@@ -433,6 +469,12 @@ async function persistSyncState(input: {
       status: input.status,
       lastAttemptedSyncAt: input.lastAttemptedSyncAt,
       lastSuccessfulSyncAt: input.lastSuccessfulSyncAt ?? undefined,
+      lastFailedSyncAt: input.lastFailedSyncAt ?? undefined,
+      attemptCount: input.attemptCount ?? undefined,
+      retryCount: input.retryCount ?? undefined,
+      latestJobId: input.latestJobId ?? undefined,
+      latestErrorCode: input.latestErrorCode ?? undefined,
+      latestErrorMessage: input.latestErrorMessage ?? undefined,
       lastErrorMetadata: toJson(input.lastErrorMetadata ?? {}),
       sourceMetadata: toJson(input.sourceMetadata ?? {}),
       syncMetadata: toJson(input.syncMetadata ?? {}),
@@ -459,7 +501,7 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
     buildingId: params.buildingId,
     maxAttempts: 3,
   });
-  await markRunning(job.id);
+  const runningJob = await markRunning(job.id);
   const logger = createLogger({
     requestId: params.requestId ?? null,
     jobId: job.id,
@@ -621,6 +663,24 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       jobId: job.id,
     },
   });
+  await persistSyncState({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    status: "RUNNING",
+    lastAttemptedSyncAt: now,
+    attemptCount: runningJob.attempts,
+    retryCount: Math.max(runningJob.attempts - 1, 0),
+    latestJobId: job.id,
+    sourceMetadata: {
+      system: PM_SYNC_SYSTEM,
+      reportingYear,
+    },
+    syncMetadata: {
+      reportingYear,
+      stepStatuses: createInitialStepStatuses("RUNNING"),
+      runtimeStatus: "RUNNING",
+    },
+  });
   let building;
   let existingSubmission;
   let previousSyncState;
@@ -702,7 +762,7 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
   const stepErrors: PortfolioManagerSyncErrorDetail[] = [];
   const warnings: string[] = [];
   let propertySnapshot: PortfolioManagerPropertySnapshot | null = null;
-  let meterSnapshots: PortfolioManagerMeterSnapshot[] = [];
+  const meterSnapshots: PortfolioManagerMeterSnapshot[] = [];
   let metricsSummary: PropertyMetrics | null = null;
   let readiness: BenchmarkReadinessResult | null = null;
   let benchmarkSubmission: {
@@ -726,6 +786,9 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
     status: "RUNNING",
     lastAttemptedSyncAt: now,
     lastSuccessfulSyncAt: previousLastSuccessfulSyncAt,
+    attemptCount: runningJob.attempts,
+    retryCount: Math.max(runningJob.attempts - 1, 0),
+    latestJobId: job.id,
     lastErrorMetadata: {},
     sourceMetadata: {
       system: PM_SYNC_SYSTEM,
@@ -741,6 +804,7 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       activeLinkedMeters: 0,
       snapshotId: null,
       benchmarkSubmissionId: null,
+      runtimeStatus: "RUNNING",
     },
   });
 
@@ -770,6 +834,12 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       status: "FAILED",
       lastAttemptedSyncAt: now,
       lastSuccessfulSyncAt: previousLastSuccessfulSyncAt,
+      lastFailedSyncAt: now,
+      attemptCount: runningJob.attempts,
+      retryCount: Math.max(runningJob.attempts - 1, 0),
+      latestJobId: job.id,
+      latestErrorCode: "PROPERTY_LINKAGE_MISSING",
+      latestErrorMessage: "Portfolio Manager property linkage is missing.",
       lastErrorMetadata: buildSyncErrorMetadata({
         warnings,
         errors: stepErrors,
@@ -792,6 +862,7 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
         activeLinkedMeters,
         snapshotId,
         benchmarkSubmissionId: null,
+        runtimeStatus: "FAILED",
       },
       qaPayload: buildQaPayload({
         reportingYear,
@@ -1426,6 +1497,15 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       status: finalStatus,
       lastAttemptedSyncAt: now,
       lastSuccessfulSyncAt,
+      lastFailedSyncAt:
+        finalStatus === "FAILED" || finalStatus === "PARTIAL" ? now : null,
+      attemptCount: runningJob.attempts,
+      retryCount: stepErrors.some((detail) => detail.retryable)
+        ? Math.max(runningJob.attempts - 1, 0)
+        : 0,
+      latestJobId: job.id,
+      latestErrorCode: stepErrors[0]?.errorCode ?? null,
+      latestErrorMessage: stepErrors[0]?.message ?? warnings[0] ?? null,
       lastErrorMetadata: buildSyncErrorMetadata({
         warnings,
         errors: stepErrors,
@@ -1449,6 +1529,13 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
         activeLinkedMeters,
         snapshotId,
         benchmarkSubmissionId: benchmarkSubmission?.id ?? null,
+        runtimeStatus:
+          finalStatus === "FAILED"
+            ? "FAILED"
+            : finalStatus === "PARTIAL" &&
+                stepErrors.some((detail) => detail.retryable)
+              ? "RETRYING"
+              : "SUCCEEDED",
       },
       qaPayload: buildQaPayload({
         reportingYear,
@@ -1460,6 +1547,20 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
         evaluatedAt: now,
       }),
     });
+
+    try {
+      await refreshSourceReconciliationDataIssues({
+        organizationId: params.organizationId,
+        buildingId: params.buildingId,
+        actorType: params.producedByType,
+        actorId: params.producedById ?? null,
+        requestId: params.requestId ?? null,
+      });
+    } catch (reconciliationError) {
+      logger.warn("Portfolio Manager reconciliation refresh failed", {
+        error: reconciliationError,
+      });
+    }
 
     await completeOperationalJob({
       status: finalStatus,
@@ -1508,6 +1609,12 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
       status: "FAILED",
       lastAttemptedSyncAt: now,
       lastSuccessfulSyncAt,
+      lastFailedSyncAt: now,
+      attemptCount: runningJob.attempts,
+      retryCount: detail.retryable ? Math.max(runningJob.attempts - 1, 0) : 0,
+      latestJobId: job.id,
+      latestErrorCode: detail.errorCode ?? null,
+      latestErrorMessage: detail.message,
       lastErrorMetadata: buildSyncErrorMetadata({
         warnings,
         errors: stepErrors,
@@ -1531,6 +1638,7 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
         activeLinkedMeters,
         snapshotId,
         benchmarkSubmissionId: benchmarkSubmission?.id ?? null,
+        runtimeStatus: detail.retryable ? "RETRYING" : "FAILED",
       },
       qaPayload: buildQaPayload({
         reportingYear,
@@ -1542,6 +1650,20 @@ export async function syncPortfolioManagerForBuildingReliable(params: {
         evaluatedAt: now,
       }),
     });
+
+    try {
+      await refreshSourceReconciliationDataIssues({
+        organizationId: params.organizationId,
+        buildingId: params.buildingId,
+        actorType: params.producedByType,
+        actorId: params.producedById ?? null,
+        requestId: params.requestId ?? null,
+      });
+    } catch (reconciliationError) {
+      logger.warn("Portfolio Manager reconciliation refresh failed", {
+        error: reconciliationError,
+      });
+    }
 
     logger.error("Portfolio Manager sync persisted failed state", {
       reportingYear,

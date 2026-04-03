@@ -4,9 +4,9 @@ import process from "node:process";
 import { Client } from "pg";
 
 function getBaseDatabaseUrl() {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required");
+    throw new Error("DIRECT_URL or DATABASE_URL is required");
   }
 
   return databaseUrl;
@@ -32,6 +32,24 @@ function runPrisma(args, env) {
       ...env,
     },
   });
+}
+
+function isProvisioningPrivilegeError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("permission denied to create database") ||
+    message.includes("permission denied to drop database") ||
+    message.includes("must be owner of database") ||
+    message.includes("CREATE DATABASE cannot run inside a transaction block")
+  );
+}
+
+function printProvisioningPrivilegeHelp(scriptName) {
+  console.error(
+    `${scriptName} requires a Postgres role that can create and drop temporary validation and shadow databases. ` +
+      "Use a local admin-capable Postgres instance for this path; a hosted Supabase connection string " +
+      "is not sufficient for it.",
+  );
 }
 
 async function querySingleRow(connectionString, query) {
@@ -129,7 +147,10 @@ async function querySeededCounts(connectionString) {
               '[]'::jsonb
             )
           ) band
-          WHERE band->>'label' = 'PRIVATE_25K_TO_49_999') AS benchmarking_private_25k_band,
+          WHERE band->>'label' = 'PRIVATE_10K_TO_24_999'
+            AND band->>'deadlineType' = 'MAY_1_FOLLOWING_YEAR'
+            AND band->'verificationYears' = '[2027]'::jsonb
+            AND band->>'verificationCadenceYears' = '6') AS benchmarking_private_10k_band,
         (SELECT COUNT(*)
           FROM jsonb_array_elements(
             COALESCE(
@@ -143,7 +164,44 @@ async function querySeededCounts(connectionString) {
               '[]'::jsonb
             )
           ) band
-          WHERE band->>'label' = 'DISTRICT_10K_PLUS') AS benchmarking_district_band,
+          WHERE band->>'label' = 'PRIVATE_25K_TO_49_999'
+            AND band->>'deadlineType' = 'MAY_1_FOLLOWING_YEAR'
+            AND band->'verificationYears' = '[2024, 2027]'::jsonb
+            AND band->>'verificationCadenceYears' = '6') AS benchmarking_private_25k_band,
+        (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+            COALESCE(
+              (
+                SELECT factors_json->'benchmarking'->'applicabilityBands'
+                FROM factor_set_versions
+                WHERE key = 'DC_CURRENT_STANDARDS' AND status = 'ACTIVE'
+                ORDER BY effective_from DESC, created_at DESC
+                LIMIT 1
+              ),
+              '[]'::jsonb
+            )
+          ) band
+          WHERE band->>'label' = 'PRIVATE_50K_PLUS'
+            AND band->>'deadlineType' = 'MAY_1_FOLLOWING_YEAR'
+            AND band->'verificationYears' = '[2024, 2027]'::jsonb
+            AND band->>'verificationCadenceYears' = '6') AS benchmarking_private_50k_band,
+        (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+            COALESCE(
+              (
+                SELECT factors_json->'benchmarking'->'applicabilityBands'
+                FROM factor_set_versions
+                WHERE key = 'DC_CURRENT_STANDARDS' AND status = 'ACTIVE'
+                ORDER BY effective_from DESC, created_at DESC
+                LIMIT 1
+              ),
+              '[]'::jsonb
+            )
+          ) band
+          WHERE band->>'label' = 'DISTRICT_10K_PLUS'
+            AND band->>'deadlineType' = 'WITHIN_DAYS_OF_BENCHMARK_GENERATION'
+            AND band->>'deadlineDaysFromGeneration' = '60'
+            AND band->>'manualSubmissionAllowedWhenNotBenchmarkable' = 'true') AS benchmarking_district_band,
         (SELECT COUNT(*) FROM organizations) AS organizations,
         (SELECT COUNT(*) FROM users) AS users,
         (SELECT COUNT(*) FROM organization_memberships) AS memberships,
@@ -153,9 +211,7 @@ async function querySeededCounts(connectionString) {
         (SELECT COUNT(*) FROM beps_prescriptive_items) AS beps_prescriptive_items,
         (SELECT COUNT(*) FROM beps_alternative_compliance_agreements) AS beps_acp_agreements,
         (SELECT COUNT(*) FROM portfolio_manager_sync_states) AS pm_sync_states,
-        (SELECT COUNT(*) FROM retrofit_candidates) AS retrofit_candidates,
-        (SELECT COUNT(*) FROM financing_cases) AS financing_cases,
-        (SELECT COUNT(*) FROM financing_case_candidates) AS financing_case_candidates
+        (SELECT COUNT(*) FROM retrofit_candidates) AS retrofit_candidates
     `,
   );
 }
@@ -199,15 +255,19 @@ async function main() {
 
     runPrisma(["migrate", "deploy"], {
       DATABASE_URL: validationUrl,
+      DIRECT_URL: validationUrl,
     });
     runPrisma(["generate"], {
       DATABASE_URL: validationUrl,
+      DIRECT_URL: validationUrl,
     });
     runPrisma(["validate"], {
       DATABASE_URL: validationUrl,
+      DIRECT_URL: validationUrl,
     });
     runPrisma(["db", "seed"], {
       DATABASE_URL: validationUrl,
+      DIRECT_URL: validationUrl,
     });
 
     const seededCounts = await querySeededCounts(validationUrl);
@@ -231,16 +291,16 @@ async function main() {
       Number(seededCounts.beps_cycle_2_trajectory_2027_rows) !== 0 ||
       Number(seededCounts.beps_cycle_2_trajectory_2028_rows) < 1 ||
       Number(seededCounts.benchmarking_applicability_bands) < 4 ||
+      Number(seededCounts.benchmarking_private_10k_band) !== 1 ||
       Number(seededCounts.benchmarking_private_25k_band) !== 1 ||
+      Number(seededCounts.benchmarking_private_50k_band) !== 1 ||
       Number(seededCounts.benchmarking_district_band) !== 1 ||
       Number(seededCounts.beps_cycles) < 2 ||
       Number(seededCounts.beps_metric_inputs) < 1 ||
       Number(seededCounts.beps_prescriptive_items) < 1 ||
       Number(seededCounts.beps_acp_agreements) < 1 ||
       Number(seededCounts.pm_sync_states) < 1 ||
-      Number(seededCounts.retrofit_candidates) < 1 ||
-      Number(seededCounts.financing_cases) < 1 ||
-      Number(seededCounts.financing_case_candidates) < 1
+      Number(seededCounts.retrofit_candidates) < 1
     ) {
       throw new Error(
         "Seed verification failed to produce active governed BEPS multi-cycle records",
@@ -251,6 +311,7 @@ async function main() {
 
     runPrisma(["db", "seed"], {
       DATABASE_URL: validationUrl,
+      DIRECT_URL: validationUrl,
     });
 
     const reseededCounts = await querySeededCounts(validationUrl);
@@ -266,12 +327,14 @@ async function main() {
       env: {
         ...process.env,
         DATABASE_URL: validationUrl,
+        DIRECT_URL: validationUrl,
       },
     });
     runPrisma(
       ["db", "execute", "--file", "prisma/validate-tenant-constraints.sql"],
       {
         DATABASE_URL: validationUrl,
+        DIRECT_URL: validationUrl,
       },
     );
 
@@ -286,6 +349,7 @@ async function main() {
       ],
       {
         DATABASE_URL: validationUrl,
+        DIRECT_URL: validationUrl,
         SHADOW_DATABASE_URL: shadowUrl,
       },
     );
@@ -297,6 +361,9 @@ async function main() {
 }
 
 main().catch((error) => {
+  if (isProvisioningPrivilegeError(error)) {
+    printProvisioningPrivilegeHelp("npm run db:validate:fresh");
+  }
   console.error(error);
   process.exit(1);
 });

@@ -31,6 +31,20 @@ export function createQueue(name: string, opts?: JobsOptions): Queue {
   });
 }
 
+export async function withQueue<T>(
+  name: string,
+  fn: (queue: Queue) => Promise<T>,
+  opts?: JobsOptions,
+): Promise<T> {
+  const queue = createQueue(name, opts);
+
+  try {
+    return await fn(queue);
+  } finally {
+    await queue.close().catch(() => null);
+  }
+}
+
 export function createWorker(
   name: string,
   processor: Processor,
@@ -45,6 +59,13 @@ export function createWorker(
 /** Queue names — single source of truth */
 export const QUEUES = {
   DATA_INGESTION: "data-ingestion",
+  UTILITY_BILL_EXTRACTION: "utility-bill-extraction",
+  PORTFOLIO_MANAGER_PROVISIONING: "portfolio-manager-provisioning",
+  PORTFOLIO_MANAGER_IMPORT: "portfolio-manager-import",
+  PORTFOLIO_MANAGER_PROVIDER_SYNC: "portfolio-manager-provider-sync",
+  PORTFOLIO_MANAGER_SETUP: "portfolio-manager-setup",
+  PORTFOLIO_MANAGER_METER_SETUP: "portfolio-manager-meter-setup",
+  PORTFOLIO_MANAGER_USAGE: "portfolio-manager-usage",
   ESPM_SYNC: "espm-sync",
   PATHWAY_ANALYSIS: "pathway-analysis",
   CAPITAL_STRUCTURING: "capital-structuring",

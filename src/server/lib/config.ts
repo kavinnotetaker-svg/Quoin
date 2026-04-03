@@ -10,21 +10,26 @@ const envSchema = z
   .object({
     DATABASE_URL: z.string().min(1),
     REDIS_URL: z.string().default("redis://localhost:6379"),
-    CLERK_SECRET_KEY: z.string().min(1),
-    CLERK_WEBHOOK_SECRET: z.string().min(1),
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
+    NEXT_PUBLIC_SUPABASE_URL: optStr.pipe(z.string().url().optional()),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: optStr,
+    SUPABASE_SERVICE_ROLE_KEY: optStr,
+    OCR_SPACE_API_KEY: optStr,
+    GEMINI_API_KEY: optStr,
+    GEMINI_MODEL: optStr,
     ESPM_BASE_URL: z
       .string()
       .url()
       .default("https://portfoliomanager.energystar.gov/ws"),
     ESPM_USERNAME: optStr,
     ESPM_PASSWORD: optStr,
+    ESPM_CREDENTIAL_MASTER_KEY: optStr.pipe(z.string().min(16).optional()),
     NEXT_PUBLIC_MAPBOX_TOKEN: optStr,
     GREEN_BUTTON_CLIENT_ID: optStr,
     GREEN_BUTTON_CLIENT_SECRET: optStr,
     GREEN_BUTTON_AUTH_ENDPOINT: optStr.pipe(z.string().url().optional()),
     GREEN_BUTTON_TOKEN_ENDPOINT: optStr.pipe(z.string().url().optional()),
     GREEN_BUTTON_REDIRECT_URI: optStr.pipe(z.string().url().optional()),
+    GREEN_BUTTON_TOKEN_MASTER_KEY: optStr.pipe(z.string().min(16).optional()),
     GREEN_BUTTON_ENCRYPTION_KEY: optStr.pipe(z.string().min(16).optional()),
     GREEN_BUTTON_SCOPE: optStr,
   })
@@ -58,12 +63,15 @@ const envSchema = z
       });
     }
 
-    if (providedGreenButtonFields.length > 0 && !value.GREEN_BUTTON_ENCRYPTION_KEY) {
+    const greenButtonTokenMasterKey =
+      value.GREEN_BUTTON_TOKEN_MASTER_KEY ?? value.GREEN_BUTTON_ENCRYPTION_KEY;
+
+    if (providedGreenButtonFields.length > 0 && !greenButtonTokenMasterKey) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          "GREEN_BUTTON_ENCRYPTION_KEY must be set when Green Button OAuth is enabled.",
-        path: ["GREEN_BUTTON_ENCRYPTION_KEY"],
+          "GREEN_BUTTON_TOKEN_MASTER_KEY must be set when Green Button OAuth is enabled.",
+        path: ["GREEN_BUTTON_TOKEN_MASTER_KEY"],
       });
     }
   });
@@ -75,6 +83,50 @@ export class ServerConfigError extends Error {
     super(message);
     this.name = "ServerConfigError";
   }
+}
+
+export function getSupabaseAuthConfig() {
+  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new ServerConfigError(
+      "Supabase Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+    );
+  }
+
+  return {
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    anonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  };
+}
+
+export function getSupabaseServiceRoleKey() {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new ServerConfigError(
+      "Supabase service role key is not configured.",
+    );
+  }
+
+  return env.SUPABASE_SERVICE_ROLE_KEY;
+}
+
+export function getOcrSpaceApiKey() {
+  if (!env.OCR_SPACE_API_KEY) {
+    throw new ServerConfigError(
+      "OCR.space API key is not configured.",
+    );
+  }
+
+  return env.OCR_SPACE_API_KEY;
+}
+
+export function getOptionalGeminiConfig() {
+  if (!env.GEMINI_API_KEY) {
+    return null;
+  }
+
+  return {
+    apiKey: env.GEMINI_API_KEY,
+    model: env.GEMINI_MODEL ?? "gemini-2.5-flash",
+  };
 }
 
 export function getEspmClientConfig() {
@@ -89,6 +141,22 @@ export function getEspmClientConfig() {
     username: env.ESPM_USERNAME,
     password: env.ESPM_PASSWORD,
   };
+}
+
+export function getEspmCredentialMasterKey() {
+  const key = process.env.ESPM_CREDENTIAL_MASTER_KEY ?? env.ESPM_CREDENTIAL_MASTER_KEY ?? null;
+  return key && key.length >= 16 ? key : null;
+}
+
+export function requireEspmCredentialMasterKey() {
+  const key = getEspmCredentialMasterKey();
+  if (!key) {
+    throw new ServerConfigError(
+      "ESPM credential master key is not configured.",
+    );
+  }
+
+  return key;
 }
 
 export function getOptionalGreenButtonConfig() {
@@ -114,10 +182,17 @@ export function getOptionalGreenButtonConfig() {
   };
 }
 
-export function getGreenButtonEncryptionKey() {
-  return env.GREEN_BUTTON_ENCRYPTION_KEY ?? null;
+export function getGreenButtonTokenMasterKey() {
+  return env.GREEN_BUTTON_TOKEN_MASTER_KEY ?? env.GREEN_BUTTON_ENCRYPTION_KEY ?? null;
 }
 
-export function getClerkWebhookSecret() {
-  return env.CLERK_WEBHOOK_SECRET;
+export function requireGreenButtonTokenMasterKey() {
+  const key = getGreenButtonTokenMasterKey();
+  if (!key) {
+    throw new ServerConfigError(
+      "Green Button token master key is not configured.",
+    );
+  }
+
+  return key;
 }

@@ -4,11 +4,16 @@ import { processCSVUpload } from "@/server/pipelines/data-ingestion/logic";
 import type { MeterType } from "@/server/pipelines/data-ingestion/types";
 import {
   TenantAccessError,
-  requireTenantContextFromSession,
+  requireOperatorTenantContextFromSession,
 } from "@/server/lib/tenant-access";
 import { createLogger } from "@/server/lib/logger";
-import { buildCsvUploadIngestionEnvelope } from "@/server/pipelines/data-ingestion/envelope";
 import { refreshBuildingIssuesAfterDataChange } from "@/server/compliance/data-issues";
+import {
+  applyRateLimit,
+  createRateLimitExceededResponse,
+  getRateLimitClientKey,
+  withRateLimitHeaders,
+} from "@/server/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -16,12 +21,27 @@ export async function POST(req: NextRequest) {
     requestId,
     procedure: "upload.csv",
   });
+  const rateLimit = await applyRateLimit({
+    scope: "upload-csv",
+    key: getRateLimitClientKey(req),
+    limit: 12,
+    windowSeconds: 60,
+  });
+  if (!rateLimit.allowed) {
+    return createRateLimitExceededResponse({
+      message: "Too many CSV uploads. Please wait and try again.",
+      result: rateLimit,
+    });
+  }
   let tenant;
   try {
-    tenant = await requireTenantContextFromSession();
+    tenant = await requireOperatorTenantContextFromSession();
   } catch (error) {
     if (error instanceof TenantAccessError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return withRateLimitHeaders(
+        NextResponse.json({ error: error.message }, { status: error.status }),
+        rateLimit,
+      );
     }
 
     throw error;
@@ -35,15 +55,21 @@ export async function POST(req: NextRequest) {
     const unitHint = formData.get("unit") as string | null;
 
     if (!file) {
-      return NextResponse.json(
-        { error: "No file provided" },
-        { status: 400 },
+      return withRateLimitHeaders(
+        NextResponse.json(
+          { error: "No file provided" },
+          { status: 400 },
+        ),
+        rateLimit,
       );
     }
     if (!buildingId) {
-      return NextResponse.json(
-        { error: "buildingId is required" },
-        { status: 400 },
+      return withRateLimitHeaders(
+        NextResponse.json(
+          { error: "buildingId is required" },
+          { status: 400 },
+        ),
+        rateLimit,
       );
     }
 
@@ -52,16 +78,22 @@ export async function POST(req: NextRequest) {
       !file.name.endsWith(".tsv") &&
       !file.name.endsWith(".txt")
     ) {
-      return NextResponse.json(
-        { error: "File must be .csv, .tsv, or .txt" },
-        { status: 400 },
+      return withRateLimitHeaders(
+        NextResponse.json(
+          { error: "File must be .csv, .tsv, or .txt" },
+          { status: 400 },
+        ),
+        rateLimit,
       );
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "File too large (max 10MB)" },
-        { status: 400 },
+      return withRateLimitHeaders(
+        NextResponse.json(
+          { error: "File too large (max 10MB)" },
+          { status: 400 },
+        ),
+        rateLimit,
       );
     }
 
@@ -69,9 +101,12 @@ export async function POST(req: NextRequest) {
       where: { id: buildingId },
     });
     if (!building) {
-      return NextResponse.json(
-        { error: "Building not found" },
-        { status: 404 },
+      return withRateLimitHeaders(
+        NextResponse.json(
+          { error: "Building not found" },
+          { status: 404 },
+        ),
+        rateLimit,
       );
     }
 
@@ -87,51 +122,21 @@ export async function POST(req: NextRequest) {
       tenantDb: tenant.tenantDb,
     });
 
-    // Run pipeline inline to create ComplianceSnapshot
+    // Run pipeline inline to create local derived artifacts.
     try {
       const { runIngestionPipeline } = await import("@/server/pipelines/data-ingestion/logic");
-      const envelope = buildCsvUploadIngestionEnvelope({
-        requestId,
-        organizationId: tenant.organizationId,
+      const pipelineResult = await runIngestionPipeline({
         buildingId,
+        organizationId: tenant.organizationId,
         uploadBatchId: result.uploadBatchId,
         triggerType: "CSV_UPLOAD",
-      });
-      let espmClient;
-      try {
-        const { createESPMClient } = await import("@/server/integrations/espm");
-        espmClient = createESPMClient();
-      } catch {
-        logger.warn("Upload pipeline ESPM client not available, skipping sync");
-      }
-      const pipelineResult = await runIngestionPipeline({
-        buildingId: envelope.buildingId,
-        organizationId: envelope.organizationId,
-        uploadBatchId: envelope.payload.uploadBatchId,
-        triggerType: envelope.payload.triggerType,
         tenantDb: tenant.tenantDb,
-        espmClient,
       });
       logger.info("Upload pipeline completed", {
         summary: pipelineResult.summary,
         organizationId: tenant.organizationId,
         buildingId,
       });
-      try {
-        await refreshBuildingIssuesAfterDataChange({
-          organizationId: tenant.organizationId,
-          buildingId,
-          actorType: "SYSTEM",
-          actorId: null,
-          requestId,
-        });
-      } catch (issueRefreshError) {
-        logger.warn("Upload issue refresh failed", {
-          error: issueRefreshError,
-          organizationId: tenant.organizationId,
-          buildingId,
-        });
-      }
       if (pipelineResult.errors.length > 0) {
         result.warnings.push(...pipelineResult.errors.map(e => `Pipeline: ${e}`));
       }
@@ -146,14 +151,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(result, { status: result.success ? 200 : 422 });
+    try {
+      await refreshBuildingIssuesAfterDataChange({
+        organizationId: tenant.organizationId,
+        buildingId,
+        actorType: "SYSTEM",
+        actorId: null,
+        requestId,
+      });
+    } catch (issueRefreshError) {
+      logger.warn("Upload issue refresh failed", {
+        error: issueRefreshError,
+        organizationId: tenant.organizationId,
+        buildingId,
+      });
+    }
+
+    return withRateLimitHeaders(
+      NextResponse.json(result, { status: result.success ? 200 : 422 }),
+      rateLimit,
+    );
   } catch (error) {
     logger.error("Upload processing failed", {
       error,
     });
-    return NextResponse.json(
-      { error: "Upload processing failed" },
-      { status: 500 },
+    return withRateLimitHeaders(
+      NextResponse.json(
+        { error: "Upload processing failed" },
+        { status: 500 },
+      ),
+      rateLimit,
     );
   }
 }

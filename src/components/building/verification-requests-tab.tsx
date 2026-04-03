@@ -1,13 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   downloadFile,
   EmptyState,
   ErrorState,
   LoadingState,
-  MetricGrid,
   Panel,
   formatDate,
 } from "@/components/internal/admin-primitives";
@@ -64,23 +63,54 @@ function getReadinessStatus(data: unknown) {
     return "NOT_STARTED";
   }
 
-  const payload = (data as { submissionPayload?: unknown }).submissionPayload;
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return "NOT_STARTED";
-  }
-
-  const readiness = (payload as Record<string, unknown>)["readiness"];
-  if (!readiness || typeof readiness !== "object" || Array.isArray(readiness)) {
-    return "NOT_STARTED";
-  }
-
-  const status = (readiness as Record<string, unknown>)["status"];
+  const status = (data as { status?: unknown }).status;
   return typeof status === "string" ? status : "NOT_STARTED";
 }
 
-export function VerificationRequestsTab({ buildingId }: { buildingId: string }) {
+function DisclosureSection({
+  title,
+  summary,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  summary?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="rounded-2xl border border-zinc-200/80 bg-[#fafbfc] px-4 py-3"
+    >
+      <summary className="cursor-pointer list-none">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold tracking-tight text-zinc-900">{title}</div>
+            {summary ? (
+              <div className="mt-1 text-[12px] leading-5 text-zinc-500">{summary}</div>
+            ) : null}
+          </div>
+          <div className="text-[12px] text-zinc-500">Show</div>
+        </div>
+      </summary>
+      <div className="mt-4">{children}</div>
+    </details>
+  );
+}
+
+export function VerificationRequestsTab({
+  buildingId,
+  showPacketActions = true,
+  canManage = false,
+}: {
+  buildingId: string;
+  showPacketActions?: boolean;
+  canManage?: boolean;
+}) {
   const [reportingYear, setReportingYear] = useState(defaultReportingYear());
   const [editingRequestId, setEditingRequestId] = useState<string | undefined>();
+  const [showComposer, setShowComposer] = useState(false);
   const [category, setCategory] = useState<(typeof REQUEST_CATEGORIES)[number]["value"]>(
     "DC_REAL_PROPERTY_ID",
   );
@@ -126,6 +156,7 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
     onSuccess: () => {
       invalidateAll();
       setEditingRequestId(undefined);
+      setShowComposer(false);
       setCategory("DC_REAL_PROPERTY_ID");
       setTitle("DC Real Property Unique ID");
       setStatus("REQUESTED");
@@ -145,7 +176,6 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
     onSuccess: invalidateAll,
   });
 
-  const readinessDisplay = getReadinessStatusDisplay(getReadinessStatus(readiness.data));
   const packetStatusDisplay = getPacketStatusDisplay(latestPacket.data?.status ?? "NONE");
   const manifestWarnings = Array.isArray(packetManifest.data?.warnings)
     ? packetManifest.data.warnings
@@ -154,13 +184,11 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
     ? packetManifest.data.blockers
     : [];
 
-  const packetDisposition = useMemo(() => {
-    const disposition = packetManifest.data?.disposition;
-    if (typeof disposition !== "string") {
-      return null;
+  useEffect(() => {
+    if (editingRequestId) {
+      setShowComposer(true);
     }
-    return disposition.replaceAll("_", " ").toLowerCase();
-  }, [packetManifest.data?.disposition]);
+  }, [editingRequestId]);
 
   async function handleExport(format: "JSON" | "MARKDOWN" | "PDF") {
     const result = await utils.benchmarking.exportBenchmarkPacket.fetch({
@@ -189,6 +217,19 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
     setNotes(item.notes ?? "");
   }
 
+  function resetComposer() {
+    setEditingRequestId(undefined);
+    setShowComposer(false);
+    setCategory("DC_REAL_PROPERTY_ID");
+    setTitle("DC Real Property Unique ID");
+    setStatus("REQUESTED");
+    setIsRequired(true);
+    setDueDate("");
+    setAssignedTo("");
+    setRequestedFrom("");
+    setNotes("");
+  }
+
   if (readiness.isLoading || requestItems.isLoading || packets.isLoading) {
     return <LoadingState />;
   }
@@ -203,123 +244,106 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
   }
 
   const btnClass =
-    "rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50";
+    "rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50";
+  const historySummary = packets.data?.[0]
+    ? `${packets.data.length} version(s), latest ${formatDate(packets.data[0].generatedAt)}`
+    : "No benchmark packet history yet";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Panel
-        title="Benchmark verification packet"
-        subtitle="Assemble a verifier-ready workpaper packet from the current readiness result, linked evidence, and open checklist items. PDF export generates the formatted reviewer handoff document; JSON and Markdown remain raw packet exports."
+        title="Review"
+        subtitle={
+          showPacketActions
+            ? "Clear blockers and build the packet."
+            : "Clear blockers and keep only the support items that still matter."
+        }
+        compact
         actions={
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="number"
               value={reportingYear}
               onChange={(event) => setReportingYear(Number(event.target.value))}
-              className="w-28 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-900 shadow-sm"
+              className="w-28 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
             />
-            <button
-              className={btnClass}
-              onClick={() => generateMutation.mutate({ buildingId, reportingYear })}
-              disabled={generateMutation.isPending || readiness.isError}
-            >
-              {generateMutation.isPending
-                ? "Generating..."
-                : latestPacket.data
-                  ? "Regenerate packet"
-                  : "Generate packet"}
-            </button>
-            <button
-              className={btnClass}
-              onClick={() => finalizeMutation.mutate({ buildingId, reportingYear })}
-              disabled={
-                finalizeMutation.isPending ||
-                !latestPacket.data ||
-                latestPacket.data.status === "FINALIZED"
-              }
-            >
-              {finalizeMutation.isPending ? "Finalizing..." : "Finalize packet"}
-            </button>
-            <button
-              className={btnClass}
-              onClick={() => handleExport("JSON")}
-              disabled={!latestPacket.data}
-            >
-              Export JSON
-            </button>
-            <button
-              className={btnClass}
-              onClick={() => handleExport("MARKDOWN")}
-              disabled={!latestPacket.data}
-            >
-              Export Markdown
-            </button>
-            <button
-              className={btnClass}
-              onClick={() => handleExport("PDF")}
-              disabled={!latestPacket.data}
-            >
-              Export PDF
-            </button>
+            {showPacketActions ? (
+              <>
+                <button
+                  className={btnClass}
+                  onClick={() => generateMutation.mutate({ buildingId, reportingYear })}
+                  disabled={generateMutation.isPending || readiness.isError || !canManage}
+                >
+                  {generateMutation.isPending
+                    ? "Generating..."
+                    : latestPacket.data
+                      ? "Refresh packet"
+                      : "Generate packet"}
+                </button>
+                <button
+                  className={btnClass}
+                  onClick={() => finalizeMutation.mutate({ buildingId, reportingYear })}
+                  disabled={
+                    finalizeMutation.isPending ||
+                    !latestPacket.data ||
+                    latestPacket.data.status === "FINALIZED" ||
+                    !canManage
+                  }
+                >
+                  {finalizeMutation.isPending ? "Finalizing..." : "Finalize packet"}
+                </button>
+              </>
+            ) : null}
           </div>
         }
       >
-        {readiness.error?.data?.code === "NOT_FOUND" ? (
-          <EmptyState message="Run benchmarking readiness first. Quoin needs a benchmark submission before it can assemble a verification packet." />
-        ) : null}
+        <div className="space-y-4 border-t border-zinc-200/80 pt-4">
+          {readiness.error?.data?.code === "NOT_FOUND" ? (
+            <EmptyState message="Run readiness first." />
+          ) : null}
 
-        {generateMutation.error ? (
-          <ErrorState
-            message="Benchmark packet generation failed."
-            detail={generateMutation.error.message}
-          />
-        ) : null}
+          {generateMutation.error ? (
+            <ErrorState
+              message="Benchmark packet generation failed."
+              detail={generateMutation.error.message}
+            />
+          ) : null}
 
-        {finalizeMutation.error ? (
-          <ErrorState
-            message="Benchmark packet finalization failed."
-            detail={finalizeMutation.error.message}
-          />
-        ) : null}
+          {finalizeMutation.error ? (
+            <ErrorState
+              message="Benchmark packet finalization failed."
+              detail={finalizeMutation.error.message}
+            />
+          ) : null}
 
-        <MetricGrid
-          items={[
-            { label: "Benchmarking readiness", value: readinessDisplay.label },
-            { label: "Packet status", value: packetStatusDisplay.label },
-            { label: "Packet disposition", value: packetDisposition ?? "Not generated" },
-            {
-              label: "Latest packet version",
-              value: latestPacket.data ? `v${latestPacket.data.version}` : "Not generated",
-            },
-          ]}
-        />
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-5 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-900">Current packet state</span>
-              <StatusBadge
-                label={packetStatusDisplay.label}
-                tone={packetStatusDisplay.tone}
-              />
+          <div className="rounded-2xl border border-zinc-200/80 bg-white/80 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold tracking-tight text-zinc-900">
+                  {manifestBlockers.length > 0
+                    ? `${manifestBlockers.length} blocker(s) to clear`
+                    : manifestWarnings.length > 0
+                      ? `${manifestWarnings.length} warning(s) to review`
+                      : latestPacket.data
+                        ? "Packet ready for review"
+                        : "No packet yet"}
+                </div>
+                <div className="mt-1 text-[12px] leading-5 text-zinc-500">
+                  {latestPacket.data
+                    ? `Packet ${packetStatusDisplay.label.toLowerCase()}. Latest version v${latestPacket.data.version}.`
+                    : "Create the first packet after readiness is ready."}
+                </div>
+              </div>
+              <StatusBadge label={packetStatusDisplay.label} tone={packetStatusDisplay.tone} />
             </div>
-            <p className="mt-2 text-[13px] text-slate-600">
-              {latestPacket.data
-                ? `Latest packet generated ${formatDate(latestPacket.data.generatedAt)}. Finalize only after blockers are resolved and required support is verified.`
-                : "No benchmark verification packet exists yet for this reporting year."}
-            </p>
-          </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-5 text-sm">
-            <div className="font-semibold text-slate-900">Warnings and blockers</div>
-            {manifestWarnings.length === 0 && manifestBlockers.length === 0 ? (
-              <p className="mt-2 text-[13px] text-slate-600">
-                No packet warnings are currently recorded.
-              </p>
-            ) : (
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-slate-700">
+            {manifestBlockers.length > 0 || manifestWarnings.length > 0 ? (
+              <ul className="mt-3 space-y-2 text-sm text-zinc-700">
                 {manifestBlockers.map((item, index) => (
-                  <li key={`blocker-${index}`} className="text-red-700">
+                  <li
+                    key={`blocker-${index}`}
+                    className="rounded-xl border border-red-200/60 bg-red-50/60 px-3 py-2 text-red-800"
+                  >
                     {String(item)}
                   </li>
                 ))}
@@ -328,231 +352,241 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
                     item && typeof item === "object" && !Array.isArray(item)
                       ? String((item as Record<string, unknown>).message ?? "Warning")
                       : String(item);
-                  return <li key={`warning-${index}`}>{message}</li>;
+                  return (
+                    <li
+                      key={`warning-${index}`}
+                      className="rounded-xl border border-amber-200/60 bg-amber-50/60 px-3 py-2 text-amber-800"
+                    >
+                      {message}
+                    </li>
+                  );
                 })}
               </ul>
-            )}
+            ) : null}
           </div>
-        </div>
-      </Panel>
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel
-          title="Client requests and evidence checklist"
-          subtitle="Track the missing items consultants need before benchmarking verification is truly ready."
-        >
+          <div className="border-t border-zinc-200/80 pt-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold tracking-tight text-zinc-900">
+                  Request items
+                </div>
+                <div className="mt-1 text-[12px] leading-5 text-zinc-500">
+                  Ask only for the items still needed.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2 text-sm"
+                onClick={() => {
+                  resetComposer();
+                  setShowComposer(true);
+                }}
+                disabled={!canManage}
+              >
+                Add request item
+              </button>
+            </div>
+          </div>
+
           {requestItems.data && requestItems.data.length > 0 ? (
-            <div className="space-y-4">
-              {requestItems.data.map((item) => {
-                const statusDisplay = getRequestItemStatusDisplay(item.status);
-                return (
-                  <div key={item.id} className="rounded-xl border border-slate-200 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="font-semibold text-slate-900">{item.title}</div>
-                        <div className="mt-1 text-[13px] text-slate-500">
-                          {REQUEST_CATEGORIES.find((entry) => entry.value === item.category)?.label ??
-                            item.category}
-                          {item.isRequired ? " • Required" : " • Optional"}
-                        </div>
+            <div className="space-y-3 border-t border-zinc-200/80 pt-4">
+            {requestItems.data.map((item) => {
+              const statusDisplay = getRequestItemStatusDisplay(item.status);
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-zinc-200/80 bg-white/80 px-4 py-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold tracking-tight text-zinc-900">
+                        {item.title}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge
-                          label={statusDisplay.label}
-                          tone={statusDisplay.tone}
-                        />
+                      <div className="mt-1 text-[12px] text-zinc-500">
+                        {REQUEST_CATEGORIES.find((entry) => entry.value === item.category)?.label ??
+                          item.category}
+                        {item.isRequired ? " | Required" : " | Optional"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge label={statusDisplay.label} tone={statusDisplay.tone} />
+                      {canManage ? (
                         <button
-                          className="text-[12px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-4"
+                          className="text-[12px] font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-4"
                           onClick={() => hydrateEditor(item)}
                         >
                           Edit
                         </button>
-                      </div>
+                      ) : null}
                     </div>
-                    <div className="mt-3 grid gap-2 text-[13px] text-slate-600 md:grid-cols-2">
-                      <div>Due: {formatDate(item.dueDate)}</div>
-                      <div>Requested from: {item.requestedFrom ?? "—"}</div>
-                      <div>Assigned to: {item.assignedTo ?? "—"}</div>
-                      <div>
-                        Linked evidence:{" "}
-                        {item.evidenceArtifact?.name ?? item.sourceArtifact?.name ?? "None linked"}
-                      </div>
-                    </div>
-                    {item.notes ? (
-                      <p className="mt-3 text-[13px] leading-relaxed text-slate-700">{item.notes}</p>
-                    ) : null}
                   </div>
-                );
-              })}
+                  <div className="mt-2 text-sm text-zinc-600">
+                    {item.notes ||
+                      `Due ${formatDate(item.dueDate)} | Assigned ${item.assignedTo ?? "None"} | Evidence ${item.evidenceArtifact?.name ?? item.sourceArtifact?.name ?? "None linked"}`}
+                  </div>
+                </div>
+              );
+            })}
             </div>
           ) : (
-            <EmptyState message="No request items exist yet for this building and reporting year." />
+            <EmptyState message="No request items yet." />
           )}
-        </Panel>
+        </div>
+      </Panel>
 
-        <Panel
-          title={editingRequestId ? "Update request item" : "Add request item"}
-          subtitle="Use this checklist to track what the client or verifier still needs to provide."
+      <DisclosureSection
+        title={editingRequestId ? "Edit request item" : "Request item composer"}
+        summary={
+          editingRequestId
+            ? "Update the selected support item."
+            : "Add the next support item only when needed."
+        }
+        defaultOpen={showComposer}
+      >
+        <form
+          className="space-y-4 rounded-2xl border border-zinc-200/80 bg-white/80 p-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            upsertMutation.mutate({
+              requestItemId: editingRequestId,
+              buildingId,
+              reportingYear,
+              category,
+              title,
+              status,
+              isRequired,
+              dueDate: dueDate ? new Date(`${dueDate}T00:00:00.000Z`).toISOString() : null,
+              assignedTo: assignedTo || null,
+              requestedFrom: requestedFrom || null,
+              notes: notes || null,
+            });
+          }}
         >
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              upsertMutation.mutate({
-                requestItemId: editingRequestId,
-                buildingId,
-                reportingYear,
-                category,
-                title,
-                status,
-                isRequired,
-                dueDate: dueDate ? new Date(`${dueDate}T00:00:00.000Z`).toISOString() : null,
-                assignedTo: assignedTo || null,
-                requestedFrom: requestedFrom || null,
-                notes: notes || null,
-              });
-            }}
-          >
-            <label className="block text-[13px] font-medium text-slate-700">
-              Category
+          <label className="block text-sm font-medium text-zinc-700">
+            Category
+            <select
+              value={category}
+              onChange={(event) => {
+                setCategory(event.target.value as (typeof REQUEST_CATEGORIES)[number]["value"]);
+                if (!editingRequestId) {
+                  const selected = REQUEST_CATEGORIES.find(
+                    (item) => item.value === event.target.value,
+                  );
+                  setTitle(selected?.label ?? event.target.value);
+                }
+              }}
+              className="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
+            >
+              {REQUEST_CATEGORIES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-sm font-medium text-zinc-700">
+            Title
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
+            />
+          </label>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block text-sm font-medium text-zinc-700">
+              Status
               <select
-                value={category}
-                onChange={(event) => {
-                  setCategory(event.target.value as (typeof REQUEST_CATEGORIES)[number]["value"]);
-                  if (!editingRequestId) {
-                    const selected = REQUEST_CATEGORIES.find(
-                      (item) => item.value === event.target.value,
-                    );
-                    setTitle(selected?.label ?? event.target.value);
-                  }
-                }}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
+                value={status}
+                onChange={(event) =>
+                  setStatus(event.target.value as (typeof REQUEST_STATUSES)[number])
+                }
+                className="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
               >
-                {REQUEST_CATEGORIES.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
+                {REQUEST_STATUSES.map((item) => (
+                  <option key={item} value={item}>
+                    {item.replaceAll("_", " ").toLowerCase()}
                   </option>
                 ))}
               </select>
             </label>
 
-            <label className="block text-[13px] font-medium text-slate-700">
-              Title
+            <label className="block text-sm font-medium text-zinc-700">
+              Due date
               <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
               />
             </label>
+          </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block text-[13px] font-medium text-slate-700">
-                Status
-                <select
-                  value={status}
-                  onChange={(event) =>
-                    setStatus(event.target.value as (typeof REQUEST_STATUSES)[number])
-                  }
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
-                >
-                  {REQUEST_STATUSES.map((item) => (
-                    <option key={item} value={item}>
-                      {item.replaceAll("_", " ").toLowerCase()}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block text-[13px] font-medium text-slate-700">
-                Due date
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(event) => setDueDate(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block text-[13px] font-medium text-slate-700">
-                Requested from
-                <input
-                  value={requestedFrom}
-                  onChange={(event) => setRequestedFrom(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
-                />
-              </label>
-
-              <label className="block text-[13px] font-medium text-slate-700">
-                Assigned to
-                <input
-                  value={assignedTo}
-                  onChange={(event) => setAssignedTo(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
-                />
-              </label>
-            </div>
-
-            <label className="flex items-center gap-2 text-[13px] font-medium text-slate-700">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block text-sm font-medium text-zinc-700">
+              Requested from
               <input
-                type="checkbox"
-                checked={isRequired}
-                onChange={(event) => setIsRequired(event.target.checked)}
-              />
-              Required for verification readiness
-            </label>
-
-            <label className="block text-[13px] font-medium text-slate-700">
-              Notes
-              <textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                rows={4}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-[13px]"
+                value={requestedFrom}
+                onChange={(event) => setRequestedFrom(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
               />
             </label>
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="submit"
-                disabled={upsertMutation.isPending}
-                className="rounded-md bg-slate-900 px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
-              >
-                {upsertMutation.isPending
-                  ? "Saving..."
-                  : editingRequestId
-                    ? "Update item"
-                    : "Create item"}
-              </button>
-              {editingRequestId ? (
-                <button
-                  type="button"
-                  className={btnClass}
-                  onClick={() => {
-                    setEditingRequestId(undefined);
-                    setCategory("DC_REAL_PROPERTY_ID");
-                    setTitle("DC Real Property Unique ID");
-                    setStatus("REQUESTED");
-                    setIsRequired(true);
-                    setDueDate("");
-                    setAssignedTo("");
-                    setRequestedFrom("");
-                    setNotes("");
-                  }}
-                >
-                  Cancel edit
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </Panel>
-      </div>
+            <label className="block text-sm font-medium text-zinc-700">
+              Assigned to
+              <input
+                value={assignedTo}
+                onChange={(event) => setAssignedTo(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
 
-      <Panel
-        title="Packet history"
-        subtitle="Track packet versions and whether the latest packet is still current."
-      >
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input
+              type="checkbox"
+              checked={isRequired}
+              onChange={(event) => setIsRequired(event.target.checked)}
+            />
+            Required for verification readiness
+          </label>
+
+          <label className="block text-sm font-medium text-zinc-700">
+            Notes
+            <textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              rows={4}
+              className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            />
+          </label>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="submit"
+              disabled={upsertMutation.isPending || !canManage}
+              className="btn-primary disabled:opacity-50"
+            >
+              {upsertMutation.isPending
+                ? "Saving..."
+                : editingRequestId
+                  ? "Update item"
+                  : "Create item"}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={resetComposer}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </DisclosureSection>
+
+      <DisclosureSection title="Packet history" summary={historySummary}>
         {packets.data && packets.data.length > 0 ? (
           <div className="space-y-3">
             {packets.data.map((packet) => {
@@ -560,13 +594,13 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
               return (
                 <div
                   key={packet.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200/80 bg-white/80 px-4 py-3"
                 >
                   <div>
-                    <div className="font-semibold text-slate-900">
-                      Reporting year {packet.reportingYear} • v{packet.version}
+                    <div className="font-semibold text-zinc-900">
+                      Reporting year {packet.reportingYear} | v{packet.version}
                     </div>
-                    <div className="mt-1 text-[13px] text-slate-500">
+                    <div className="mt-1 text-sm text-zinc-500">
                       Generated {formatDate(packet.generatedAt)}
                     </div>
                   </div>
@@ -578,7 +612,21 @@ export function VerificationRequestsTab({ buildingId }: { buildingId: string }) 
         ) : (
           <EmptyState message="No benchmark verification packets have been generated yet." />
         )}
-      </Panel>
+      </DisclosureSection>
+
+      {showPacketActions && latestPacket.data ? (
+        <div className="flex flex-wrap gap-2">
+          <button className={btnClass} onClick={() => handleExport("PDF")} disabled={!canManage}>
+            Export PDF
+          </button>
+          <button className={btnClass} onClick={() => handleExport("MARKDOWN")} disabled={!canManage}>
+            Export Markdown
+          </button>
+          <button className={btnClass} onClick={() => handleExport("JSON")} disabled={!canManage}>
+            Export JSON
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

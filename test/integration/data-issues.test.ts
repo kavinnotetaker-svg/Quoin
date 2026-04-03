@@ -7,8 +7,8 @@ import { refreshBuildingIssuesAfterDataChange } from "@/server/compliance/data-i
 describe("data issue resolution workflow", () => {
   const scope = `data-issues-${Date.now()}`;
 
-  let org: { id: string; clerkOrgId: string };
-  let user: { id: string; clerkUserId: string };
+  let org: { id: string };
+  let user: { id: string; authUserId: string };
   let benchmarkRuleVersion: { id: string };
   let benchmarkFactorSetVersion: { id: string };
   let blockingBuilding: { id: string };
@@ -17,9 +17,8 @@ describe("data issue resolution workflow", () => {
   function createCaller(requestId: string) {
     return appRouter.createCaller({
       requestId,
-      clerkUserId: user.clerkUserId,
-      clerkOrgId: org.clerkOrgId,
-      clerkOrgRole: "org:admin",
+      authUserId: user.authUserId,
+      activeOrganizationId: org.id,
       prisma,
     });
   }
@@ -239,20 +238,19 @@ describe("data issue resolution workflow", () => {
 
     org = await prisma.organization.create({
       data: {
-        clerkOrgId: `org_${scope}`,
         name: `Data Issues Org ${scope}`,
         slug: `data-issues-${scope}`,
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     user = await prisma.user.create({
       data: {
-        clerkUserId: `user_${scope}`,
+        authUserId: `user_${scope}`,
         email: `${scope}@example.com`,
         name: "Data Issues User",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     await prisma.organizationMembership.create({
@@ -405,6 +403,21 @@ describe("data issue resolution workflow", () => {
         organizationId: org?.id,
       },
     });
+    await prisma.meterSourceReconciliation.deleteMany({
+      where: {
+        organizationId: org?.id,
+      },
+    });
+    await prisma.buildingSourceReconciliation.deleteMany({
+      where: {
+        organizationId: org?.id,
+      },
+    });
+    await prisma.greenButtonConnection.deleteMany({
+      where: {
+        organizationId: org?.id,
+      },
+    });
     await prisma.dataIssue.deleteMany({
       where: {
         organizationId: org?.id,
@@ -421,6 +434,16 @@ describe("data issue resolution workflow", () => {
       },
     });
     await prisma.complianceSnapshot.deleteMany({
+      where: {
+        organizationId: org?.id,
+      },
+    });
+    await prisma.benchmarkPacket.deleteMany({
+      where: {
+        organizationId: org?.id,
+      },
+    });
+    await prisma.complianceRun.deleteMany({
       where: {
         organizationId: org?.id,
       },
@@ -471,12 +494,25 @@ describe("data issue resolution workflow", () => {
 
     expect(first.state).toBe("DATA_INCOMPLETE");
     expect(first.blockingIssueCount).toBe(1);
-    expect(first.openIssues.filter((issue) => issue.status === "OPEN")).toHaveLength(1);
-    expect(first.openIssues[0]).toMatchObject({
-      issueType: "MISSING_MONTHS",
-      severity: "BLOCKING",
-      status: "OPEN",
-    });
+    expect(
+      first.openIssues.filter(
+        (issue) => issue.issueType === "MISSING_MONTHS" && issue.status === "OPEN",
+      ),
+    ).toHaveLength(1);
+    expect(first.openIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issueType: "MISSING_MONTHS",
+          severity: "BLOCKING",
+          status: "OPEN",
+        }),
+        expect.objectContaining({
+          issueType: "PM_SYNC_REQUIRED",
+          severity: "WARNING",
+          status: "OPEN",
+        }),
+      ]),
+    );
 
     const second = await refreshBuildingIssuesAfterDataChange({
       organizationId: org.id,
@@ -492,6 +528,7 @@ describe("data issue resolution workflow", () => {
         where: {
           organizationId: org.id,
           buildingId: blockingBuilding.id,
+          issueType: "MISSING_MONTHS",
         },
       }),
     ).toBe(1);
@@ -500,8 +537,54 @@ describe("data issue resolution workflow", () => {
       id: blockingBuilding.id,
     });
 
-    expect(building.issueSummary.state).toBe("DATA_INCOMPLETE");
-    expect(building.issueSummary.blockingIssueCount).toBe(1);
+    expect(building.issueSummary.openIssues).toHaveLength(2);
+    expect(building.issueSummary.openIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issueType: "MISSING_MONTHS",
+        }),
+        expect.objectContaining({
+          issueType: "PM_SYNC_REQUIRED",
+        }),
+      ]),
+    );
+    expect(building.readinessSummary).toMatchObject({
+      state: "DATA_INCOMPLETE",
+      primaryStatus: "DATA_INCOMPLETE",
+      qaVerdict: "FAIL",
+      reasonSummary: "Missing Months",
+    });
+    expect(building.readinessSummary.evaluations.benchmark).toMatchObject({
+      reportingYear: 2025,
+      ruleVersion: "data-issues-test-v1",
+      metricUsed: "ANNUAL_BENCHMARKING_READINESS",
+      qaVerdict: "FAIL",
+    });
+    expect(building.readinessSummary.artifacts.benchmarkSubmission?.id).toBeTruthy();
+    expect(building.readinessSummary.lastReadinessEvaluatedAt).toBeNull();
+    expect(building.readinessSummary.lastComplianceEvaluatedAt).toBeNull();
+    expect(building.governedSummary.readinessSummary).toEqual(building.readinessSummary);
+    expect((building as Record<string, unknown>).latestBenchmarkSubmission).toBeUndefined();
+    expect((building as Record<string, unknown>).latestBepsFiling).toBeUndefined();
+
+    const list = await createCaller(`building-list-${scope}`).building.list({
+      page: 1,
+      pageSize: 10,
+      sortBy: "name",
+      sortOrder: "asc",
+    });
+    const listedBuilding = list.buildings.find(
+      (candidate) => candidate.id === blockingBuilding.id,
+    );
+
+    expect(listedBuilding?.readinessSummary.state).toBe("DATA_INCOMPLETE");
+    expect(listedBuilding?.readinessSummary.primaryStatus).toBe("DATA_INCOMPLETE");
+    expect(listedBuilding?.readinessSummary).toEqual(building.readinessSummary);
+    expect(listedBuilding?.governedSummary.readinessSummary).toEqual(
+      building.governedSummary.readinessSummary,
+    );
+    expect((listedBuilding as Record<string, unknown>)?.latestBenchmarkSubmission).toBeUndefined();
+    expect((listedBuilding as Record<string, unknown>)?.latestBepsFiling).toBeUndefined();
   });
 
   it("resolves blocking issues and moves to ready to submit when the data condition is fixed", async () => {
@@ -539,6 +622,7 @@ describe("data issue resolution workflow", () => {
       where: {
         organizationId: org.id,
         buildingId: blockingBuilding.id,
+        issueType: "MISSING_MONTHS",
       },
     });
 
@@ -559,6 +643,7 @@ describe("data issue resolution workflow", () => {
       where: {
         organizationId: org.id,
         buildingId: warningBuilding.id,
+        issueType: "DIRECT_READINGS_MISSING",
       },
     });
 
@@ -587,6 +672,99 @@ describe("data issue resolution workflow", () => {
     });
     expect(reopened.status).toBe("OPEN");
     expect(refreshed.state).toBe("READY_TO_SUBMIT");
-    expect(refreshed.warningIssueCount).toBe(1);
+    expect(refreshed.warningIssueCount).toBe(2);
+  });
+
+  it("keeps readiness timestamps distinct and stable", async () => {
+    const executedAt = new Date("2026-03-18T10:30:00.000Z");
+    const readinessEvaluatedAt = new Date("2026-03-18T09:15:00.000Z");
+    const packetGeneratedAt = new Date("2026-03-18T11:00:00.000Z");
+    const packetFinalizedAt = new Date("2026-03-18T11:30:00.000Z");
+
+    const complianceRun = await prisma.complianceRun.create({
+      data: {
+        organizationId: org.id,
+        buildingId: warningBuilding.id,
+        ruleVersionId: benchmarkRuleVersion.id,
+        factorSetVersionId: benchmarkFactorSetVersion.id,
+        runType: "BENCHMARKING_EVALUATION",
+        status: "SUCCEEDED",
+        inputSnapshotRef: "test:data-issues",
+        inputSnapshotHash: `hash-${scope}`,
+        resultPayload: {},
+        producedByType: "SYSTEM",
+        producedById: "test",
+        executedAt,
+      },
+      select: { id: true },
+    });
+
+    await prisma.benchmarkSubmission.update({
+      where: {
+        buildingId_reportingYear: {
+          buildingId: warningBuilding.id,
+          reportingYear: 2025,
+        },
+      },
+      data: {
+        complianceRunId: complianceRun.id,
+        readinessEvaluatedAt,
+      },
+    });
+
+    const submission = await prisma.benchmarkSubmission.findUniqueOrThrow({
+      where: {
+        buildingId_reportingYear: {
+          buildingId: warningBuilding.id,
+          reportingYear: 2025,
+        },
+      },
+      select: { id: true },
+    });
+
+    await prisma.benchmarkPacket.create({
+      data: {
+        organizationId: org.id,
+        buildingId: warningBuilding.id,
+        benchmarkSubmissionId: submission.id,
+        reportingYear: 2025,
+        version: 1,
+        status: "FINALIZED",
+        packetHash: `hash-${scope}`,
+        packetPayload: {},
+        generatedAt: packetGeneratedAt,
+        finalizedAt: packetFinalizedAt,
+        createdByType: "SYSTEM",
+        createdById: "test",
+      },
+    });
+
+    const building = await createCaller(`building-get-timestamps-${scope}`).building.get({
+      id: warningBuilding.id,
+    });
+
+    expect(building.readinessSummary.lastReadinessEvaluatedAt).toBe(
+      readinessEvaluatedAt.toISOString(),
+    );
+    expect(building.readinessSummary.lastComplianceEvaluatedAt).toBe(
+      executedAt.toISOString(),
+    );
+    expect(building.readinessSummary.lastPacketGeneratedAt).toBe(
+      packetGeneratedAt.toISOString(),
+    );
+    expect(building.readinessSummary.lastPacketFinalizedAt).toBe(
+      packetFinalizedAt.toISOString(),
+    );
+    expect(
+      building.readinessSummary.evaluations.benchmark?.lastComplianceEvaluatedAt,
+    ).toBe(executedAt.toISOString());
+    expect(
+      building.readinessSummary.artifacts.benchmarkSubmission?.lastReadinessEvaluatedAt,
+    ).toBe(readinessEvaluatedAt.toISOString());
+    expect(building.readinessSummary.artifacts.benchmarkPacket?.generatedAt).toBe(
+      packetGeneratedAt.toISOString(),
+    );
   });
 });
+
+

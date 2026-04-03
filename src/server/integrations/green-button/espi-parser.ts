@@ -11,7 +11,8 @@ const espiParser = new XMLParser({
   attributeNamePrefix: "@_",
   textNodeName: "#text",
   removeNSPrefix: true,
-  isArray: (_name: string, jpath: string) => {
+  isArray: (_name, jPathOrMatcher) => {
+    const jpath = typeof jPathOrMatcher === "string" ? jPathOrMatcher : "";
     return (
       jpath === "feed.entry" ||
       jpath.endsWith("IntervalBlock") ||

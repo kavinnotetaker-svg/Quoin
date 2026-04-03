@@ -11,6 +11,9 @@ const EXPECTED_RANGES: Record<
   ELECTRIC: { minPerKSF: 0.5, maxPerKSF: 50 },
   GAS: { minPerKSF: 0.1, maxPerKSF: 30 },
   STEAM: { minPerKSF: 0.1, maxPerKSF: 40 },
+  WATER_INDOOR: { minPerKSF: 0, maxPerKSF: 0 },
+  WATER_OUTDOOR: { minPerKSF: 0, maxPerKSF: 0 },
+  WATER_RECYCLED: { minPerKSF: 0, maxPerKSF: 0 },
   OTHER: { minPerKSF: 0, maxPerKSF: 100 },
 };
 

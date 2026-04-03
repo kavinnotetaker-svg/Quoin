@@ -37,6 +37,8 @@ async function removeEmptyDirs(dir) {
 }
 
 async function main() {
+  await fs.unlink(tsBuildInfoFile).catch(() => undefined);
+
   try {
     await fs.access(generatedRoot);
   } catch {
@@ -75,7 +77,6 @@ async function main() {
   }
 
   await removeEmptyDirs(generatedRoot).catch(() => undefined);
-  await fs.unlink(tsBuildInfoFile).catch(() => undefined);
 }
 
 main().catch((error) => {

@@ -48,6 +48,31 @@ describe("validateBenchmarkYearData", () => {
     );
   });
 
+  it("allows periods that touch on the same boundary date", () => {
+    const result = validateBenchmarkYearData(
+      [
+        {
+          meterId: "meter_1",
+          meterType: "ELECTRIC",
+          periodStart: new Date("2025-01-01T00:00:00.000Z"),
+          periodEnd: new Date("2025-06-30T00:00:00.000Z"),
+        },
+        {
+          meterId: "meter_1",
+          meterType: "ELECTRIC",
+          periodStart: new Date("2025-06-30T00:00:00.000Z"),
+          periodEnd: new Date("2025-12-31T00:00:00.000Z"),
+        },
+      ],
+      2025,
+    );
+
+    expect(result.overlapStreams).toEqual([]);
+    expect(result.issues.map((issue) => issue.details.issueType)).not.toContain(
+      "OVERLAPPING_PERIODS",
+    );
+  });
+
   it("passes clean annual coverage without issues", () => {
     const result = validateBenchmarkYearData(
       [

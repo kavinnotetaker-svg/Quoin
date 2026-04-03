@@ -39,4 +39,14 @@ export class MeterService {
     }) as string;
     return this.client.post(`/property/${propertyId}/meter`, xml);
   }
+
+  /** List property-to-meter associations for a property */
+  async listPropertyMeterAssociations(propertyId: number): Promise<unknown> {
+    return this.client.get(`/association/property/${propertyId}/meter`);
+  }
+
+  /** Associate one meter to a property */
+  async associateMeterToProperty(propertyId: number, meterId: number): Promise<unknown> {
+    return this.client.post(`/association/property/${propertyId}/meter/${meterId}`, "");
+  }
 }

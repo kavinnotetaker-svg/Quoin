@@ -5,6 +5,7 @@ import { appRouter } from "@/server/trpc/routers";
 
 describe("benchmarking workflow", () => {
   const scope = `${Date.now()}`;
+  const activeEffectiveFrom = new Date(Date.now() - 60_000);
   const freshDqcCheckedAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
   const benchmarkingApplicabilityBands = [
     {
@@ -43,10 +44,10 @@ describe("benchmarking workflow", () => {
     },
   ];
 
-  let orgA: { id: string; clerkOrgId: string };
-  let orgB: { id: string; clerkOrgId: string };
-  let userA: { id: string; clerkUserId: string };
-  let userB: { id: string; clerkUserId: string };
+  let orgA: { id: string };
+  let orgB: { id: string };
+  let userA: { id: string; authUserId: string };
+  let userB: { id: string; authUserId: string };
   let buildingA: { id: string };
   let buildingB: { id: string };
 
@@ -120,7 +121,7 @@ describe("benchmarking workflow", () => {
         sourceArtifactId: sourceArtifact.id,
         version: "test-v1",
         status: "ACTIVE",
-        effectiveFrom: new Date("2025-01-01T00:00:00.000Z"),
+        effectiveFrom: activeEffectiveFrom,
         implementationKey: "benchmarking/readiness-v1",
         sourceMetadata: {
           authority: {
@@ -154,6 +155,7 @@ describe("benchmarking workflow", () => {
       update: {
         sourceArtifactId: guidanceArtifact.id,
         status: "ACTIVE",
+        effectiveFrom: activeEffectiveFrom,
         sourceMetadata: { scope },
         factorsJson: {
           benchmarking: {
@@ -200,7 +202,7 @@ describe("benchmarking workflow", () => {
         sourceArtifactId: guidanceArtifact.id,
         version: "test-v1",
         status: "ACTIVE",
-        effectiveFrom: new Date("2025-01-01T00:00:00.000Z"),
+        effectiveFrom: activeEffectiveFrom,
         sourceMetadata: { scope },
         factorsJson: {
           benchmarking: {
@@ -248,38 +250,36 @@ describe("benchmarking workflow", () => {
       data: {
         name: `Benchmark Org A ${scope}`,
         slug: `benchmark-org-a-${scope}`,
-        clerkOrgId: `clerk_benchmark_org_a_${scope}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     orgB = await prisma.organization.create({
       data: {
         name: `Benchmark Org B ${scope}`,
         slug: `benchmark-org-b-${scope}`,
-        clerkOrgId: `clerk_benchmark_org_b_${scope}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     userA = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_benchmark_user_a_${scope}`,
+        authUserId: `supabase_benchmark_user_a_${scope}`,
         email: `benchmark_a_${scope}@test.com`,
         name: "Benchmark User A",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     userB = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_benchmark_user_b_${scope}`,
+        authUserId: `supabase_benchmark_user_b_${scope}`,
         email: `benchmark_b_${scope}@test.com`,
         name: "Benchmark User B",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     await prisma.organizationMembership.createMany({
@@ -484,8 +484,8 @@ describe("benchmarking workflow", () => {
     });
     await prisma.user.deleteMany({
       where: {
-        clerkUserId: {
-          startsWith: "clerk_benchmark_user_",
+        authUserId: {
+          startsWith: "supabase_benchmark_user_",
         },
       },
     });
@@ -497,17 +497,16 @@ describe("benchmarking workflow", () => {
     });
   });
 
-  function createCaller(clerkUserId: string, clerkOrgId: string) {
+  function createCaller(authUserId: string, activeOrganizationId: string) {
     return appRouter.createCaller({
-      clerkUserId,
-      clerkOrgId,
-      clerkOrgRole: "org:admin",
+      authUserId,
+      activeOrganizationId,
       prisma,
     });
   }
 
   it("creates and updates the canonical benchmark submission through the governed workflow", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const evaluated = await caller.benchmarking.evaluateReadiness({
       buildingId: buildingA.id,
@@ -569,8 +568,8 @@ describe("benchmarking workflow", () => {
   });
 
   it("retrieves benchmarking records only within the authenticated tenant", async () => {
-    const callerA = createCaller(userA.clerkUserId, orgA.clerkOrgId);
-    const callerB = createCaller(userB.clerkUserId, orgB.clerkOrgId);
+    const callerA = createCaller(userA.authUserId, orgA.id);
+    const callerB = createCaller(userB.authUserId, orgB.id);
 
     await callerA.benchmarking.evaluateReadiness({
       buildingId: buildingA.id,
@@ -597,7 +596,7 @@ describe("benchmarking workflow", () => {
   });
 
   it("surfaces governed scope and deadline metadata through the router", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const smallPrivateBuilding = await prisma.building.create({
       data: {
@@ -744,6 +743,7 @@ describe("benchmarking workflow", () => {
         ownershipTypeUsed: "PRIVATE",
         applicabilityBandLabel: "PRIVATE_10K_TO_24_999",
         minimumGrossSquareFeet: 10000,
+        manualSubmissionAllowedWhenNotBenchmarkable: false,
       });
 
       expect(districtResult.readiness.summary.applicabilityBandLabel).toBe(
@@ -762,6 +762,7 @@ describe("benchmarking workflow", () => {
         ownershipTypeUsed: "DISTRICT",
         applicabilityBandLabel: "DISTRICT_10K_PLUS",
         deadlineType: "WITHIN_DAYS_OF_BENCHMARK_GENERATION",
+        manualSubmissionAllowedWhenNotBenchmarkable: true,
       });
     } finally {
       await prisma.evidenceArtifact.deleteMany({
@@ -792,3 +793,6 @@ describe("benchmarking workflow", () => {
     }
   });
 });
+
+
+

@@ -5,13 +5,24 @@ import type {
   DataIssueSource,
   DataIssueStatus,
   DataIssueType,
-  FilingRecord,
   Prisma,
 } from "@/generated/prisma/client";
 import { prisma } from "@/server/lib/db";
 import { createAuditLog } from "@/server/lib/audit-log";
 import { NotFoundError, ValidationError, WorkflowStateError } from "@/server/lib/errors";
 import { createLogger } from "@/server/lib/logger";
+import {
+  derivePrimaryComplianceStatus,
+  extractComplianceEngineResult,
+  summarizeReasonCodes,
+  type ComplianceEngineSurfaceResult,
+  type PrimaryComplianceSurfaceStatus,
+} from "@/server/compliance/compliance-surface";
+import {
+  refreshBuildingSourceReconciliation,
+  type BuildingSourceReconciliationSummary,
+} from "@/server/compliance/source-reconciliation";
+import { listSubmissionWorkflowSummariesForArtifacts, type SubmissionWorkflowSummary } from "@/server/compliance/submission-workflows";
 import type {
   ComplianceEngineQaIssue,
   ComplianceEngineResult,
@@ -28,7 +39,7 @@ export type BuildingReadinessState =
   (typeof BUILDING_READINESS_STATE)[keyof typeof BUILDING_READINESS_STATE];
 
 type DataIssueStatusFilter = "ACTIVE" | "ALL";
-type IssueRefreshScope = "BENCHMARKING" | "BEPS";
+type IssueRefreshScope = "BENCHMARKING" | "SYSTEM";
 
 type IssueCandidate = {
   issueKey: string;
@@ -53,36 +64,92 @@ function isPresent<T>(value: T | null): value is T {
   return value !== null;
 }
 
+type ActiveIssueInput = {
+  id: string;
+  issueType: DataIssueType;
+  severity: DataIssueSeverity;
+  status: DataIssueStatus;
+  title: string;
+  description: string;
+  requiredAction: string;
+};
+
 type ReadinessInput = {
   buildingId: string;
-  openIssues: Array<{
-    id: string;
-    issueType: DataIssueType;
-    severity: DataIssueSeverity;
-    status: DataIssueStatus;
-    title: string;
-    description: string;
-    requiredAction: string;
-  }>;
-  latestBenchmarkSubmission: Pick<
-    BenchmarkSubmission,
-    "id" | "status" | "reportingYear" | "complianceRunId"
-  > | null;
-  latestBepsFiling: Pick<
-    FilingRecord,
-    "id" | "status" | "filingYear" | "complianceRunId"
-  > | null;
-  latestBepsPacketStatus: string | null;
+  openIssues: ActiveIssueInput[];
+  benchmark: {
+    surface: ComplianceEngineSurfaceResult | null;
+    evaluation: ComplianceEvaluationSummary | null;
+    submission: BenchmarkSubmissionArtifactReference | null;
+    packet: PacketArtifactReference | null;
+    workflow: SubmissionWorkflowSummary | null;
+  };
 };
+
+export interface BenchmarkSubmissionArtifactReference {
+  id: string;
+  status: string;
+  reportingYear: number;
+  complianceRunId: string | null;
+  lastReadinessEvaluatedAt: string | null;
+  lastComplianceEvaluatedAt: string | null;
+}
+
+export interface PacketArtifactReference {
+  id: string;
+  status: string;
+  reportingYear: number | null;
+  filingYear: number | null;
+  complianceCycle: string | null;
+  generatedAt: string;
+  finalizedAt: string | null;
+}
+
+export interface ComplianceEvaluationSummary {
+  scope: "BENCHMARKING" | "BEPS";
+  recordId: string;
+  status: string | null;
+  applicability: string | null;
+  qaVerdict: string | null;
+  ruleVersion: string | null;
+  metricUsed: string | null;
+  reasonCodes: string[];
+  reasonSummary: string;
+  decision: {
+    meetsStandard: boolean | null;
+    blocked: boolean;
+    insufficientData: boolean;
+  };
+  reportingYear: number | null;
+  filingYear: number | null;
+  complianceCycle: string | null;
+  complianceRunId: string | null;
+  lastComplianceEvaluatedAt: string | null;
+}
 
 export interface BuildingReadinessSummary {
   state: BuildingReadinessState;
   blockingIssueCount: number;
   warningIssueCount: number;
+  primaryStatus: PrimaryComplianceSurfaceStatus;
+  qaVerdict: string | null;
+  reasonCodes: string[];
+  reasonSummary: string;
   nextAction: {
     title: string;
     reason: string;
     href: string;
+  };
+  lastReadinessEvaluatedAt: string | null;
+  lastComplianceEvaluatedAt: string | null;
+  lastPacketGeneratedAt: string | null;
+  lastPacketFinalizedAt: string | null;
+  evaluations: {
+    benchmark: ComplianceEvaluationSummary | null;
+  };
+  artifacts: {
+    benchmarkSubmission: BenchmarkSubmissionArtifactReference | null;
+    benchmarkPacket: PacketArtifactReference | null;
   };
 }
 
@@ -104,6 +171,18 @@ export interface BuildingIssueSummary extends BuildingReadinessSummary {
   }>;
 }
 
+export interface BuildingOperationalState {
+  buildingId: string;
+  readinessSummary: BuildingReadinessSummary;
+  issueSummary: {
+    openIssues: BuildingIssueSummary["openIssues"];
+  };
+  activeIssueCounts: {
+    blocking: number;
+    warning: number;
+  };
+}
+
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -115,18 +194,12 @@ function toInputJson(value: Record<string, unknown>): Prisma.InputJsonValue {
 }
 
 function asComplianceEngineResult(payload: unknown): ComplianceEngineResult | null {
-  const record = toRecord(payload);
-  const engine = toRecord(record.complianceEngine ?? record.engineResult);
-
-  if (!engine || Object.keys(engine).length === 0) {
-    return null;
-  }
-
-  return engine as unknown as ComplianceEngineResult;
+  const engine = extractComplianceEngineResult(payload)?.raw;
+  return engine ? (engine as unknown as ComplianceEngineResult) : null;
 }
 
-function issueHref(buildingId: string, scope: IssueRefreshScope) {
-  return `/buildings/${buildingId}#${scope === "BEPS" ? "beps" : "overview"}`;
+function issueHref(buildingId: string) {
+  return `/buildings/${buildingId}#workflow`;
 }
 
 function qaIssueDefinition(issueType: string) {
@@ -294,19 +367,225 @@ function buildVerificationIssueCandidates(input: {
     .filter(isPresent);
 }
 
+function buildSourceReconciliationIssueCandidates(input: {
+  summary: BuildingSourceReconciliationSummary;
+}) {
+  const candidates: IssueCandidate[] = [];
+  const issueKeyPrefix =
+    input.summary.referenceYear != null
+      ? `system:${input.summary.referenceYear}:reconciliation`
+      : "system:reconciliation";
+  const blockingConflicts = input.summary.conflicts.filter(
+    (conflict) => conflict.severity === "BLOCKING",
+  );
+  const warningConflicts = input.summary.conflicts.filter(
+    (conflict) => conflict.severity === "WARNING",
+  );
+
+  if (blockingConflicts.length > 0) {
+    candidates.push({
+      issueKey: `${issueKeyPrefix}:conflict`,
+      reportingYear: input.summary.referenceYear,
+      issueType: "METER_MAPPING_MISSING",
+      severity: "BLOCKING",
+      title: "Canonical source conflicts require review",
+      description:
+        blockingConflicts[0]?.message ??
+        "Canonical source totals or meter mappings conflict across ingestion sources.",
+      requiredAction:
+        "Review the conflicting source records and resolve the affected meter mapping or consumption mismatch before moving forward.",
+      source: "SYSTEM",
+      metadata: {
+        reconciliationStatus: input.summary.status,
+        conflictCount: blockingConflicts.length,
+        conflictCodes: blockingConflicts.map((conflict) => conflict.code),
+      },
+    });
+  }
+
+  if (warningConflicts.length > 0) {
+    candidates.push({
+      issueKey: `${issueKeyPrefix}:incomplete`,
+      reportingYear: input.summary.referenceYear,
+      issueType: "PM_SYNC_REQUIRED",
+      severity: "WARNING",
+      title: "Canonical source linkage is incomplete",
+      description:
+        warningConflicts[0]?.message ??
+        "One or more source linkages are incomplete for the current canonical source summary.",
+      requiredAction:
+        "Complete the missing source linkage or rerun the affected sync before relying on the canonical source summary.",
+      source: "SYSTEM",
+      metadata: {
+        reconciliationStatus: input.summary.status,
+        incompleteCount: warningConflicts.length,
+        conflictCodes: warningConflicts.map((conflict) => conflict.code),
+      },
+    });
+  }
+
+  return candidates;
+}
+
 function isActiveIssue(status: DataIssueStatus) {
   return status === "OPEN" || status === "IN_PROGRESS";
+}
+
+function toIsoString(value: Date | null | undefined) {
+  return value ? value.toISOString() : null;
+}
+
+function maxIsoTimestamp(...values: Array<string | null>) {
+  const timestamps = values.filter(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  return timestamps.reduce((latest, current) =>
+    new Date(current).getTime() > new Date(latest).getTime() ? current : latest,
+  );
+}
+
+function buildEvaluationSummary(input: {
+  scope: "BENCHMARKING" | "BEPS";
+  recordId: string;
+  reportingYear?: number | null;
+  filingYear?: number | null;
+  complianceCycle?: string | null;
+  engine: ComplianceEngineSurfaceResult | null;
+  complianceRunId: string | null;
+  lastComplianceEvaluatedAt: Date | null;
+}): ComplianceEvaluationSummary | null {
+  if (!input.engine) {
+    return null;
+  }
+
+  return {
+    scope: input.scope,
+    recordId: input.recordId,
+    status: input.engine.status,
+    applicability:
+      typeof input.engine.raw?.applicability === "string"
+        ? input.engine.raw.applicability
+        : null,
+    qaVerdict: input.engine.qaVerdict,
+    ruleVersion: input.engine.ruleVersion,
+    metricUsed: input.engine.metricUsed,
+    reasonCodes: input.engine.reasonCodes,
+    reasonSummary: summarizeReasonCodes(input.engine.reasonCodes),
+    decision: input.engine.decision,
+    reportingYear: input.reportingYear ?? null,
+    filingYear: input.filingYear ?? null,
+    complianceCycle: input.complianceCycle ?? null,
+    complianceRunId: input.complianceRunId,
+    lastComplianceEvaluatedAt: toIsoString(input.lastComplianceEvaluatedAt),
+  };
+}
+
+type BenchmarkSubmissionSource = Pick<
+  BenchmarkSubmission,
+  "id" | "status" | "reportingYear" | "complianceRunId" | "readinessEvaluatedAt"
+> & {
+  submissionPayload: unknown;
+  complianceRun: {
+    id: string;
+    executedAt: Date;
+  } | null;
+  benchmarkPackets: Array<{
+    id: string;
+    status: string;
+    reportingYear: number;
+    generatedAt: Date;
+    finalizedAt: Date | null;
+  }>;
+};
+
+function normalizeBenchmarkState(
+  record: BenchmarkSubmissionSource | null,
+  workflow: SubmissionWorkflowSummary | null,
+) {
+  const surface = record ? extractComplianceEngineResult(record.submissionPayload) : null;
+  const evaluation = record
+    ? buildEvaluationSummary({
+        scope: "BENCHMARKING",
+        recordId: record.id,
+        reportingYear: record.reportingYear,
+        engine: surface,
+        complianceRunId: record.complianceRunId,
+        lastComplianceEvaluatedAt: record.complianceRun?.executedAt ?? null,
+      })
+    : null;
+  const submission = record
+    ? {
+        id: record.id,
+        status: record.status,
+        reportingYear: record.reportingYear,
+        complianceRunId: record.complianceRunId,
+        lastReadinessEvaluatedAt: toIsoString(record.readinessEvaluatedAt),
+        lastComplianceEvaluatedAt: toIsoString(record.complianceRun?.executedAt),
+      }
+    : null;
+  const latestPacket = record?.benchmarkPackets[0] ?? null;
+  const packet = latestPacket
+    ? {
+        id: latestPacket.id,
+        status: latestPacket.status,
+        reportingYear: latestPacket.reportingYear,
+        filingYear: null,
+        complianceCycle: null,
+        generatedAt: latestPacket.generatedAt.toISOString(),
+        finalizedAt: toIsoString(latestPacket.finalizedAt),
+      }
+    : null;
+
+  return {
+    surface,
+    evaluation,
+    submission,
+    packet,
+    workflow,
+  };
 }
 
 function deriveReadinessState(input: ReadinessInput): BuildingReadinessSummary {
   const activeIssues = input.openIssues.filter((issue) => isActiveIssue(issue.status));
   const blockingIssues = activeIssues.filter((issue) => issue.severity === "BLOCKING");
   const warningIssues = activeIssues.filter((issue) => issue.severity === "WARNING");
-  const href = `/buildings/${input.buildingId}#overview`;
+  const href = issueHref(input.buildingId);
+  const primaryStatus = derivePrimaryComplianceStatus({
+    benchmark: input.benchmark.surface,
+    beps: null,
+  });
+  const reasonCodes = input.benchmark.surface?.reasonCodes ?? [];
+  const baseSummary = {
+    primaryStatus,
+    qaVerdict: input.benchmark.surface?.qaVerdict ?? null,
+    reasonCodes,
+    reasonSummary: summarizeReasonCodes(reasonCodes),
+    lastReadinessEvaluatedAt:
+      input.benchmark.submission?.lastReadinessEvaluatedAt ?? null,
+    lastComplianceEvaluatedAt: input.benchmark.evaluation?.lastComplianceEvaluatedAt ?? null,
+    lastPacketGeneratedAt: input.benchmark.packet?.generatedAt ?? null,
+    lastPacketFinalizedAt: input.benchmark.packet?.finalizedAt ?? null,
+    evaluations: {
+      benchmark: input.benchmark.evaluation,
+    },
+    artifacts: {
+      benchmarkSubmission: input.benchmark.submission,
+      benchmarkPacket: input.benchmark.packet,
+    },
+  } satisfies Omit<
+    BuildingReadinessSummary,
+    "state" | "blockingIssueCount" | "warningIssueCount" | "nextAction"
+  >;
 
   if (blockingIssues.length > 0) {
     const issue = blockingIssues[0];
     return {
+      ...baseSummary,
       state: BUILDING_READINESS_STATE.DATA_INCOMPLETE,
       blockingIssueCount: blockingIssues.length,
       warningIssueCount: warningIssues.length,
@@ -319,12 +598,13 @@ function deriveReadinessState(input: ReadinessInput): BuildingReadinessSummary {
   }
 
   if (
-    input.latestBepsFiling?.status === "FILED" ||
-    input.latestBepsFiling?.status === "ACCEPTED" ||
-    input.latestBenchmarkSubmission?.status === "SUBMITTED" ||
-    input.latestBenchmarkSubmission?.status === "ACCEPTED"
+    input.benchmark.workflow?.state === "SUBMITTED" ||
+    input.benchmark.workflow?.state === "COMPLETED" ||
+    input.benchmark.submission?.status === "SUBMITTED" ||
+    input.benchmark.submission?.status === "ACCEPTED"
   ) {
     return {
+      ...baseSummary,
       state: BUILDING_READINESS_STATE.SUBMITTED,
       blockingIssueCount: 0,
       warningIssueCount: warningIssues.length,
@@ -337,57 +617,41 @@ function deriveReadinessState(input: ReadinessInput): BuildingReadinessSummary {
   }
 
   if (
-    input.latestBepsFiling?.status === "GENERATED" ||
-    input.latestBepsPacketStatus === "GENERATED" ||
-    input.latestBepsPacketStatus === "FINALIZED" ||
-    input.latestBenchmarkSubmission?.status === "READY"
+    input.benchmark.workflow?.state === "APPROVED_FOR_SUBMISSION" ||
+    input.benchmark.submission?.status === "READY"
   ) {
     return {
+      ...baseSummary,
       state: BUILDING_READINESS_STATE.READY_TO_SUBMIT,
       blockingIssueCount: 0,
       warningIssueCount: warningIssues.length,
       nextAction: {
-        title:
-          input.latestBepsFiling?.status === "GENERATED" ||
-          input.latestBepsPacketStatus === "GENERATED" ||
-          input.latestBepsPacketStatus === "FINALIZED"
-            ? "Submit the BEPS filing"
-            : "Submit the benchmarking package",
-        reason:
-          input.latestBepsFiling?.status === "GENERATED" ||
-          input.latestBepsPacketStatus === "GENERATED" ||
-          input.latestBepsPacketStatus === "FINALIZED"
-            ? "A filing-ready BEPS record exists and no blocking data issues remain."
-            : "Benchmarking is ready and no blocking data issues remain.",
-        href: issueHref(
-          input.buildingId,
-          input.latestBepsFiling?.status === "GENERATED" ||
-            input.latestBepsPacketStatus === "GENERATED" ||
-            input.latestBepsPacketStatus === "FINALIZED"
-            ? "BEPS"
-            : "BENCHMARKING",
-        ),
+        title: "Submit the benchmarking package",
+        reason: "Benchmarking is ready and no blocking data issues remain.",
+        href,
       },
     };
   }
 
   return {
+    ...baseSummary,
     state: BUILDING_READINESS_STATE.READY_FOR_REVIEW,
     blockingIssueCount: 0,
     warningIssueCount: warningIssues.length,
     nextAction: {
       title:
-        input.latestBepsFiling?.complianceRunId || input.latestBenchmarkSubmission?.complianceRunId
+        input.benchmark.workflow?.state === "READY_FOR_REVIEW" ||
+        input.benchmark.workflow?.state === "NEEDS_CORRECTION" ||
+        input.benchmark.submission?.complianceRunId
           ? "Review the latest compliance result"
           : "Run the latest evaluation",
       reason:
-        input.latestBepsFiling?.complianceRunId || input.latestBenchmarkSubmission?.complianceRunId
+        input.benchmark.workflow?.state === "READY_FOR_REVIEW" ||
+        input.benchmark.workflow?.state === "NEEDS_CORRECTION" ||
+        input.benchmark.submission?.complianceRunId
           ? "No blocking issues remain. Review the latest governed result before submission."
           : "The building no longer has blocking data issues, but a current evaluation still needs to be reviewed.",
-      href:
-        input.latestBepsFiling?.complianceRunId != null
-          ? issueHref(input.buildingId, "BEPS")
-          : issueHref(input.buildingId, "BENCHMARKING"),
+      href,
     },
   };
 }
@@ -395,7 +659,7 @@ function deriveReadinessState(input: ReadinessInput): BuildingReadinessSummary {
 async function syncIssueCandidates(params: {
   organizationId: string;
   buildingId: string;
-  reportingYear: number;
+  reportingYear: number | null;
   scope: IssueRefreshScope;
   candidates: IssueCandidate[];
   actorType: ActorType;
@@ -403,7 +667,10 @@ async function syncIssueCandidates(params: {
   requestId?: string | null;
 }) {
   const now = new Date();
-  const scopePrefix = `${params.scope.toLowerCase()}:${params.reportingYear}:`;
+  const scopePrefix =
+    params.reportingYear != null
+      ? `${params.scope.toLowerCase()}:${params.reportingYear}:`
+      : `${params.scope.toLowerCase()}:`;
   const existing = await prisma.dataIssue.findMany({
     where: {
       organizationId: params.organizationId,
@@ -528,107 +795,75 @@ async function syncIssueCandidates(params: {
   };
 }
 
-async function getLatestSubmissionState(params: {
+export async function listBuildingOperationalStates(params: {
   organizationId: string;
-  buildingId: string;
+  buildingIds: string[];
 }) {
-  const [openIssues, latestBenchmarkSubmission, latestBepsFiling] = await Promise.all([
+  const buildingIds = Array.from(new Set(params.buildingIds));
+
+  if (buildingIds.length === 0) {
+    return new Map<string, BuildingOperationalState>();
+  }
+
+  const [openIssues, benchmarkSubmissions] = await Promise.all([
     prisma.dataIssue.findMany({
       where: {
         organizationId: params.organizationId,
-        buildingId: params.buildingId,
+        buildingId: {
+          in: buildingIds,
+        },
         status: {
           in: ["OPEN", "IN_PROGRESS"],
         },
       },
       orderBy: [{ severity: "desc" }, { detectedAt: "asc" }],
     }),
-    prisma.benchmarkSubmission.findFirst({
+    prisma.benchmarkSubmission.findMany({
       where: {
         organizationId: params.organizationId,
-        buildingId: params.buildingId,
+        buildingId: {
+          in: buildingIds,
+        },
       },
-      orderBy: [{ reportingYear: "desc" }, { updatedAt: "desc" }],
+      distinct: ["buildingId"],
+      orderBy: [
+        { buildingId: "asc" },
+        { reportingYear: "desc" },
+        { updatedAt: "desc" },
+      ],
       select: {
         id: true,
+        buildingId: true,
         status: true,
         reportingYear: true,
         complianceRunId: true,
-      },
-    }),
-    prisma.filingRecord.findFirst({
-      where: {
-        organizationId: params.organizationId,
-        buildingId: params.buildingId,
-        filingType: "BEPS_COMPLIANCE",
-      },
-      orderBy: [{ filingYear: "desc" }, { updatedAt: "desc" }],
-      select: {
-        id: true,
-        status: true,
-        filingYear: true,
-        complianceRunId: true,
-        packets: {
+        readinessEvaluatedAt: true,
+        submissionPayload: true,
+        complianceRun: {
+          select: {
+            id: true,
+            executedAt: true,
+          },
+        },
+        benchmarkPackets: {
           orderBy: [{ generatedAt: "desc" }, { version: "desc" }],
           take: 1,
           select: {
+            id: true,
             status: true,
+            reportingYear: true,
+            generatedAt: true,
+            finalizedAt: true,
           },
         },
       },
     }),
   ]);
 
-  return {
-    openIssues,
-    latestBenchmarkSubmission,
-    latestBepsFiling,
-    latestBepsPacketStatus: latestBepsFiling?.packets[0]?.status ?? null,
-  };
-}
-
-export async function getBuildingIssueSummary(params: {
-  organizationId: string;
-  buildingId: string;
-}): Promise<BuildingIssueSummary> {
-  const building = await prisma.building.findFirst({
-    where: {
-      id: params.buildingId,
-      organizationId: params.organizationId,
-    },
-    select: { id: true },
-  });
-
-  if (!building) {
-    throw new NotFoundError("Building not found");
-  }
-
-  const [issues, submissionState] = await Promise.all([
-    prisma.dataIssue.findMany({
-      where: {
-        organizationId: params.organizationId,
-        buildingId: params.buildingId,
-        status: {
-          in: ["OPEN", "IN_PROGRESS", "DISMISSED", "RESOLVED"],
-        },
-      },
-      orderBy: [{ status: "asc" }, { severity: "desc" }, { detectedAt: "asc" }],
-    }),
-    getLatestSubmissionState(params),
-  ]);
-
-  const readiness = deriveReadinessState({
-    buildingId: params.buildingId,
-    openIssues: submissionState.openIssues,
-    latestBenchmarkSubmission: submissionState.latestBenchmarkSubmission,
-    latestBepsFiling: submissionState.latestBepsFiling,
-    latestBepsPacketStatus: submissionState.latestBepsPacketStatus,
-  });
-
-  return {
-    buildingId: params.buildingId,
-    ...readiness,
-    openIssues: issues.map((issue) => ({
+  const issuesByBuildingId = new Map<string, BuildingIssueSummary["openIssues"]>();
+  for (const issue of openIssues) {
+    const existing = issuesByBuildingId.get(issue.buildingId) ?? [];
+    existing.push({
       id: issue.id,
       reportingYear: issue.reportingYear,
       issueType: issue.issueType,
@@ -641,7 +876,107 @@ export async function getBuildingIssueSummary(params: {
       detectedAt: issue.detectedAt.toISOString(),
       resolvedAt: issue.resolvedAt?.toISOString() ?? null,
       metadata: toRecord(issue.metadata),
-    })),
+    });
+    issuesByBuildingId.set(issue.buildingId, existing);
+  }
+
+  const latestBenchmarkByBuildingId = new Map(
+    benchmarkSubmissions.map((submission) => [submission.buildingId, submission]),
+  );
+
+  const workflowSummaries = await listSubmissionWorkflowSummariesForArtifacts({
+    organizationId: params.organizationId,
+    benchmarkPacketIds: Array.from(
+      new Set(
+        benchmarkSubmissions
+          .map((submission) => submission.benchmarkPackets[0]?.id ?? null)
+          .filter((value): value is string => value != null),
+      ),
+    ),
+  });
+
+  const states = new Map<string, BuildingOperationalState>();
+  for (const buildingId of buildingIds) {
+    const openBuildingIssues = issuesByBuildingId.get(buildingId) ?? [];
+    const latestBenchmark = latestBenchmarkByBuildingId.get(buildingId) ?? null;
+    const benchmark = normalizeBenchmarkState(
+      latestBenchmark,
+      latestBenchmark?.benchmarkPackets[0]?.id
+        ? workflowSummaries.benchmarkByPacketId.get(latestBenchmark.benchmarkPackets[0].id) ??
+            null
+        : null,
+    );
+    const readinessSummary = deriveReadinessState({
+      buildingId,
+      openIssues: openBuildingIssues,
+      benchmark,
+    });
+
+    states.set(buildingId, {
+      buildingId,
+      readinessSummary,
+      issueSummary: {
+        openIssues: openBuildingIssues,
+      },
+      activeIssueCounts: {
+        blocking: openBuildingIssues.filter((issue) => issue.severity === "BLOCKING").length,
+        warning: openBuildingIssues.filter((issue) => issue.severity === "WARNING").length,
+      },
+    });
+  }
+
+  return states;
+}
+
+export async function getBuildingOperationalState(params: {
+  organizationId: string;
+  buildingId: string;
+}): Promise<BuildingOperationalState> {
+  const building = await prisma.building.findFirst({
+    where: {
+      id: params.buildingId,
+      organizationId: params.organizationId,
+    },
+    select: { id: true },
+  });
+
+  if (!building) {
+    throw new NotFoundError("Building not found");
+  }
+
+  const states = await listBuildingOperationalStates({
+    organizationId: params.organizationId,
+    buildingIds: [params.buildingId],
+  });
+
+  return (
+    states.get(params.buildingId) ?? {
+      buildingId: params.buildingId,
+      readinessSummary: deriveReadinessState({
+        buildingId: params.buildingId,
+        openIssues: [],
+        benchmark: normalizeBenchmarkState(null, null),
+      }),
+      issueSummary: {
+        openIssues: [],
+      },
+      activeIssueCounts: {
+        blocking: 0,
+        warning: 0,
+      },
+    }
+  );
+}
+
+export async function getBuildingIssueSummary(params: {
+  organizationId: string;
+  buildingId: string;
+}): Promise<BuildingIssueSummary> {
+  const operationalState = await getBuildingOperationalState(params);
+  return {
+    buildingId: params.buildingId,
+    ...operationalState.readinessSummary,
+    openIssues: operationalState.issueSummary.openIssues,
   };
 }
 
@@ -706,13 +1041,9 @@ export async function refreshBenchmarkingDataIssues(params: {
     procedure: "dataIssues.refreshBenchmarking",
   });
 
-  const previous = await getLatestSubmissionState(params);
-  const previousReadiness = deriveReadinessState({
+  const previous = await getBuildingOperationalState({
+    organizationId: params.organizationId,
     buildingId: params.buildingId,
-    openIssues: previous.openIssues,
-    latestBenchmarkSubmission: previous.latestBenchmarkSubmission,
-    latestBepsFiling: previous.latestBepsFiling,
-    latestBepsPacketStatus: previous.latestBepsPacketStatus,
   });
 
   const candidates = [
@@ -738,16 +1069,12 @@ export async function refreshBenchmarkingDataIssues(params: {
     requestId: params.requestId ?? null,
   });
 
-  const next = await getLatestSubmissionState(params);
-  const nextReadiness = deriveReadinessState({
+  const next = await getBuildingOperationalState({
+    organizationId: params.organizationId,
     buildingId: params.buildingId,
-    openIssues: next.openIssues,
-    latestBenchmarkSubmission: next.latestBenchmarkSubmission,
-    latestBepsFiling: next.latestBepsFiling,
-    latestBepsPacketStatus: next.latestBepsPacketStatus,
   });
 
-  if (previousReadiness.state !== nextReadiness.state) {
+  if (previous.readinessSummary.state !== next.readinessSummary.state) {
     await createAuditLog({
       actorType: params.actorType,
       actorId: params.actorId ?? null,
@@ -755,10 +1082,10 @@ export async function refreshBenchmarkingDataIssues(params: {
       buildingId: params.buildingId,
       action: "BUILDING_READINESS_CHANGED",
       inputSnapshot: {
-        previousState: previousReadiness.state,
+        previousState: previous.readinessSummary.state,
       },
       outputSnapshot: {
-        nextState: nextReadiness.state,
+        nextState: next.readinessSummary.state,
         reportingYear: params.reportingYear,
       },
       requestId: params.requestId ?? null,
@@ -770,17 +1097,15 @@ export async function refreshBenchmarkingDataIssues(params: {
     createdCount: syncResult.createdIssueIds.length,
     reopenedCount: syncResult.reopenedIssueIds.length,
     resolvedCount: syncResult.resolvedIssueIds.length,
-    readinessState: nextReadiness.state,
+    readinessState: next.readinessSummary.state,
   });
 
-  return nextReadiness;
+  return next.readinessSummary;
 }
 
-export async function refreshBepsDataIssues(params: {
+export async function refreshSourceReconciliationDataIssues(params: {
   organizationId: string;
   buildingId: string;
-  filingYear: number;
-  engineResult: ComplianceEngineResult;
   actorType: ActorType;
   actorId?: string | null;
   requestId?: string | null;
@@ -789,45 +1114,41 @@ export async function refreshBepsDataIssues(params: {
     organizationId: params.organizationId,
     buildingId: params.buildingId,
     requestId: params.requestId ?? null,
-    procedure: "dataIssues.refreshBeps",
+    procedure: "dataIssues.refreshSourceReconciliation",
   });
 
-  const previous = await getLatestSubmissionState(params);
-  const previousReadiness = deriveReadinessState({
-    buildingId: params.buildingId,
-    openIssues: previous.openIssues,
-    latestBenchmarkSubmission: previous.latestBenchmarkSubmission,
-    latestBepsFiling: previous.latestBepsFiling,
-    latestBepsPacketStatus: previous.latestBepsPacketStatus,
-  });
-
-  const candidates = buildQaIssueCandidates({
-    scope: "BEPS",
-    reportingYear: params.filingYear,
-    qaIssues: params.engineResult.qa.issues,
-  });
-
-  const syncResult = await syncIssueCandidates({
+  const previous = await getBuildingOperationalState({
     organizationId: params.organizationId,
     buildingId: params.buildingId,
-    reportingYear: params.filingYear,
-    scope: "BEPS",
-    candidates,
+  });
+
+  const reconciliationSummary = await refreshBuildingSourceReconciliation({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
     actorType: params.actorType,
     actorId: params.actorId ?? null,
     requestId: params.requestId ?? null,
   });
 
-  const next = await getLatestSubmissionState(params);
-  const nextReadiness = deriveReadinessState({
+  const syncResult = await syncIssueCandidates({
+    organizationId: params.organizationId,
     buildingId: params.buildingId,
-    openIssues: next.openIssues,
-    latestBenchmarkSubmission: next.latestBenchmarkSubmission,
-    latestBepsFiling: next.latestBepsFiling,
-    latestBepsPacketStatus: next.latestBepsPacketStatus,
+    reportingYear: reconciliationSummary.referenceYear,
+    scope: "SYSTEM",
+    candidates: buildSourceReconciliationIssueCandidates({
+      summary: reconciliationSummary,
+    }),
+    actorType: params.actorType,
+    actorId: params.actorId ?? null,
+    requestId: params.requestId ?? null,
   });
 
-  if (previousReadiness.state !== nextReadiness.state) {
+  const next = await getBuildingOperationalState({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+  });
+
+  if (previous.readinessSummary.state !== next.readinessSummary.state) {
     await createAuditLog({
       actorType: params.actorType,
       actorId: params.actorId ?? null,
@@ -835,25 +1156,28 @@ export async function refreshBepsDataIssues(params: {
       buildingId: params.buildingId,
       action: "BUILDING_READINESS_CHANGED",
       inputSnapshot: {
-        previousState: previousReadiness.state,
+        previousState: previous.readinessSummary.state,
       },
       outputSnapshot: {
-        nextState: nextReadiness.state,
-        filingYear: params.filingYear,
+        nextState: next.readinessSummary.state,
+        reconciliationStatus: reconciliationSummary.status,
       },
       requestId: params.requestId ?? null,
     });
   }
 
-  logger.info("BEPS data issues refreshed", {
-    filingYear: params.filingYear,
+  logger.info("Source reconciliation issues refreshed", {
     createdCount: syncResult.createdIssueIds.length,
     reopenedCount: syncResult.reopenedIssueIds.length,
     resolvedCount: syncResult.resolvedIssueIds.length,
-    readinessState: nextReadiness.state,
+    readinessState: next.readinessSummary.state,
+    reconciliationStatus: reconciliationSummary.status,
   });
 
-  return nextReadiness;
+  return {
+    reconciliationSummary,
+    readinessSummary: next.readinessSummary,
+  };
 }
 
 export async function refreshBuildingIssuesAfterDataChange(params: {
@@ -863,31 +1187,25 @@ export async function refreshBuildingIssuesAfterDataChange(params: {
   actorId?: string | null;
   requestId?: string | null;
 }) {
-  const [latestBenchmarkSubmission, latestBepsFiling] = await Promise.all([
-    prisma.benchmarkSubmission.findFirst({
-      where: {
-        organizationId: params.organizationId,
-        buildingId: params.buildingId,
-      },
-      orderBy: [{ reportingYear: "desc" }, { updatedAt: "desc" }],
-      select: {
-        reportingYear: true,
-        submissionPayload: true,
-      },
-    }),
-    prisma.filingRecord.findFirst({
-      where: {
-        organizationId: params.organizationId,
-        buildingId: params.buildingId,
-        filingType: "BEPS_COMPLIANCE",
-      },
-      orderBy: [{ filingYear: "desc" }, { updatedAt: "desc" }],
-      select: {
-        filingYear: true,
-        filingPayload: true,
-      },
-    }),
-  ]);
+  await refreshSourceReconciliationDataIssues({
+    organizationId: params.organizationId,
+    buildingId: params.buildingId,
+    actorType: params.actorType,
+    actorId: params.actorId ?? null,
+    requestId: params.requestId ?? null,
+  });
+
+  const latestBenchmarkSubmission = await prisma.benchmarkSubmission.findFirst({
+    where: {
+      organizationId: params.organizationId,
+      buildingId: params.buildingId,
+    },
+    orderBy: [{ reportingYear: "desc" }, { updatedAt: "desc" }],
+    select: {
+      reportingYear: true,
+      submissionPayload: true,
+    },
+  });
 
   if (latestBenchmarkSubmission) {
     const verificationItems = await prisma.verificationItemResult.findMany({
@@ -907,21 +1225,6 @@ export async function refreshBuildingIssuesAfterDataChange(params: {
         reportingYear: latestBenchmarkSubmission.reportingYear,
         engineResult,
         verification: { items: verificationItems },
-        actorType: params.actorType,
-        actorId: params.actorId ?? null,
-        requestId: params.requestId ?? null,
-      });
-    }
-  }
-
-  if (latestBepsFiling?.filingYear != null) {
-    const engineResult = asComplianceEngineResult(latestBepsFiling.filingPayload);
-    if (engineResult) {
-      await refreshBepsDataIssues({
-        organizationId: params.organizationId,
-        buildingId: params.buildingId,
-        filingYear: latestBepsFiling.filingYear,
-        engineResult,
         actorType: params.actorType,
         actorId: params.actorId ?? null,
         requestId: params.requestId ?? null,
@@ -1002,8 +1305,4 @@ export async function updateDataIssueStatus(params: {
   });
 
   return updated;
-}
-
-export function deriveBuildingReadinessSummary(input: ReadinessInput) {
-  return deriveReadinessState(input);
 }

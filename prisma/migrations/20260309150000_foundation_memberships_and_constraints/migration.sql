@@ -205,7 +205,18 @@ GRANT USAGE ON SCHEMA public TO quoin_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO quoin_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO quoin_app;
-GRANT quoin_app TO quoin;
+
+DO $$
+DECLARE
+  runtime_grantee text := current_user;
+BEGIN
+  IF runtime_grantee = 'quoin_app' THEN
+    RETURN;
+  END IF;
+
+  EXECUTE format('GRANT quoin_app TO %I WITH SET TRUE', runtime_grantee);
+END
+$$;
 
 ALTER TABLE "organization_memberships" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "organization_memberships" FORCE ROW LEVEL SECURITY;

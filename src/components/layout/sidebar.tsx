@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ChartNoAxesCombined,
   Building2,
-  FileText,
   Menu,
+  Settings,
   X,
-  Zap
 } from "lucide-react";
 import { useState } from "react";
 
@@ -19,12 +19,9 @@ interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Portfolio", icon: ChartNoAxesCombined },
   { href: "/buildings", label: "Buildings", icon: Building2 },
-  {
-    href: "/reports",
-    label: "Reports",
-    icon: FileText,
-  },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -36,7 +33,8 @@ export function Sidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed left-3 top-3 z-50 rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:hidden transition-colors"
+        className="fixed left-3 top-3 z-50 rounded-full p-2 text-[#6b737b] transition-colors hover:bg-[#f1f0ec] hover:text-[#2b3138] lg:hidden"
+        aria-label="Open navigation"
       >
         <Menu size={20} />
       </button>
@@ -44,42 +42,54 @@ export function Sidebar() {
       {/* Overlay */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm lg:hidden transition-opacity duration-300"
+          className="fixed inset-0 z-40 bg-[rgba(42,52,57,0.4)] lg:hidden transition-opacity duration-300"
           onClick={() => setOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar: Stitch — surface-container-low bg, hairline right border */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col bg-white border-r border-slate-200/60 text-slate-600 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(247,246,242,0.98) 0%, rgba(242,243,241,0.96) 100%)",
+          borderRight: "1px solid rgba(207, 211, 214, 0.7)",
+        }}
       >
-        {/* Brand Header */}
-        <div className="border-b border-slate-200/60 px-5">
-          <div className="flex h-14 items-center justify-between">
-            <Link
-              href="/buildings"
-              className="flex items-center gap-2.5 text-sm font-bold tracking-tight text-slate-900 transition-opacity hover:opacity-80"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-400 shadow-[0_2px_8px_-2px_rgba(6,182,212,0.5)]">
-                <Zap size={14} className="text-white fill-white" />
+        {/* Brand */}
+        <div
+          className="px-6 py-5"
+          style={{ borderBottom: "1px solid rgba(207, 211, 214, 0.64)" }}
+        >
+          <Link
+            href="/buildings"
+            className="transition-opacity hover:opacity-80"
+          >
+            <div>
+              <div
+                className="font-dashboard-sans text-[11px] font-semibold uppercase leading-none tracking-[0.18em]"
+                style={{ color: "#6c7480" }}
+              >
+                Project
               </div>
-              Quoin
-            </Link>
-            <button
-              onClick={() => setOpen(false)}
-              className="text-slate-400 hover:text-slate-900 transition-colors lg:hidden"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          {/* Accent gradient strip */}
-          <div className="h-0.5 -mx-5 bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 opacity-60" />
+              <div className="mt-1 font-dashboard-display text-[1.45rem] font-medium leading-none tracking-[0.02em] text-[#272e35]">
+                QUOIN
+              </div>
+            </div>
+          </Link>
+          <button
+            onClick={() => setOpen(false)}
+            className="absolute right-3 top-3 text-[#6b737b] transition-colors hover:text-[#2b3138] lg:hidden"
+            aria-label="Close navigation"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        <nav className="flex-1 py-6 px-0">
           {NAV_ITEMS.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(item.href + "/");
@@ -89,25 +99,52 @@ export function Sidebar() {
                 key={item.label}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200 ${
-                  active
-                    ? "bg-slate-50 text-emerald-600 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] border border-slate-100"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                }`}
+                className="flex items-center gap-3 py-3 px-6 transition-all duration-150"
+                style={{
+                  borderLeft: active ? "2px solid #6c7480" : "2px solid transparent",
+                  color: active ? "#2b3138" : "#69727b",
+                  backgroundColor: active ? "rgba(255,255,255,0.62)" : "transparent",
+                  fontFamily: "var(--font-dashboard-sans)",
+                  fontSize: "15px",
+                  fontWeight: active ? 600 : 500,
+                  textTransform: "none",
+                  letterSpacing: "0.01em",
+                  borderTopRightRadius: "18px",
+                  borderBottomRightRadius: "18px",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.color = "#2b3138";
+                    (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.44)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.color = "#69727b";
+                    (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                  }
+                }}
               >
-                <Icon 
-                  size={16} 
-                  strokeWidth={active ? 2 : 1.5} 
-                  className={`transition-colors duration-200 ${active ? "text-emerald-500" : "text-slate-400 group-hover:text-slate-600"}`}
+                <Icon
+                  size={16}
+                  strokeWidth={active ? 2 : 1.5}
+                  style={{ color: active ? "#4d5966" : "#a4adb6", flexShrink: 0 }}
                 />
-                {item.label}
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
-        
-        <div className="border-t border-slate-200/60 px-4 py-3 text-xs text-slate-400">
-          Focused compliance workflow
+
+        {/* Footer */}
+        <div
+          className="px-6 py-4 font-dashboard-sans text-[10px] tracking-[0.08em]"
+          style={{
+            borderTop: "1px solid rgba(207, 211, 214, 0.64)",
+            color: "#9ea5ac",
+          }}
+        >
+          ESPM Benchmarking
         </div>
       </aside>
     </>

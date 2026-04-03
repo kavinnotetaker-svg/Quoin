@@ -2,21 +2,20 @@ import { prisma } from "@/server/lib/db";
 
 export type AppRole = "ADMIN" | "MANAGER" | "ENGINEER" | "VIEWER";
 
-export function mapClerkRole(
-  clerkRole: string | null | undefined,
-): AppRole {
-  switch (clerkRole) {
-    case "org:admin":
-      return "ADMIN";
-    case "org:manager":
-      return "MANAGER";
-    case "org:engineer":
-      return "ENGINEER";
-    default:
-      return "VIEWER";
-  }
+interface EnsureUserRecordInput {
+  authUserId: string;
+  email?: string | null;
+  name?: string | null;
 }
 
+interface UpsertOrganizationInput {
+  name: string;
+  slug?: string | null;
+}
+
+/**
+ * Normalizes a label into a URL-safe organization slug.
+ */
 export function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -26,22 +25,68 @@ export function slugify(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
-export async function upsertOrganization(params: {
-  clerkOrgId: string;
-  name: string;
-  slug?: string | null;
-}) {
-  const normalizedSlug = params.slug?.trim() || slugify(params.name);
+/**
+ * Ensures a local Quoin user exists for the provided Supabase identity.
+ */
+export async function ensureUserRecord(input: EnsureUserRecordInput) {
+  const authUserId = input.authUserId.trim();
+  if (!authUserId) {
+    throw new Error("authUserId is required.");
+  }
 
-  return prisma.organization.upsert({
-    where: { clerkOrgId: params.clerkOrgId },
-    update: {
-      name: params.name,
-      slug: normalizedSlug,
+  const email =
+    input.email?.trim() || `${authUserId.toLowerCase()}@placeholder.local`;
+  const name = input.name?.trim() || "Unknown";
+
+  const existingUser = await prisma.user.findUnique({
+    where: {
+      authUserId,
     },
-    create: {
-      clerkOrgId: params.clerkOrgId,
-      name: params.name,
+  });
+
+  if (existingUser) {
+    return prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        authUserId,
+        email,
+        name,
+      },
+    });
+  }
+
+  return prisma.user.create({
+    data: {
+      authUserId,
+      email,
+      name,
+    },
+  });
+}
+
+/**
+ * Creates or updates a local organization record by its Quoin slug.
+ */
+export async function upsertOrganization(input: UpsertOrganizationInput) {
+  const normalizedSlug = input.slug?.trim() || slugify(input.name);
+  const existing = await prisma.organization.findFirst({
+    where: { slug: normalizedSlug },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return prisma.organization.update({
+      where: { id: existing.id },
+      data: {
+        name: input.name,
+        slug: normalizedSlug,
+      },
+    });
+  }
+
+  return prisma.organization.create({
+    data: {
+      name: input.name,
       slug: normalizedSlug,
       tier: "FREE",
       settings: {},
@@ -49,55 +94,30 @@ export async function upsertOrganization(params: {
   });
 }
 
-export async function ensureUserRecord(params: {
-  clerkUserId: string;
-  email?: string | null;
-  name?: string | null;
-}) {
-  const email = params.email?.trim() || `${params.clerkUserId}@placeholder.local`;
-  const name = params.name?.trim() || "Unknown";
-
-  return prisma.user.upsert({
-    where: { clerkUserId: params.clerkUserId },
-    update: {
-      email,
-      name,
-    },
-    create: {
-      clerkUserId: params.clerkUserId,
-      email,
-      name,
-    },
-  });
-}
-
+/**
+ * Creates or updates a membership for the given organization and auth user.
+ */
 export async function upsertOrganizationMembership(params: {
   organizationId: string;
-  clerkUserId: string;
+  authUserId: string;
   role: AppRole;
-  clerkMembershipId?: string | null;
   email?: string | null;
   name?: string | null;
 }) {
   const user = await ensureUserRecord({
-    clerkUserId: params.clerkUserId,
+    authUserId: params.authUserId,
     email: params.email,
     name: params.name,
   });
 
-  const existingMembership =
-    params.clerkMembershipId != null
-      ? await prisma.organizationMembership.findUnique({
-          where: { clerkMembershipId: params.clerkMembershipId },
-        })
-      : await prisma.organizationMembership.findUnique({
-          where: {
-            organizationId_userId: {
-              organizationId: params.organizationId,
-              userId: user.id,
-            },
-          },
-        });
+  const existingMembership = await prisma.organizationMembership.findUnique({
+    where: {
+      organizationId_userId: {
+        organizationId: params.organizationId,
+        userId: user.id,
+      },
+    },
+  });
 
   if (existingMembership) {
     return prisma.organizationMembership.update({
@@ -106,7 +126,6 @@ export async function upsertOrganizationMembership(params: {
         organizationId: params.organizationId,
         userId: user.id,
         role: params.role,
-        clerkMembershipId: params.clerkMembershipId ?? existingMembership.clerkMembershipId,
       },
     });
   }
@@ -116,46 +135,78 @@ export async function upsertOrganizationMembership(params: {
       organizationId: params.organizationId,
       userId: user.id,
       role: params.role,
-      clerkMembershipId: params.clerkMembershipId ?? null,
     },
   });
 }
 
-export async function deleteOrganizationMembership(params: {
-  clerkOrgId: string;
-  clerkUserId: string;
-  clerkMembershipId?: string | null;
+/**
+ * Creates a new Quoin-managed organization and seeds the creator as admin.
+ */
+export async function createOrganizationForUser(params: {
+  authUserId: string;
+  email?: string | null;
+  name?: string | null;
+  organizationName: string;
+  organizationSlug?: string | null;
 }) {
-  if (params.clerkMembershipId) {
-    const deleted = await prisma.organizationMembership.deleteMany({
-      where: { clerkMembershipId: params.clerkMembershipId },
-    });
-
-    if (deleted.count > 0) {
-      return deleted.count;
-    }
-  }
-
-  const organization = await prisma.organization.findUnique({
-    where: { clerkOrgId: params.clerkOrgId },
-    select: { id: true },
+  const organization = await upsertOrganization({
+    name: params.organizationName,
+    slug: params.organizationSlug,
   });
-  if (!organization) {
-    return 0;
-  }
 
+  await upsertOrganizationMembership({
+    organizationId: organization.id,
+    authUserId: params.authUserId,
+    role: "ADMIN",
+    email: params.email,
+    name: params.name,
+  });
+
+  return organization;
+}
+
+/**
+ * Lists memberships for the provided auth user.
+ */
+export async function listOrganizationMembershipsForUser(params: {
+  authUserId: string;
+}) {
   const user = await prisma.user.findUnique({
-    where: { clerkUserId: params.clerkUserId },
-    select: { id: true },
+    where: {
+      authUserId: params.authUserId,
+    },
+    select: {
+      id: true,
+      memberships: {
+        orderBy: {
+          organization: {
+            name: "asc",
+          },
+        },
+        include: {
+          organization: true,
+        },
+      },
+    },
   });
-  if (!user) {
-    return 0;
-  }
 
+  return {
+    userId: user?.id ?? null,
+    memberships: user?.memberships ?? [],
+  };
+}
+
+/**
+ * Deletes a membership using the Quoin organization and user identifiers.
+ */
+export async function deleteOrganizationMembership(params: {
+  organizationId: string;
+  userId: string;
+}) {
   const deleted = await prisma.organizationMembership.deleteMany({
     where: {
-      organizationId: organization.id,
-      userId: user.id,
+      organizationId: params.organizationId,
+      userId: params.userId,
     },
   });
 

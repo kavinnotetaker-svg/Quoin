@@ -176,7 +176,10 @@ export function validateBenchmarkYearData(
         });
       }
 
-      if (start <= addUtcDays(cursor, -1)) {
+      // Treat an exact boundary match as continuous coverage.
+      // Utility periods can legitimately be represented as:
+      // previous.end === next.start
+      if (start < addUtcDays(cursor, -1)) {
         overlapStreams.add(streamKey);
         overlapDetails.push({
           streamKey,

@@ -5,6 +5,7 @@ import type {
   ESPMMetric,
   ESPMReasonsForNoScore,
 } from "./types";
+import { ESPMNotFoundError, ESPMValidationError } from "./errors";
 
 export class MetricsService {
   constructor(private readonly client: ESPMClient) { }
@@ -25,8 +26,6 @@ export class MetricsService {
       "sourceTotal",
       "siteIntensity",
       "sourceIntensity",
-      "weatherNormalizedSiteIntensity",
-      "weatherNormalizedSourceIntensity",
       "directGHGEmissions",
       "medianScore",
     ].join(", ");
@@ -47,7 +46,20 @@ export class MetricsService {
     let fallback: PropertyMetrics | null = null;
 
     for (let month = endMonth; month >= 1; month -= 1) {
-      const metrics = await this.getPropertyMetrics(propertyId, year, month);
+      let metrics: PropertyMetrics;
+      try {
+        metrics = await this.getPropertyMetrics(propertyId, year, month);
+      } catch (error) {
+        if (
+          error instanceof ESPMValidationError ||
+          error instanceof ESPMNotFoundError
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
+
       fallback ??= metrics;
 
       if (this.hasUsableMetrics(metrics)) {
@@ -63,10 +75,21 @@ export class MetricsService {
    * Common: insufficient data, property type not eligible, etc.
    */
   async getReasonsForNoScore(propertyId: number): Promise<string[]> {
-    const raw = await this.client.get<ESPMReasonsForNoScore>(
-      `/property/${propertyId}/reasonsForNoScore`,
-    );
-    return raw?.reasons?.reason ?? [];
+    try {
+      const raw = await this.client.get<ESPMReasonsForNoScore>(
+        `/property/${propertyId}/reasonsForNoScore`,
+      );
+      return raw?.reasons?.reason ?? [];
+    } catch (error) {
+      if (
+        error instanceof ESPMValidationError ||
+        error instanceof ESPMNotFoundError
+      ) {
+        return [];
+      }
+
+      throw error;
+    }
   }
 
   private parseMetrics(raw: ESPMPropertyMetrics): PropertyMetrics {

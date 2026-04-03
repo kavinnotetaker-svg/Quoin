@@ -1,11 +1,15 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
-import { getTenantClient, prisma } from "@/server/lib/db";
+import { getTenantClient } from "@/server/lib/db";
+import { resolveRequestAuth } from "@/server/lib/auth";
 import {
-  mapClerkRole,
-  upsertOrganization,
-  upsertOrganizationMembership,
+  ensureUserRecord,
+  listOrganizationMembershipsForUser,
   type AppRole,
 } from "@/server/lib/organization-membership";
+import {
+  listCapabilitiesForRole,
+  hasCapability,
+  type Capability,
+} from "@/server/lib/capabilities";
 
 export class TenantAccessError extends Error {
   constructor(
@@ -18,75 +22,106 @@ export class TenantAccessError extends Error {
 }
 
 export interface TenantContext {
-  clerkUserId: string;
-  clerkOrgId: string;
-  clerkOrgRole: string | null;
+  authUserId: string;
+  userId: string;
+  actorId: string;
   appRole: AppRole;
+  capabilities: Capability[];
   organizationId: string;
   tenantDb: ReturnType<typeof getTenantClient>;
 }
 
-export async function ensureOrganizationForClerkOrgId(clerkOrgId: string) {
-  const existing = await prisma.organization.findUnique({
-    where: { clerkOrgId },
-  });
-  if (existing) {
-    return existing;
+export function normalizeTenantIdentifier(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
   }
 
-  const client = await clerkClient();
-  const clerkOrg = await client.organizations.getOrganization({
-    organizationId: clerkOrgId,
-  });
-
-  return upsertOrganization({
-    clerkOrgId,
-    name: clerkOrg.name,
-    slug: clerkOrg.slug,
-  });
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
 }
 
+/**
+ * Resolves the tenant-scoped runtime context from the current auth state.
+ */
 export async function requireTenantContext(input: {
-  clerkUserId: string | null;
-  clerkOrgId: string | null | undefined;
-  clerkOrgRole?: string | null | undefined;
+  authUserId?: string | null;
+  email?: string | null;
+  name?: string | null;
+  activeOrganizationId?: string | null;
 }) {
-  if (!input.clerkUserId) {
+  const authUserId = normalizeTenantIdentifier(input.authUserId);
+  if (!authUserId) {
     throw new TenantAccessError("Unauthorized", 401);
   }
 
-  if (!input.clerkOrgId) {
+  const user = await ensureUserRecord({
+    authUserId,
+    email: input.email,
+    name: input.name,
+  });
+  const membershipData = await listOrganizationMembershipsForUser({
+    authUserId,
+  });
+
+  if (membershipData.memberships.length === 0) {
     throw new TenantAccessError(
-      "No organization selected. Please select or create an organization.",
+      "No organization selected. Please create an organization to continue.",
       403,
     );
   }
 
-  const organization = await ensureOrganizationForClerkOrgId(input.clerkOrgId);
-  const appRole = mapClerkRole(input.clerkOrgRole);
+  const requestedOrganizationId = normalizeTenantIdentifier(input.activeOrganizationId);
+  const membership =
+    membershipData.memberships.find(
+      (entry) => entry.organizationId === requestedOrganizationId,
+    ) ?? (membershipData.memberships.length === 1 ? membershipData.memberships[0] : null);
 
-  await upsertOrganizationMembership({
-    organizationId: organization.id,
-    clerkUserId: input.clerkUserId,
-    role: appRole,
-  });
+  if (!membership) {
+    throw new TenantAccessError(
+      "No organization selected. Please choose one of your organizations.",
+      403,
+    );
+  }
 
   return {
-    clerkUserId: input.clerkUserId,
-    clerkOrgId: input.clerkOrgId,
-    clerkOrgRole: input.clerkOrgRole ?? null,
-    appRole,
-    organizationId: organization.id,
-    tenantDb: getTenantClient(organization.id),
+    authUserId,
+    userId: user.id,
+    actorId: authUserId,
+    appRole: membership.role,
+    capabilities: listCapabilitiesForRole(membership.role),
+    organizationId: membership.organizationId,
+    tenantDb: getTenantClient(membership.organizationId),
   } satisfies TenantContext;
 }
 
-export async function requireTenantContextFromSession() {
-  const { userId, orgId, orgRole } = await auth();
+export function canManageOperatorActions(appRole: AppRole) {
+  return hasCapability(appRole, "BUILDING_WRITE");
+}
 
-  return requireTenantContext({
-    clerkUserId: userId,
-    clerkOrgId: orgId,
-    clerkOrgRole: orgRole,
-  });
+/**
+ * Resolves the tenant context directly from the current request session.
+ */
+export async function requireTenantContextFromSession() {
+  const auth = await resolveRequestAuth();
+  if (!auth.authUserId) {
+    throw new TenantAccessError("Unauthorized", 401);
+  }
+
+  return requireTenantContext(auth);
+}
+
+/**
+ * Resolves the tenant context and asserts the current user can manage operator workflows.
+ */
+export async function requireOperatorTenantContextFromSession() {
+  const tenant = await requireTenantContextFromSession();
+
+  if (!canManageOperatorActions(tenant.appRole)) {
+    throw new TenantAccessError(
+      "Operator access is required for this action.",
+      403,
+    );
+  }
+
+  return tenant;
 }

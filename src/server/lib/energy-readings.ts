@@ -6,7 +6,18 @@ type EnergyReadingLike = {
   periodStart: Date;
   periodEnd: Date;
   ingestedAt?: Date;
+  rawPayload?: unknown;
+  archivedAt?: Date | null;
 };
+
+function getOverrideOfReadingId(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const value = (rawPayload as Record<string, unknown>)["overrideOfReadingId"];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
 
 function readingKey(reading: EnergyReadingLike) {
   return [
@@ -32,6 +43,7 @@ function sourcePriority(source: string) {
     case "MANUAL":
       return 4;
     case "CSV_UPLOAD":
+    case "BILL_UPLOAD":
       return 3;
     case "GREEN_BUTTON":
       return 2;
@@ -46,6 +58,9 @@ export function dedupeEnergyReadings<T extends EnergyReadingLike>(readings: T[])
   const latestByKey = new Map<string, T>();
 
   for (const reading of readings) {
+    if (reading.archivedAt != null) {
+      continue;
+    }
     const key = readingKey(reading);
     const current = latestByKey.get(key);
 
@@ -89,6 +104,9 @@ export function collapseDisplayEnergyReadings<T extends EnergyReadingLike>(readi
   const selectedByKey = new Map<string, T>();
 
   for (const reading of readings) {
+    if (reading.archivedAt != null) {
+      continue;
+    }
     const key = displayReadingKey(reading);
     const current = selectedByKey.get(key);
 
@@ -125,7 +143,15 @@ export function collapseDisplayEnergyReadings<T extends EnergyReadingLike>(readi
     }
   }
 
-  return Array.from(selectedByKey.values()).sort((left, right) => {
+  const overriddenReadingIds = new Set(
+    Array.from(selectedByKey.values())
+      .map((reading) => getOverrideOfReadingId(reading.rawPayload))
+      .filter((value): value is string => value != null),
+  );
+
+  return Array.from(selectedByKey.values())
+    .filter((reading) => !overriddenReadingIds.has(reading.id ?? ""))
+    .sort((left, right) => {
     const byPeriod = left.periodStart.getTime() - right.periodStart.getTime();
     if (byPeriod !== 0) {
       return byPeriod;
@@ -136,6 +162,6 @@ export function collapseDisplayEnergyReadings<T extends EnergyReadingLike>(readi
       return byEnd;
     }
 
-    return left.meterType.localeCompare(right.meterType);
-  });
+      return left.meterType.localeCompare(right.meterType);
+    });
 }

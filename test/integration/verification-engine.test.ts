@@ -6,10 +6,10 @@ import { appRouter } from "@/server/trpc/routers";
 describe("digital verification engine", () => {
   const scope = `${Date.now()}`;
 
-  let orgA: { id: string; clerkOrgId: string };
-  let orgB: { id: string; clerkOrgId: string };
-  let userA: { id: string; clerkUserId: string };
-  let userB: { id: string; clerkUserId: string };
+  let orgA: { id: string };
+  let orgB: { id: string };
+  let userA: { id: string; authUserId: string };
+  let userB: { id: string; authUserId: string };
   let sourceArtifactId: string;
   let passBuilding: { id: string };
   let missingGfaBuilding: { id: string };
@@ -21,38 +21,36 @@ describe("digital verification engine", () => {
       data: {
         name: `Verification Org A ${scope}`,
         slug: `verification-org-a-${scope}`,
-        clerkOrgId: `clerk_verification_org_a_${scope}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     orgB = await prisma.organization.create({
       data: {
         name: `Verification Org B ${scope}`,
         slug: `verification-org-b-${scope}`,
-        clerkOrgId: `clerk_verification_org_b_${scope}`,
         tier: "FREE",
       },
-      select: { id: true, clerkOrgId: true },
+      select: { id: true },
     });
 
     userA = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_verification_user_a_${scope}`,
+        authUserId: `supabase_verification_user_a_${scope}`,
         email: `verification_a_${scope}@test.com`,
         name: "Verification User A",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     userB = await prisma.user.create({
       data: {
-        clerkUserId: `clerk_verification_user_b_${scope}`,
+        authUserId: `supabase_verification_user_b_${scope}`,
         email: `verification_b_${scope}@test.com`,
         name: "Verification User B",
       },
-      select: { id: true, clerkUserId: true },
+      select: { id: true, authUserId: true },
     });
 
     await prisma.organizationMembership.createMany({
@@ -242,17 +240,16 @@ describe("digital verification engine", () => {
     });
   });
 
-  function createCaller(clerkUserId: string, clerkOrgId: string) {
+  function createCaller(authUserId: string, activeOrganizationId: string) {
     return appRouter.createCaller({
-      clerkUserId,
-      clerkOrgId,
-      clerkOrgRole: "org:admin",
+      authUserId,
+      activeOrganizationId,
       prisma,
     });
   }
 
   it("returns a full PASS verification checklist when all deterministic checks are satisfied", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const checklist = await caller.benchmarking.getVerificationChecklist({
       buildingId: passBuilding.id,
@@ -278,7 +275,7 @@ describe("digital verification engine", () => {
   });
 
   it("fails GFA verification when gross floor area is missing", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const checklist = await caller.benchmarking.getVerificationChecklist({
       buildingId: missingGfaBuilding.id,
@@ -291,7 +288,7 @@ describe("digital verification engine", () => {
   });
 
   it("fails annual data coverage when gaps exist in the reporting year", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const checklist = await caller.benchmarking.getVerificationChecklist({
       buildingId: gapBuilding.id,
@@ -304,7 +301,7 @@ describe("digital verification engine", () => {
   });
 
   it("marks missing evidence as NEEDS_REVIEW instead of passing silently", async () => {
-    const caller = createCaller(userA.clerkUserId, orgA.clerkOrgId);
+    const caller = createCaller(userA.authUserId, orgA.id);
 
     const checklist = await caller.benchmarking.getVerificationChecklist({
       buildingId: missingEvidenceBuilding.id,
@@ -320,7 +317,7 @@ describe("digital verification engine", () => {
   });
 
   it("enforces tenant-safe access for verification results", async () => {
-    const caller = createCaller(userB.clerkUserId, orgB.clerkOrgId);
+    const caller = createCaller(userB.authUserId, orgB.id);
 
     await expect(
       caller.benchmarking.getVerificationChecklist({
@@ -473,3 +470,6 @@ describe("digital verification engine", () => {
     }
   }
 });
+
+
+

@@ -12,6 +12,9 @@ npm run db:start
 npm run db:validate:fresh
 ```
 
+`npm run db:start` is a Docker helper for local validation infrastructure. It is
+not required for the normal Supabase-backed runtime path.
+
 `db:validate:fresh` does all of the following against a temporary database:
 
 - applies all Prisma migrations
@@ -21,6 +24,11 @@ npm run db:validate:fresh
 - audits tenant invariants
 - validates the composite org/building foreign keys
 - checks for schema drift with `prisma migrate diff`
+
+This path requires a Postgres role that can create and drop temporary
+databases. Use local Docker Postgres or another admin-capable Postgres instance
+for it. A normal hosted Supabase `DATABASE_URL` is not suitable for this
+workflow.
 
 ## Existing database upgrade proof
 
@@ -35,6 +43,21 @@ npm run db:validate:constraints
 Or run the same sequence with:
 
 ```bash
+npm run db:validate:current
+```
+
+This path works against a hosted Supabase database because it validates the
+current database in place and does not create temporary databases.
+
+## Hosted Supabase-compatible commands
+
+These commands are suitable for a hosted Supabase Postgres connection:
+
+```bash
+npx prisma migrate deploy
+npm run prisma:generate
+npm run db:audit:tenant
+npm run db:validate:constraints
 npm run db:validate:current
 ```
 

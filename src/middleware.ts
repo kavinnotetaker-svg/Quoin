@@ -1,18 +1,23 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { refreshSupabaseSession } from "@/lib/supabase/middleware";
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/webhooks/(.*)",
-  "/api/health",
-]);
-
-export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    await auth.protect();
+/**
+ * Refreshes Supabase SSR session cookies when hosted auth is configured.
+ * Quoin is Supabase-auth-only; route protection is enforced inside the app
+ * auth layer and tenant context resolution.
+ */
+export default async function middleware(request: NextRequest) {
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return NextResponse.next({
+      request,
+    });
   }
-});
+
+  return refreshSupabaseSession(request);
+}
 
 export const config = {
   matcher: [

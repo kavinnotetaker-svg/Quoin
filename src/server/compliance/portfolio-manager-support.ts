@@ -11,7 +11,12 @@ import {
   ESPMRateLimitError,
   ESPMValidationError,
 } from "@/server/integrations/espm";
-import { normalizeUnitKey } from "@/server/pipelines/data-ingestion/normalizer";
+import {
+  defaultLocalUnitForMeterType,
+  getPortfolioManagerRemoteMeterDefinition,
+  mapRawEspmMeterType,
+} from "@/server/portfolio-manager/unit-catalog";
+import { parsePeriodDate } from "@/lib/period-date";
 
 export type PortfolioManagerSyncStep =
   | "property"
@@ -140,19 +145,6 @@ function getBoolean(value: unknown): boolean | null {
   return null;
 }
 
-function parseDate(value: unknown): Date | null {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim()) {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  return null;
-}
-
 function firstRecord(value: unknown): Record<string, unknown> | null {
   const direct = toRecord(value);
   if (Object.keys(direct).length > 0) {
@@ -171,36 +163,23 @@ function getNestedObject(value: unknown, key: string): Record<string, unknown> |
 }
 
 export function mapEspmMeterType(type: string | null): MeterType {
-  const normalized = type?.toLowerCase() ?? "";
-
-  if (normalized.includes("electric")) return "ELECTRIC";
-  if (normalized.includes("gas")) return "GAS";
-  if (normalized.includes("steam")) return "STEAM";
-
-  return "OTHER";
+  return mapRawEspmMeterType(type);
 }
 
-export function mapEspmUnit(unit: string | null): EnergyUnit {
-  const normalized = normalizeUnitKey(unit ?? "");
+export function mapEspmUnit(
+  unit: string | null,
+  rawType?: string | null,
+): EnergyUnit {
+  const remote = getPortfolioManagerRemoteMeterDefinition({
+    rawType: rawType ?? null,
+    rawUnitOfMeasure: unit,
+  });
 
-  switch (normalized) {
-    case "kwh":
-    case "mwh":
-      return "KWH";
-    case "therms":
-    case "ccf":
-    case "kcf":
-    case "mcf":
-    case "cf":
-      return "THERMS";
-    case "mlb":
-    case "lbs":
-      return "MMBTU";
-    case "kbtu":
-    case "gj":
-    default:
-      return "KBTU";
+  if (remote) {
+    return remote.preferredLocalUnit;
   }
+
+  return defaultLocalUnitForMeterType(mapEspmMeterType(rawType ?? null));
 }
 
 export function parsePortfolioManagerProperty(
@@ -215,7 +194,8 @@ export function parsePortfolioManagerProperty(
     );
   }
 
-  const propertyId = getNumber(property["@_id"] ?? property["id"]);
+  const propertyId =
+    getNumber(property["@_id"] ?? property["id"]) ?? expectedPropertyId ?? null;
   if (propertyId == null) {
     throw new PortfolioManagerPayloadError(
       "Portfolio Manager property payload did not include a property ID.",
@@ -252,13 +232,40 @@ export function parsePortfolioManagerMeterIds(raw: unknown): number[] {
     "response" in record ||
     "links" in record ||
     "link" in record ||
-    "meterList" in record;
+    "meterList" in record ||
+    "meterPropertyAssociationList" in record;
 
   if (!hasRecognizedRoot) {
     throw new PortfolioManagerPayloadError(
       "Portfolio Manager meter list payload is malformed.",
       "meters",
     );
+  }
+
+  const associationList = getNestedObject(record, "meterPropertyAssociationList");
+  if (associationList) {
+    const associationMeterIds = Object.values(associationList).flatMap((association) => {
+      const meters = getNestedObject(association, "meters");
+      if (!meters) {
+        return [];
+      }
+
+      return toArray(meters["meterId"])
+        .map((entry) => {
+          const primitiveId = getNumber(entry);
+          if (primitiveId != null) {
+            return primitiveId;
+          }
+
+          const meterRecord = toRecord(entry);
+          return getNumber(meterRecord["@_id"] ?? meterRecord["id"]);
+        })
+        .filter((value): value is number => value != null);
+    });
+
+    if (associationMeterIds.length > 0) {
+      return associationMeterIds;
+    }
   }
 
   const links =
@@ -268,12 +275,19 @@ export function parsePortfolioManagerMeterIds(raw: unknown): number[] {
     record["link"];
 
   const linkEntries =
+    toRecord(links)["meterId"] ??
+    getNestedObject(links, "meterId")?.["meterId"] ??
     getNestedObject(links, "link")?.["link"] ??
     toRecord(links)["link"] ??
     links;
 
   return toArray(linkEntries)
     .map((entry) => {
+      const primitiveId = getNumber(entry);
+      if (primitiveId != null) {
+        return primitiveId;
+      }
+
       const link = toRecord(entry);
       const numericId = getNumber(link["@_id"] ?? link["id"]);
       if (numericId != null) {
@@ -320,7 +334,7 @@ export function parsePortfolioManagerMeterDetail(
     meterId,
     meterType: mapEspmMeterType(rawType),
     name: getString(meter["name"]) ?? `Portfolio Manager meter ${meterId}`,
-    unit: mapEspmUnit(rawUnitOfMeasure),
+    unit: mapEspmUnit(rawUnitOfMeasure, rawType),
     inUse: getBoolean(meter["inUse"]) ?? true,
     rawType,
     rawUnitOfMeasure,
@@ -357,8 +371,8 @@ export function parsePortfolioManagerConsumptionReadings(
   const readings = rows
     .map((entry) => {
       const row = toRecord(entry);
-      const periodStart = parseDate(row["startDate"]);
-      const periodEnd = parseDate(row["endDate"]);
+      const periodStart = parsePeriodDate(row["startDate"]);
+      const periodEnd = parsePeriodDate(row["endDate"]);
       const usage = getNumber(row["usage"]);
 
       if (!periodStart || !periodEnd || usage == null) {

@@ -1,53 +1,17 @@
-import crypto from "crypto";
 import type { GreenButtonConfig, GreenButtonTokens } from "./types";
 import { refreshAccessToken } from "./oauth";
 import { createLogger } from "@/server/lib/logger";
 import {
-  ConfigError,
   createRetryableIntegrationError,
   NotFoundError,
   WorkflowStateError,
 } from "@/server/lib/errors";
-
-const ALGORITHM = "aes-256-gcm";
-const SALT = "quoin-gb-salt";
+import {
+  getGreenButtonTokensForBuilding,
+  greenButtonCredentialSelect,
+  rotateGreenButtonCredentials,
+} from "./credentials";
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
-
-/**
- * Encrypt a token string for DB storage using AES-256-GCM.
- * Output format: iv:authTag:ciphertext (all hex-encoded).
- */
-export function encryptToken(plaintext: string, encryptionKey: string): string {
-  const key = crypto.scryptSync(encryptionKey, SALT, 32);
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  let encrypted = cipher.update(plaintext, "utf8", "hex");
-  encrypted += cipher.final("hex");
-  const authTag = cipher.getAuthTag().toString("hex");
-  return `${iv.toString("hex")}:${authTag}:${encrypted}`;
-}
-
-/**
- * Decrypt a token string from DB storage.
- */
-export function decryptToken(
-  encrypted: string,
-  encryptionKey: string,
-): string {
-  const parts = encrypted.split(":");
-  if (parts.length !== 3) {
-    throw new ConfigError("Invalid encrypted Green Button token format.");
-  }
-  const [ivHex, authTagHex, ciphertext] = parts;
-  const key = crypto.scryptSync(encryptionKey, SALT, 32);
-  const iv = Buffer.from(ivHex!, "hex");
-  const authTag = Buffer.from(authTagHex!, "hex");
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(authTag);
-  let decrypted = decipher.update(ciphertext!, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
-}
 
 /**
  * Get a valid access token for a building's Green Button connection.
@@ -74,15 +38,7 @@ export async function getValidToken(
       organizationId: input.organizationId,
       buildingId: input.buildingId,
     },
-    select: {
-      id: true,
-      status: true,
-      accessToken: true,
-      refreshToken: true,
-      tokenExpiresAt: true,
-      resourceUri: true,
-      subscriptionId: true,
-    },
+    select: greenButtonCredentialSelect,
   });
 
   if (!connection) {
@@ -100,20 +56,12 @@ export async function getValidToken(
       },
     );
   }
-
-  if (!connection.accessToken || !connection.refreshToken) {
-    throw new WorkflowStateError(
-      "Green Button connection is missing stored OAuth tokens.",
-      {
-        details: {
-          connectionId: connection.id,
-        },
-      },
-    );
-  }
-
-  const accessToken = decryptToken(connection.accessToken, input.encryptionKey);
-  const refreshToken = decryptToken(connection.refreshToken, input.encryptionKey);
+  const { tokens } = await getGreenButtonTokensForBuilding({
+    db,
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    masterKey: input.encryptionKey,
+  });
   const expiresAt = connection.tokenExpiresAt;
 
   if (
@@ -121,8 +69,8 @@ export async function getValidToken(
     new Date(expiresAt).getTime() > Date.now() + REFRESH_BUFFER_MS
   ) {
     return {
-      accessToken,
-      refreshToken,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       expiresAt: new Date(expiresAt),
       scope: "",
       resourceUri: connection.resourceUri ?? "",
@@ -132,18 +80,13 @@ export async function getValidToken(
   }
 
   try {
-    const refreshed = await refreshAccessToken(input.config, refreshToken);
+    const refreshed = await refreshAccessToken(input.config, tokens.refreshToken);
 
-    await db.greenButtonConnection.update({
-      where: { id: connection.id },
-      data: {
-        accessToken: encryptToken(refreshed.accessToken, input.encryptionKey),
-        refreshToken: encryptToken(refreshed.refreshToken, input.encryptionKey),
-        tokenExpiresAt: refreshed.expiresAt,
-        subscriptionId: refreshed.subscriptionId,
-        resourceUri: refreshed.resourceUri,
-        status: "ACTIVE",
-      },
+    await rotateGreenButtonCredentials({
+      db,
+      connectionId: connection.id,
+      tokens: refreshed,
+      masterKey: input.encryptionKey,
     });
 
     logger.info("Green Button access token refreshed", {

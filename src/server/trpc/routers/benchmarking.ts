@@ -1,8 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { NotFoundError } from "@/server/lib/errors";
-import { router, tenantProcedure } from "../init";
-import { createESPMClient } from "@/server/integrations/espm";
+import { prisma } from "@/server/lib/db";
+import { router, tenantProcedure, operatorProcedure } from "../init";
 import {
   evaluateAndUpsertBenchmarkSubmission,
   type BenchmarkSubmissionContext,
@@ -10,9 +10,7 @@ import {
 import {
   getPortfolioManagerSyncState,
   listPortfolioBenchmarkReadiness,
-  syncPortfolioManagerForBuilding,
 } from "@/server/compliance/portfolio-manager-sync";
-import { pushLocalEnergyToPortfolioManager } from "@/server/compliance/portfolio-manager-push";
 import {
   exportBenchmarkPacket,
   finalizeBenchmarkPacket,
@@ -71,16 +69,16 @@ const benchmarkRequestStatusSchema = z.enum([
   "BLOCKED",
 ]);
 
-async function ensureTenantBuilding(
-  tenantDb: {
-    building: {
-      findUnique: (args: { where: { id: string } }) => Promise<{ id: string } | null>;
-    };
-  },
+async function ensureOrganizationBuilding(
+  organizationId: string,
   buildingId: string,
 ) {
-  const building = await tenantDb.building.findUnique({
-    where: { id: buildingId },
+  const building = await prisma.building.findFirst({
+    where: {
+      id: buildingId,
+      organizationId,
+    },
+    select: { id: true },
   });
 
   if (!building) {
@@ -89,57 +87,16 @@ async function ensureTenantBuilding(
 }
 
 export const benchmarkingRouter = router({
-  syncPortfolioManager: tenantProcedure
-    .input(
-      z.object({
-        buildingId: z.string(),
-        reportingYear: z.number().int().min(2000).max(2100).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
-      const espmClient = ctx.espmFactory ? ctx.espmFactory() : createESPMClient();
-
-      return syncPortfolioManagerForBuilding({
-        organizationId: ctx.organizationId,
-        buildingId: input.buildingId,
-        reportingYear: input.reportingYear,
-        espmClient,
-        producedByType: "USER",
-        producedById: ctx.clerkUserId ?? null,
-        requestId: ctx.requestId ?? null,
-      });
-    }),
-
-  pushLocalEnergyToPortfolioManager: tenantProcedure
-    .input(
-      z.object({
-        buildingId: z.string(),
-        reportingYear: z.number().int().min(2000).max(2100).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
-      const espmClient = ctx.espmFactory ? ctx.espmFactory() : createESPMClient();
-
-      return pushLocalEnergyToPortfolioManager({
-        organizationId: ctx.organizationId,
-        buildingId: input.buildingId,
-        reportingYear: input.reportingYear,
-        espmClient,
-        producedByType: "USER",
-        producedById: ctx.clerkUserId ?? null,
-      });
-    }),
-
-  getPortfolioManagerSyncStatus: tenantProcedure
+  // Legacy benchmark-compatibility read models. Do not use these queries for the
+  // current Portfolio Manager connection, setup, import, or push workflow.
+  getLegacyPortfolioManagerBenchmarkStatus: tenantProcedure
     .input(
       z.object({
         buildingId: z.string(),
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
 
       const syncState = await getPortfolioManagerSyncState({
         organizationId: ctx.organizationId,
@@ -156,7 +113,7 @@ export const benchmarkingRouter = router({
       return syncState;
     }),
 
-  listPortfolioReadiness: tenantProcedure
+  listLegacyPortfolioBenchmarkReadiness: tenantProcedure
     .input(
       z.object({
         reportingYear: z.number().int().min(2000).max(2100).optional(),
@@ -171,14 +128,14 @@ export const benchmarkingRouter = router({
       }),
     ),
 
-  getQaFindings: tenantProcedure
+  getLegacyPortfolioManagerQaFindings: tenantProcedure
     .input(
       z.object({
         buildingId: z.string(),
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
 
       const syncState = await getPortfolioManagerSyncState({
         organizationId: ctx.organizationId,
@@ -195,7 +152,7 @@ export const benchmarkingRouter = router({
       return syncState.qaPayload;
     }),
 
-  evaluateReadiness: tenantProcedure
+  evaluateReadiness: operatorProcedure
     .input(
       z.object({
         buildingId: z.string(),
@@ -205,7 +162,7 @@ export const benchmarkingRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
 
       return evaluateAndUpsertBenchmarkSubmission({
         organizationId: ctx.organizationId,
@@ -215,7 +172,7 @@ export const benchmarkingRouter = router({
           gfaCorrectionRequired: input.gfaCorrectionRequired ?? false,
         },
         producedByType: "USER",
-        producedById: ctx.clerkUserId ?? null,
+        producedById: ctx.authUserId ?? null,
         requestId: ctx.requestId ?? null,
         evidenceArtifacts: input.evidenceArtifacts,
       });
@@ -229,15 +186,17 @@ export const benchmarkingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
 
-      const submission = await ctx.tenantDb.benchmarkSubmission.findUnique({
+      const submission = await prisma.benchmarkSubmission.findUnique({
         where: {
           buildingId_reportingYear: {
             buildingId: input.buildingId,
             reportingYear: input.reportingYear,
           },
         },
+        // Guard by org explicitly because the compound unique does not include org.
+        // The building access check above ensures the building belongs to this org.
         include: {
           ruleVersion: {
             include: {
@@ -275,11 +234,13 @@ export const benchmarkingRouter = router({
     )
     .query(async ({ ctx, input }) => {
       if (input.buildingId) {
-        await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+        await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       }
 
-      return ctx.tenantDb.benchmarkSubmission.findMany({
-        where: input.buildingId ? { buildingId: input.buildingId } : undefined,
+      return prisma.benchmarkSubmission.findMany({
+        where: input.buildingId
+          ? { organizationId: ctx.organizationId, buildingId: input.buildingId }
+          : { organizationId: ctx.organizationId },
         orderBy: [{ reportingYear: "desc" }, { createdAt: "desc" }],
         take: input.limit,
         include: {
@@ -294,7 +255,7 @@ export const benchmarkingRouter = router({
       });
     }),
 
-  upsertSubmission: tenantProcedure
+  upsertSubmission: operatorProcedure
     .input(
       z.object({
         buildingId: z.string(),
@@ -307,9 +268,9 @@ export const benchmarkingRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
 
-      const existing = await ctx.tenantDb.benchmarkSubmission.findUnique({
+      const existing = await prisma.benchmarkSubmission.findUnique({
         where: {
           buildingId_reportingYear: {
             buildingId: input.buildingId,
@@ -352,7 +313,7 @@ export const benchmarkingRouter = router({
         explicitStatus: input.status ?? null,
         submittedAt: input.submittedAt ? new Date(input.submittedAt) : null,
         producedByType: "USER",
-        producedById: ctx.clerkUserId ?? null,
+        producedById: ctx.authUserId ?? null,
         requestId: ctx.requestId ?? null,
         additionalSubmissionPayload: {
           ...existingPayload,
@@ -370,7 +331,7 @@ export const benchmarkingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return listBenchmarkRequestItems({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
@@ -386,7 +347,7 @@ export const benchmarkingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return listVerificationResults({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
@@ -394,7 +355,7 @@ export const benchmarkingRouter = router({
       });
     }),
 
-  upsertRequestItem: tenantProcedure
+  upsertRequestItem: operatorProcedure
     .input(
       z.object({
         requestItemId: z.string().optional(),
@@ -413,7 +374,7 @@ export const benchmarkingRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return upsertBenchmarkRequestItem({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
@@ -435,11 +396,11 @@ export const benchmarkingRouter = router({
         sourceArtifactId: input.sourceArtifactId,
         evidenceArtifactId: input.evidenceArtifactId,
         createdByType: "USER",
-        createdById: ctx.clerkUserId ?? null,
+        createdById: ctx.authUserId ?? null,
       });
     }),
 
-  generateBenchmarkPacket: tenantProcedure
+  generateBenchmarkPacket: operatorProcedure
     .input(
       z.object({
         buildingId: z.string(),
@@ -447,13 +408,14 @@ export const benchmarkingRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return generateBenchmarkPacket({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         reportingYear: input.reportingYear,
         createdByType: "USER",
-        createdById: ctx.clerkUserId ?? null,
+        createdById: ctx.authUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 
@@ -465,7 +427,7 @@ export const benchmarkingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return getLatestBenchmarkPacket({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
@@ -481,7 +443,7 @@ export const benchmarkingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return listBenchmarkPackets({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
@@ -497,7 +459,7 @@ export const benchmarkingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return getBenchmarkPacketManifest({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
@@ -505,7 +467,7 @@ export const benchmarkingRouter = router({
       });
     }),
 
-  finalizeBenchmarkPacket: tenantProcedure
+  finalizeBenchmarkPacket: operatorProcedure
     .input(
       z.object({
         buildingId: z.string(),
@@ -513,17 +475,18 @@ export const benchmarkingRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return finalizeBenchmarkPacket({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         reportingYear: input.reportingYear,
         createdByType: "USER",
-        createdById: ctx.clerkUserId ?? null,
+        createdById: ctx.authUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 
-  exportBenchmarkPacket: tenantProcedure
+  exportBenchmarkPacket: operatorProcedure
     .input(
       z.object({
         buildingId: z.string(),
@@ -532,12 +495,16 @@ export const benchmarkingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureTenantBuilding(ctx.tenantDb, input.buildingId);
+      await ensureOrganizationBuilding(ctx.organizationId, input.buildingId);
       return exportBenchmarkPacket({
         organizationId: ctx.organizationId,
         buildingId: input.buildingId,
         reportingYear: input.reportingYear,
         format: input.format,
+        createdByType: "USER",
+        createdById: ctx.authUserId ?? null,
+        requestId: ctx.requestId ?? null,
       });
     }),
 });
+

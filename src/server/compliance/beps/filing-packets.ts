@@ -4,6 +4,7 @@ import type {
   BepsRequestItemStatus,
   Prisma,
 } from "@/generated/prisma/client";
+import { createAuditLog } from "@/server/lib/audit-log";
 import { prisma } from "@/server/lib/db";
 import {
   hashDeterministicJson,
@@ -916,7 +917,7 @@ export async function markBepsFilingPacketsStaleTx(
     where: {
       filingRecordId: params.filingRecordId,
       status: {
-        in: ["GENERATED", "FINALIZED"],
+        in: ["GENERATED"],
       },
     },
     data: {
@@ -1192,6 +1193,7 @@ export async function generateBepsFilingPacket(input: {
   packetType?: BepsPacketType;
   createdByType: ActorType;
   createdById?: string | null;
+  requestId?: string | null;
 }) {
   const packetType = normalizeBepsPacketType(input.packetType);
   const filingRecord = await loadBepsFilingAssemblyContext(input);
@@ -1240,7 +1242,7 @@ export async function generateBepsFilingPacket(input: {
     });
   }
 
-  return prisma.$transaction(async (tx) => {
+  const packet = await prisma.$transaction(async (tx) => {
     await markBepsFilingPacketsStaleTx(tx, {
       filingRecordId: input.filingRecordId,
     });
@@ -1300,6 +1302,28 @@ export async function generateBepsFilingPacket(input: {
       },
     });
   });
+
+  await createAuditLog({
+    actorType: input.createdByType,
+    actorId: input.createdById ?? null,
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    action: "COMPLIANCE_ARTIFACT_GENERATED",
+    inputSnapshot: {
+      artifactType: "BEPS_FILING_PACKET",
+      filingRecordId: input.filingRecordId,
+      packetType,
+    },
+    outputSnapshot: {
+      packetId: packet.id,
+      version: packet.version,
+      status: packet.status,
+      packetHash: packet.packetHash,
+    },
+    requestId: input.requestId ?? null,
+  });
+
+  return packet;
 }
 
 export async function finalizeBepsFilingPacket(input: {
@@ -1309,9 +1333,10 @@ export async function finalizeBepsFilingPacket(input: {
   packetType?: BepsPacketType;
   createdByType: ActorType;
   createdById?: string | null;
+  requestId?: string | null;
 }) {
   const packetType = normalizeBepsPacketType(input.packetType);
-  return prisma.$transaction(async (tx) => {
+  const finalized = await prisma.$transaction(async (tx) => {
     const packet = await tx.filingPacket.findFirst({
       where: {
         organizationId: input.organizationId,
@@ -1404,6 +1429,30 @@ export async function finalizeBepsFilingPacket(input: {
       },
     });
   });
+
+  await createAuditLog({
+    actorType: input.createdByType,
+    actorId: input.createdById ?? null,
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    action: "COMPLIANCE_ARTIFACT_FINALIZED",
+    inputSnapshot: {
+      artifactType: "BEPS_FILING_PACKET",
+      filingRecordId: input.filingRecordId,
+      packetType,
+      packetId: finalized.id,
+      version: finalized.version,
+    },
+    outputSnapshot: {
+      packetId: finalized.id,
+      version: finalized.version,
+      status: finalized.status,
+      finalizedAt: finalized.finalizedAt?.toISOString() ?? null,
+    },
+    requestId: input.requestId ?? null,
+  });
+
+  return finalized;
 }
 
 export async function getLatestBepsFilingPacket(params: {
@@ -1435,7 +1484,11 @@ export async function getLatestBepsFilingPacket(params: {
     },
   });
 
-  if (!latestPacket || latestPacket.status === "STALE") {
+  if (
+    !latestPacket ||
+    latestPacket.status === "STALE" ||
+    latestPacket.status === "FINALIZED"
+  ) {
     return latestPacket;
   }
 
@@ -1893,6 +1946,9 @@ export async function exportBepsFilingPacket(input: {
   filingRecordId: string;
   packetType?: BepsPacketType;
   format: BepsFilingPacketExportFormat;
+  createdByType?: ActorType;
+  createdById?: string | null;
+  requestId?: string | null;
 }) {
   const logger = createLogger({
     organizationId: input.organizationId,
@@ -1923,7 +1979,7 @@ export async function exportBepsFilingPacket(input: {
 
   if (input.format === "MARKDOWN") {
     const content = renderPacketMarkdown(packetExport);
-    return {
+    const result = {
       packetId: packet.id,
       version: packet.version,
       status: packet.status,
@@ -1934,6 +1990,30 @@ export async function exportBepsFilingPacket(input: {
       encoding: "utf-8" as const,
       content,
     };
+
+    await createAuditLog({
+      actorType: input.createdByType ?? "SYSTEM",
+      actorId: input.createdById ?? null,
+      organizationId: input.organizationId,
+      buildingId: input.buildingId,
+      action: "COMPLIANCE_ARTIFACT_EXPORTED",
+      inputSnapshot: {
+        artifactType: "BEPS_FILING_PACKET",
+        filingRecordId: input.filingRecordId,
+        packetId: packet.id,
+        packetType: packet.packetType,
+        version: packet.version,
+        format: input.format,
+      },
+      outputSnapshot: {
+        fileName: result.fileName,
+        contentType: result.contentType,
+        packetHash: packet.packetHash,
+      },
+      requestId: input.requestId ?? null,
+    });
+
+    return result;
   }
 
   if (input.format === "PDF") {
@@ -1941,7 +2021,7 @@ export async function exportBepsFilingPacket(input: {
       const content = await renderPacketDocumentPdfBase64(
         buildBepsPacketRenderDocument(packetExport),
       );
-      return {
+      const result = {
         packetId: packet.id,
         version: packet.version,
         status: packet.status,
@@ -1952,6 +2032,30 @@ export async function exportBepsFilingPacket(input: {
         encoding: "base64" as const,
         content,
       };
+
+      await createAuditLog({
+        actorType: input.createdByType ?? "SYSTEM",
+        actorId: input.createdById ?? null,
+        organizationId: input.organizationId,
+        buildingId: input.buildingId,
+        action: "COMPLIANCE_ARTIFACT_EXPORTED",
+        inputSnapshot: {
+          artifactType: "BEPS_FILING_PACKET",
+          filingRecordId: input.filingRecordId,
+          packetId: packet.id,
+          packetType: packet.packetType,
+          version: packet.version,
+          format: input.format,
+        },
+        outputSnapshot: {
+          fileName: result.fileName,
+          contentType: result.contentType,
+          packetHash: packet.packetHash,
+        },
+        requestId: input.requestId ?? null,
+      });
+
+      return result;
     } catch (error) {
       logger.error("BEPS packet PDF export failed", {
         error,
@@ -1973,7 +2077,7 @@ export async function exportBepsFilingPacket(input: {
   }
 
   const content = stringifyDeterministicJson(packetExport);
-  return {
+  const result = {
     packetId: packet.id,
     version: packet.version,
     status: packet.status,
@@ -1984,6 +2088,30 @@ export async function exportBepsFilingPacket(input: {
     encoding: "utf-8" as const,
     content,
   };
+
+  await createAuditLog({
+    actorType: input.createdByType ?? "SYSTEM",
+    actorId: input.createdById ?? null,
+    organizationId: input.organizationId,
+    buildingId: input.buildingId,
+    action: "COMPLIANCE_ARTIFACT_EXPORTED",
+    inputSnapshot: {
+      artifactType: "BEPS_FILING_PACKET",
+      filingRecordId: input.filingRecordId,
+      packetId: packet.id,
+      packetType: packet.packetType,
+      version: packet.version,
+      format: input.format,
+    },
+    outputSnapshot: {
+      fileName: result.fileName,
+      contentType: result.contentType,
+      packetHash: packet.packetHash,
+    },
+    requestId: input.requestId ?? null,
+  });
+
+  return result;
 }
 
 export async function listBepsFilingPackets(params: {

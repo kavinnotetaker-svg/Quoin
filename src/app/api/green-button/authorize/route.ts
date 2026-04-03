@@ -10,6 +10,24 @@ import {
   requireTenantContextFromSession,
 } from "@/server/lib/tenant-access";
 import { getOptionalGreenButtonConfig } from "@/server/lib/config";
+import {
+  applyRateLimit,
+  createRateLimitExceededResponse,
+  getRateLimitClientKey,
+  withRateLimitHeaders,
+} from "@/server/lib/rate-limit";
+
+const GREEN_BUTTON_STATE_COOKIE = "quoin_green_button_oauth_state";
+
+function getStateCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 10 * 60,
+  };
+}
 
 /**
  * GET /api/green-button/authorize?buildingId=xxx
@@ -21,12 +39,27 @@ export async function GET(req: NextRequest) {
     requestId,
     procedure: "greenButton.authorize",
   });
+  const rateLimit = await applyRateLimit({
+    scope: "green-button-authorize",
+    key: getRateLimitClientKey(req),
+    limit: 10,
+    windowSeconds: 60,
+  });
+  if (!rateLimit.allowed) {
+    return createRateLimitExceededResponse({
+      message: "Too many Green Button authorization attempts. Please wait and try again.",
+      result: rateLimit,
+    });
+  }
   let tenant;
   try {
     tenant = await requireTenantContextFromSession();
   } catch (error) {
     if (error instanceof TenantAccessError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return withRateLimitHeaders(
+        NextResponse.json({ error: error.message }, { status: error.status }),
+        rateLimit,
+      );
     }
 
     throw error;
@@ -35,9 +68,12 @@ export async function GET(req: NextRequest) {
   const buildingId = req.nextUrl.searchParams.get("buildingId");
   if (!buildingId) {
     logger.warn("Green Button authorization requested without buildingId");
-    return NextResponse.json(
-      { error: "buildingId is required", requestId },
-      { status: 400 },
+    return withRateLimitHeaders(
+      NextResponse.json(
+        { error: "buildingId is required", requestId },
+        { status: 400 },
+      ),
+      rateLimit,
     );
   }
 
@@ -46,9 +82,12 @@ export async function GET(req: NextRequest) {
     logger.warn("Green Button authorization attempted without configuration", {
       buildingId,
     });
-    return NextResponse.json(
-      { error: "Green Button is not configured", requestId },
-      { status: 503 },
+    return withRateLimitHeaders(
+      NextResponse.json(
+        { error: "Green Button is not configured", requestId },
+        { status: 503 },
+      ),
+      rateLimit,
     );
   }
 
@@ -59,9 +98,12 @@ export async function GET(req: NextRequest) {
     logger.warn("Green Button authorization requested for missing building", {
       buildingId,
     });
-    return NextResponse.json(
-      { error: "Building not found", requestId },
-      { status: 404 },
+    return withRateLimitHeaders(
+      NextResponse.json(
+        { error: "Building not found", requestId },
+        { status: 404 },
+      ),
+      rateLimit,
     );
   }
 
@@ -80,5 +122,7 @@ export async function GET(req: NextRequest) {
     buildingId,
   });
 
-  return NextResponse.redirect(authUrl);
+  const response = NextResponse.redirect(authUrl);
+  response.cookies.set(GREEN_BUTTON_STATE_COOKIE, state, getStateCookieOptions());
+  return withRateLimitHeaders(response, rateLimit);
 }
